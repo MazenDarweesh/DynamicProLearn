@@ -1,6 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { AdminService, AdminModuleDto } from '../../../core/services/admin.service';
 
 @Component({
   selector: 'app-content-builder',
@@ -14,7 +15,7 @@ import { Router } from '@angular/router';
           <h2>Curriculum Content Builder</h2>
           <div class="actions-header">
             <button class="btn-secondary" (click)="notImplemented('View Drafts')">Drafts</button>
-            <button class="btn-primary" (click)="notImplemented('New Module')">+ New Module</button>
+            <button class="btn-primary" (click)="createNewModule()">+ New Module</button>
           </div>
         </div>
       </header>
@@ -22,21 +23,20 @@ import { Router } from '@angular/router';
       <div class="content grid">
         <div class="sidebar card">
           <h4>Modules</h4>
-          <ul class="module-list">
-            <li class="active">
-              <span class="dot"></span> Intro to DynamicPro
+          <div *ngIf="isLoading" class="text-secondary mt-2">Loading...</div>
+          <ul class="module-list" *ngIf="!isLoading">
+            <li *ngFor="let mod of modules" [class.active]="selectedModule?.id === mod.id" (click)="selectModule(mod)">
+              <span class="dot" *ngIf="selectedModule?.id === mod.id"></span> {{ mod.name }}
             </li>
-            <li (click)="notImplemented('View Financial Accounting')">Financial Accounting</li>
-            <li (click)="notImplemented('View HR Management')">HR Management</li>
           </ul>
         </div>
 
-        <div class="main-builder card">
+        <div class="main-builder card" *ngIf="selectedModule">
           <div class="builder-header">
-            <h3>Intro to DynamicPro</h3>
-            <span class="badge badge-success">Published</span>
+            <h3>{{ selectedModule.name }}</h3>
+            <span class="badge" [class.badge-success]="selectedModule.isPublished">{{ selectedModule.isPublished ? 'Published' : 'Draft' }}</span>
           </div>
-          <p class="text-secondary mt-1">Learn the fundamentals of our enterprise system.</p>
+          <p class="text-secondary mt-1">{{ selectedModule.description }}</p>
 
           <div class="units-container mt-4">
             <div class="unit-box">
@@ -96,8 +96,46 @@ import { Router } from '@angular/router';
     .badge-success { background: #E6F4EA; color: #137333; }
   `]
 })
-export class ContentBuilderComponent {
+export class ContentBuilderComponent implements OnInit {
   private router = inject(Router);
+  private adminService = inject(AdminService);
+  
+  modules: AdminModuleDto[] = [];
+  selectedModule: AdminModuleDto | null = null;
+  isLoading = true;
+
+  ngOnInit() {
+    this.loadModules();
+  }
+
+  loadModules() {
+    this.adminService.getModules().subscribe({
+      next: (data) => {
+        this.modules = data;
+        if (data.length > 0) this.selectedModule = data[0];
+        this.isLoading = false;
+      },
+      error: () => this.isLoading = false
+    });
+  }
+
+  selectModule(mod: AdminModuleDto) {
+    this.selectedModule = mod;
+  }
+
+  createNewModule() {
+    const name = prompt('Enter Module Name:');
+    if (!name) return;
+    const desc = prompt('Enter Module Description:');
+    
+    this.adminService.createModule(name, desc || '').subscribe({
+      next: () => {
+        alert('Module Created Successfully!');
+        this.loadModules(); // reload
+      },
+      error: (err) => alert('Failed to create module: ' + (err.error?.detail || err.message))
+    });
+  }
   
   goBack() {
     this.router.navigate(['/admin']);

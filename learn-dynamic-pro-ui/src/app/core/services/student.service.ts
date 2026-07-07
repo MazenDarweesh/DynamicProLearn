@@ -8,6 +8,12 @@ export interface ModuleDto {
   description: string;
 }
 
+export interface UnitDto {
+  id: string;
+  title: string;
+  orderIndex: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -17,5 +23,9 @@ export class StudentService {
 
   getAssignedModules(): Observable<ModuleDto[]> {
     return this.http.get<ModuleDto[]>(`${this.apiUrl}/modules`);
+  }
+
+  getModuleUnits(moduleId: string): Observable<UnitDto[]> {
+    return this.http.get<UnitDto[]>(`${this.apiUrl}/modules/${moduleId}/units`);
   }
 }

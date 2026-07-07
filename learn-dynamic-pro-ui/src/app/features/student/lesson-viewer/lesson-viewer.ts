@@ -1,6 +1,7 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
+import { StudentService, UnitDto } from '../../../core/services/student.service';
 
 @Component({
   selector: 'app-lesson-viewer',
@@ -10,16 +11,18 @@ import { Router } from '@angular/router';
     <div class="viewer-container">
       <header class="viewer-header">
         <button class="btn-back" (click)="goBack()">← Back to Dashboard</button>
-        <h3>Module: Introduction to ERP</h3>
+        <h3>Module Lessons</h3>
       </header>
       
       <div class="viewer-content">
         <!-- Sidebar -->
         <div class="viewer-sidebar card">
-          <div class="unit">
-            <h4>Unit 1: Basics</h4>
-            <div class="lesson active">Lesson 1.1: What is ERP?</div>
-            <div class="lesson">Lesson 1.2: System Modules</div>
+          <div *ngIf="isLoading" class="text-secondary">Loading units...</div>
+          <div *ngIf="!isLoading && units.length === 0" class="text-secondary">No units found.</div>
+          
+          <div class="unit" *ngFor="let unit of units">
+            <h4>{{ unit.title }}</h4>
+            <div class="lesson active">Lesson 1: Introduction</div>
           </div>
         </div>
         
@@ -31,8 +34,8 @@ import { Router } from '@angular/router';
           
           <div class="lesson-details card mt-3">
             <div class="badge">Video Lecture</div>
-            <h2>Lesson 1.1: What is ERP?</h2>
-            <p class="text-secondary">Learn the fundamental concepts of Enterprise Resource Planning and how it unifies business processes.</p>
+            <h2>Lesson 1: Introduction</h2>
+            <p class="text-secondary">Learn the fundamental concepts of this unit.</p>
             
             <button class="btn-primary mt-3" (click)="notImplemented('Mark as Completed')">Mark as Completed</button>
           </div>
@@ -63,9 +66,27 @@ import { Router } from '@angular/router';
     .mt-3 { margin-top: 20px; }
   `]
 })
-export class LessonViewer {
+export class LessonViewer implements OnInit {
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+  private studentService = inject(StudentService);
   
+  units: UnitDto[] = [];
+  isLoading = true;
+
+  ngOnInit() {
+    const moduleId = this.route.snapshot.paramMap.get('id');
+    if (moduleId) {
+      this.studentService.getModuleUnits(moduleId).subscribe({
+        next: (data) => {
+          this.units = data;
+          this.isLoading = false;
+        },
+        error: () => this.isLoading = false
+      });
+    }
+  }
+
   goBack() {
     this.router.navigate(['/student']);
   }

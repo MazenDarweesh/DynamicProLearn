@@ -10,12 +10,10 @@ export interface AdminModuleDto {
   totalUnits: number;
 }
 
-export interface UserDto {
+export interface CompanyDto {
   id: string;
-  username: string;
-  role: string;
-  companyName: string;
-  departmentName: string;
+  name: string;
+  industry: string;
 }
 
 @Injectable({
@@ -29,8 +27,11 @@ export class AdminService {
     return this.http.get<AdminModuleDto[]>(`${this.apiUrl}/modules`);
   }
 
-  // A mock endpoint call - assuming this exists or we can mock the UI
-  getUsers(): Observable<UserDto[]> {
-    return this.http.get<UserDto[]>(`${this.apiUrl}/users`); // if it exists
+  createModule(name: string, description: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/modules`, { name, description });
+  }
+
+  getCompanies(): Observable<CompanyDto[]> {
+    return this.http.get<CompanyDto[]>(`${this.apiUrl}/companies`);
   }
 }
