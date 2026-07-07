@@ -1,0 +1,6 @@
+@LearnDynamicPro.API_HostAddress = http://localhost:5115
+
+GET {{LearnDynamicPro.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

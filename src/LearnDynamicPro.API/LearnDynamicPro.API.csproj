@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <ItemGroup>
+    <ProjectReference Include="..\LearnDynamicPro.Domain\LearnDynamicPro.Domain.csproj" />
+    <ProjectReference Include="..\LearnDynamicPro.Application\LearnDynamicPro.Application.csproj" />
+    <ProjectReference Include="..\LearnDynamicPro.Infrastructure\LearnDynamicPro.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.9" />
+    <PackageReference Include="Scalar.AspNetCore" Version="2.16.10" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+</Project>
