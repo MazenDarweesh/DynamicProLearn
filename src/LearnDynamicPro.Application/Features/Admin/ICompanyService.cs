@@ -1,10 +1,10 @@
 using LearnDynamicPro.Application.Dtos.Companies;
 
-namespace LearnDynamicPro.Application.Features.Tenants;
+namespace LearnDynamicPro.Application.Features.Admin;
 
-public interface ITenantService
+public interface ICompanyService
 {
-    // Company CRUD (for Admin)
+    // Company CRUD
     Task<CompanyDto> CreateCompanyAsync(CreateCompanyRequest request);
     Task<List<CompanyDto>> GetAllCompaniesAsync();
 

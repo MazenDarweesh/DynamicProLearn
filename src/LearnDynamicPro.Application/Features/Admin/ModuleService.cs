@@ -1,17 +1,15 @@
 using LearnDynamicPro.Application.Dtos.Modules;
 using LearnDynamicPro.Application.Interfaces;
 
-namespace LearnDynamicPro.Application.Features.Modules;
+namespace LearnDynamicPro.Application.Features.Admin;
 
 public class ModuleService : IModuleService
 {
     private readonly IApplicationDbContext _context;
-    private readonly ICurrentUserService _currentUserService;
 
-    public ModuleService(IApplicationDbContext context, ICurrentUserService currentUserService)
+    public ModuleService(IApplicationDbContext context)
     {
         _context = context;
-        _currentUserService = currentUserService;
     }
 
     public Task<ModuleDto> CreateModuleAsync(CreateModuleRequest request) => throw new NotImplementedException();

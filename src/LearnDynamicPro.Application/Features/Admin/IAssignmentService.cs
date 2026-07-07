@@ -1,7 +1,6 @@
 using LearnDynamicPro.Application.Dtos.Assignments;
-using LearnDynamicPro.Application.Dtos.Modules;
 
-namespace LearnDynamicPro.Application.Features.Assignments;
+namespace LearnDynamicPro.Application.Features.Admin;
 
 public interface IAssignmentService
 {
@@ -9,7 +8,4 @@ public interface IAssignmentService
     Task<DepartmentModuleDto> AssignModuleToDepartmentAsync(AssignModuleRequest request);
     Task RemoveAssignmentAsync(Guid assignmentId);
     Task<List<DepartmentModuleDto>> GetAssignmentsByDepartmentAsync(Guid departmentId);
-    
-    // Core filter: Get accessible modules for the logged-in student (applies intersection logic)
-    Task<List<ModuleDto>> GetAssignedModulesForCurrentStudentAsync();
 }

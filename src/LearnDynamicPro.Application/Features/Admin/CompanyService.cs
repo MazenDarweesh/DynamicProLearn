@@ -1,14 +1,14 @@
 using LearnDynamicPro.Application.Dtos.Companies;
 using LearnDynamicPro.Application.Interfaces;
 
-namespace LearnDynamicPro.Application.Features.Tenants;
+namespace LearnDynamicPro.Application.Features.Admin;
 
-public class TenantService : ITenantService
+public class CompanyService : ICompanyService
 {
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
 
-    public TenantService(IApplicationDbContext context, IPasswordHasher passwordHasher)
+    public CompanyService(IApplicationDbContext context, IPasswordHasher passwordHasher)
     {
         _context = context;
         _passwordHasher = passwordHasher;

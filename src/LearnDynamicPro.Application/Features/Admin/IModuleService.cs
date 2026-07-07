@@ -1,6 +1,6 @@
 using LearnDynamicPro.Application.Dtos.Modules;
 
-namespace LearnDynamicPro.Application.Features.Modules;
+namespace LearnDynamicPro.Application.Features.Admin;
 
 public interface IModuleService
 {
