@@ -19,7 +19,7 @@ import { Router } from '@angular/router';
           <button class="btn-secondary" (click)="goTo('admin/users')">Users</button>
           <button class="btn-secondary" (click)="goTo('admin/content')">Content</button>
           <button class="btn-secondary" (click)="goTo('admin/assignments')">Assignments</button>
-          <button class="btn-primary" style="background: var(--color-danger); color: white;" (click)="logout()">Logout</button>
+          <button class="btn-danger" (click)="logout()">Logout</button>
         </div>
       </header>
       

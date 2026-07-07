@@ -13,8 +13,8 @@ import { Router } from '@angular/router';
         <div class="d-flex justify-between w-100 mt-2">
           <h2>Curriculum Content Builder</h2>
           <div class="actions-header">
-            <button class="btn-secondary">Drafts</button>
-            <button class="btn-primary">+ New Module</button>
+            <button class="btn-secondary" (click)="notImplemented('View Drafts')">Drafts</button>
+            <button class="btn-primary" (click)="notImplemented('New Module')">+ New Module</button>
           </div>
         </div>
       </header>
@@ -26,8 +26,8 @@ import { Router } from '@angular/router';
             <li class="active">
               <span class="dot"></span> Intro to DynamicPro
             </li>
-            <li>Financial Accounting</li>
-            <li>HR Management</li>
+            <li (click)="notImplemented('View Financial Accounting')">Financial Accounting</li>
+            <li (click)="notImplemented('View HR Management')">HR Management</li>
           </ul>
         </div>
 
@@ -42,7 +42,7 @@ import { Router } from '@angular/router';
             <div class="unit-box">
               <div class="d-flex justify-between">
                 <h4>Unit 1: System Basics</h4>
-                <button class="btn-icon">Add Lesson</button>
+                <button class="btn-icon" (click)="notImplemented('Add Lesson')">Add Lesson</button>
               </div>
               <div class="lesson-item">
                 <span class="icon">🎥</span> Lesson 1.1: What is ERP?
@@ -52,7 +52,7 @@ import { Router } from '@angular/router';
               </div>
             </div>
             
-            <button class="btn-dashed mt-3">+ Add Unit</button>
+            <button class="btn-dashed mt-3" (click)="notImplemented('Add Unit')">+ Add Unit</button>
           </div>
         </div>
       </div>
@@ -61,8 +61,6 @@ import { Router } from '@angular/router';
   styles: [`
     .dashboard-container { padding: 40px; max-width: 1300px; margin: 0 auto; }
     .header { margin-bottom: 30px; }
-    .btn-back { background: none; border: none; font-family: inherit; font-size: 14px; color: var(--color-text-secondary); cursor: pointer; padding: 0; }
-    .btn-back:hover { color: var(--color-primary); }
     .d-flex { display: flex; align-items: center; }
     .justify-between { justify-content: space-between; }
     .w-100 { width: 100%; }
@@ -72,7 +70,6 @@ import { Router } from '@angular/router';
     .mt-4 { margin-top: 25px; }
     
     .actions-header { display: flex; gap: 10px; }
-    .btn-secondary { background: var(--color-bg-page); border: 1px solid var(--color-border); padding: 10px 20px; border-radius: var(--radius-btn); cursor: pointer; font-family: inherit; font-weight: 500; }
     
     .grid { display: grid; grid-template-columns: 280px 1fr; gap: 30px; align-items: start; }
     
@@ -92,7 +89,6 @@ import { Router } from '@angular/router';
     
     .lesson-item { background: white; padding: 12px 15px; border-radius: 6px; border: 1px solid var(--color-border); margin-bottom: 10px; font-size: 14px; display: flex; align-items: center; gap: 10px; }
     
-    .btn-icon { background: none; border: none; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--color-primary); }
     .btn-dashed { width: 100%; padding: 15px; background: none; border: 2px dashed var(--color-border); border-radius: 8px; color: var(--color-text-secondary); font-family: inherit; font-weight: 500; cursor: pointer; }
     .btn-dashed:hover { border-color: var(--color-primary); color: var(--color-primary); }
     
@@ -105,5 +101,9 @@ export class ContentBuilderComponent {
   
   goBack() {
     this.router.navigate(['/admin']);
+  }
+
+  notImplemented(feature: string) {
+    alert(`[UI Demo] The '${feature}' feature will be connected to the backend soon!`);
   }
 }

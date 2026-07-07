@@ -12,7 +12,7 @@ import { Router } from '@angular/router';
         <button class="btn-back" (click)="goBack()">← Back to Dashboard</button>
         <div class="d-flex justify-between w-100 mt-2">
           <h2>Department Assignments</h2>
-          <button class="btn-primary">Assign New Module</button>
+          <button class="btn-primary" (click)="notImplemented('Assign New Module')">Assign New Module</button>
         </div>
       </header>
 
@@ -27,7 +27,7 @@ import { Router } from '@angular/router';
             <p><strong>Required Type:</strong> Mandatory</p>
           </div>
           <div class="actions mt-3">
-            <button class="btn-secondary w-100">Edit Rule</button>
+            <button class="btn-secondary w-100" (click)="notImplemented('Edit Rule')">Edit Rule</button>
           </div>
         </div>
 
@@ -41,7 +41,7 @@ import { Router } from '@angular/router';
             <p><strong>Required Type:</strong> Elective</p>
           </div>
           <div class="actions mt-3">
-            <button class="btn-secondary w-100">Edit Rule</button>
+            <button class="btn-secondary w-100" (click)="notImplemented('Edit Rule')">Edit Rule</button>
           </div>
         </div>
       </div>
@@ -50,8 +50,6 @@ import { Router } from '@angular/router';
   styles: [`
     .dashboard-container { padding: 40px; max-width: 1200px; margin: 0 auto; }
     .header { margin-bottom: 30px; }
-    .btn-back { background: none; border: none; font-family: inherit; font-size: 14px; color: var(--color-text-secondary); cursor: pointer; padding: 0; }
-    .btn-back:hover { color: var(--color-primary); }
     .d-flex { display: flex; align-items: center; }
     .justify-between { justify-content: space-between; }
     .w-100 { width: 100%; }
@@ -69,9 +67,6 @@ import { Router } from '@angular/router';
     
     .badge { padding: 4px 10px; border-radius: 6px; display: inline-block; font-size: 12px; font-weight: 600; }
     .badge-primary { background: var(--color-primary-light); color: var(--color-primary); }
-    
-    .btn-secondary { background: var(--color-bg-page); border: 1px solid var(--color-border); padding: 10px 20px; border-radius: var(--radius-btn); cursor: pointer; font-family: inherit; font-weight: 500; }
-    .btn-secondary:hover { background: #f0f0f0; }
   `]
 })
 export class AssignmentsManagerComponent {
@@ -79,5 +74,9 @@ export class AssignmentsManagerComponent {
   
   goBack() {
     this.router.navigate(['/admin']);
+  }
+
+  notImplemented(feature: string) {
+    alert(`[UI Demo] The '${feature}' feature will be connected to the backend soon!`);
   }
 }

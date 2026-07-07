@@ -34,7 +34,7 @@ import { Router } from '@angular/router';
             <h2>Lesson 1.1: What is ERP?</h2>
             <p class="text-secondary">Learn the fundamental concepts of Enterprise Resource Planning and how it unifies business processes.</p>
             
-            <button class="btn-primary mt-3">Mark as Completed</button>
+            <button class="btn-primary mt-3" (click)="notImplemented('Mark as Completed')">Mark as Completed</button>
           </div>
         </div>
       </div>
@@ -43,8 +43,6 @@ import { Router } from '@angular/router';
   styles: [`
     .viewer-container { padding: 20px; max-width: 1400px; margin: 0 auto; height: 100vh; display: flex; flex-direction: column; }
     .viewer-header { display: flex; align-items: center; gap: 20px; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--color-border); }
-    .btn-back { background: none; border: none; font-family: inherit; font-size: 16px; color: var(--color-text-secondary); cursor: pointer; }
-    .btn-back:hover { color: var(--color-primary); }
     
     .viewer-content { display: flex; gap: 30px; flex: 1; min-height: 0; }
     
@@ -70,5 +68,9 @@ export class LessonViewer {
   
   goBack() {
     this.router.navigate(['/student']);
+  }
+
+  notImplemented(feature: string) {
+    alert(`[UI Demo] The '${feature}' feature will be connected to the backend soon!`);
   }
 }

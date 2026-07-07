@@ -12,7 +12,7 @@ import { Router } from '@angular/router';
         <button class="btn-back" (click)="goBack()">← Back to Dashboard</button>
         <div class="d-flex justify-between w-100 mt-2">
           <h2>Users & Roles Management</h2>
-          <button class="btn-primary">+ Add New User</button>
+          <button class="btn-primary" (click)="notImplemented('Add New User')">+ Add New User</button>
         </div>
       </header>
 
@@ -44,7 +44,7 @@ import { Router } from '@angular/router';
               <td class="text-secondary">DynamicPro (HQ)</td>
               <td><span class="badge badge-success">Active</span></td>
               <td class="actions">
-                <button class="btn-icon">Edit</button>
+                <button class="btn-icon" (click)="notImplemented('Edit User')">Edit</button>
               </td>
             </tr>
             <tr>
@@ -53,7 +53,7 @@ import { Router } from '@angular/router';
               <td class="text-secondary">DynamicPro (Sales)</td>
               <td><span class="badge badge-success">Active</span></td>
               <td class="actions">
-                <button class="btn-icon">Edit</button>
+                <button class="btn-icon" (click)="notImplemented('Edit User')">Edit</button>
               </td>
             </tr>
           </tbody>
@@ -90,7 +90,6 @@ import { Router } from '@angular/router';
     .badge-success { background: #E6F4EA; color: #137333; }
     
     .actions { display: flex; gap: 10px; }
-    .btn-icon { background: none; border: none; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--color-primary); }
   `]
 })
 export class UsersManagerComponent {
@@ -98,5 +97,9 @@ export class UsersManagerComponent {
   
   goBack() {
     this.router.navigate(['/admin']);
+  }
+
+  notImplemented(feature: string) {
+    alert(`[UI Demo] The '${feature}' feature will be connected to the backend soon!`);
   }
 }
