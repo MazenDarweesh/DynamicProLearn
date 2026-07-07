@@ -40,7 +40,7 @@ import { Router } from '@angular/router';
               <span class="progress-text">0% Complete</span>
             </div>
             <div class="card-footer">
-              <button class="btn-primary w-100">Start Learning</button>
+              <button class="btn-primary w-100" (click)="openLesson(mod.id)">Start Learning</button>
             </div>
           </div>
         </div>
@@ -90,9 +90,18 @@ export class DashboardComponent implements OnInit {
       },
       error: (err) => {
         console.error('Failed to load modules', err);
+        // Mock data fallback just for demo
+        this.modules = [
+          { id: 'm1', name: 'Intro to DynamicPro ERP', description: 'Learn the fundamentals of our enterprise system.' },
+          { id: 'm2', name: 'Financial Accounting', description: 'Master the GL, AP, and AR modules.' }
+        ];
         this.isLoading = false;
       }
     });
+  }
+
+  openLesson(moduleId: string) {
+    this.router.navigate(['/student/lesson', moduleId]);
   }
 
   logout() {

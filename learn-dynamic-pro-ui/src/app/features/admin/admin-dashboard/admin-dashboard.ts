@@ -15,7 +15,12 @@ import { Router } from '@angular/router';
           <h2>Enterprise Administration</h2>
           <p class="subtitle">Manage content, users, and organization structure</p>
         </div>
-        <button class="btn-primary" style="background: var(--color-border); color: var(--color-text-primary);" (click)="logout()">Logout</button>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-secondary" (click)="goTo('admin/users')">Users</button>
+          <button class="btn-secondary" (click)="goTo('admin/content')">Content</button>
+          <button class="btn-secondary" (click)="goTo('admin/assignments')">Assignments</button>
+          <button class="btn-primary" style="background: var(--color-danger); color: white;" (click)="logout()">Logout</button>
+        </div>
       </header>
       
       <!-- Summary Cards -->
@@ -159,5 +164,9 @@ export class AdminDashboardComponent implements OnInit {
   logout() {
     this.auth.logout();
     this.router.navigate(['/login']);
+  }
+
+  goTo(path: string) {
+    this.router.navigate([`/${path}`]);
   }
 }
