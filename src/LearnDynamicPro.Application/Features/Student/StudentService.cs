@@ -100,41 +100,36 @@ public class StudentService : IStudentService
             .Select(u => u.ModuleId)
             .FirstOrDefaultAsync();
 
-        // Step 2 — load all assignment filters for this dept+module
-        var assignments = await _context.DepartmentModuleAssignments
-            .AsNoTracking()
-            .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId)
-            .Select(a => new { a.LevelId, a.TypeId })
-            .ToListAsync();
+        // Step 2 — IQueryable for assignment filters
+        var assignments = _context.DepartmentModuleAssignments
+            .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId);
 
-        if (!assignments.Any())
-            return new List<LessonDto>(); // Department has no access to this module
-
-        // Step 3 — load all lessons for the unit then track which ones are completed
-        var completedLessonIds = await _context.LessonProgresses
+        // Step 3 — Apply Intersection Filter in Database using Any (EXISTS)
+        var accessibleLessonsQuery = _context.Lessons
             .AsNoTracking()
-            .Where(lp => lp.UserId == userId && lp.IsCompleted)
-            .Select(lp => lp.LessonId)
-            .ToHashSetAsync();
-
-        var lessons = await _context.Lessons
-            .AsNoTracking()
-            .Where(l => l.UnitId == unitId)
             .Include(l => l.Level)
             .Include(l => l.Type)
+            .Where(l => l.UnitId == unitId && assignments.Any(a =>
+                (a.LevelId == null || a.LevelId == l.LevelId) &&
+                (a.TypeId  == null || a.TypeId  == l.TypeId)
+            ));
+
+        // Step 4 — Fetch the filtered lessons and completed IDs
+        var lessons = await accessibleLessonsQuery
             .OrderBy(l => l.OrderIndex)
             .ToListAsync();
 
-        // Step 4 — apply Intersection Filter in memory
-        // A lesson is visible if it satisfies at least one assignment row.
-        var visible = lessons.Where(lesson =>
-            assignments.Any(a =>
-                (a.LevelId == null || a.LevelId == lesson.LevelId) &&
-                (a.TypeId  == null || a.TypeId  == lesson.TypeId)
-            )
-        );
+        if (!lessons.Any())
+            return new List<LessonDto>();
 
-        return visible.Select(l => new LessonDto
+        var lessonIds = lessons.Select(l => l.Id).ToList();
+        var completedLessonIds = await _context.LessonProgresses
+            .AsNoTracking()
+            .Where(lp => lp.UserId == userId && lessonIds.Contains(lp.LessonId) && lp.IsCompleted)
+            .Select(lp => lp.LessonId)
+            .ToHashSetAsync();
+
+        return lessons.Select(l => new LessonDto
         {
             Id          = l.Id,
             UnitId      = l.UnitId,

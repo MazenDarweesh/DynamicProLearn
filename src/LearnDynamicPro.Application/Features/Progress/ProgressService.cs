@@ -96,15 +96,44 @@ public class ProgressService : IProgressService
 
     public async Task<UserProgressDto> GetUserProgressAsync(Guid userId)
     {
-        var completedCount = await _context.LessonProgresses
+        var user = await _context.Users
             .AsNoTracking()
-            .CountAsync(p => p.UserId == userId && p.IsCompleted);
+            .FirstOrDefaultAsync(u => u.Id == userId);
+            
+        if (user == null)
+            throw new KeyNotFoundException($"User {userId} not found.");
+
+        // 1. IQueryable for user's department assignments
+        var deptAssignments = _context.DepartmentModuleAssignments
+            .Where(a => a.DepartmentId == user.DepartmentId);
+
+        // 2. IQueryable for accessible lessons applying intersection logic in SQL
+        var accessibleLessons = _context.Lessons
+            .Where(lesson => deptAssignments.Any(a =>
+                a.ModuleId == lesson.Unit!.ModuleId &&
+                (a.LevelId == null || a.LevelId == lesson.LevelId) &&
+                (a.TypeId == null || a.TypeId == lesson.TypeId)));
+
+        // 3. Aggregate stats via SQL GroupBy
+        var modulesProgress = await accessibleLessons
+            .GroupBy(l => new { l.Unit!.ModuleId, ModuleName = l.Unit.Module!.Name })
+            .Select(g => new ModuleProgressDto
+            {
+                ModuleId = g.Key.ModuleId,
+                ModuleName = g.Key.ModuleName,
+                TotalLessons = g.Count(),
+                CompletedLessons = g.Count(l => _context.LessonProgresses.Any(p => p.UserId == userId && p.LessonId == l.Id && p.IsCompleted))
+            })
+            .OrderBy(m => m.ModuleName)
+            .ToListAsync();
 
         return new UserProgressDto
         {
             UserId = userId,
-            CompletedLessons = completedCount,
-            TotalLessons = completedCount // Simplified for now
+            Username = user.Username,
+            TotalLessons = modulesProgress.Sum(m => m.TotalLessons),
+            CompletedLessons = modulesProgress.Sum(m => m.CompletedLessons),
+            ModulesProgress = modulesProgress
         };
     }
 }
