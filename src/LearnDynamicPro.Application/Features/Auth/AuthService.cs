@@ -1,5 +1,6 @@
 using LearnDynamicPro.Application.Dtos.Auth;
 using LearnDynamicPro.Application.Interfaces;
+using Microsoft.EntityFrameworkCore;
 
 namespace LearnDynamicPro.Application.Features.Auth;
 
@@ -19,8 +20,31 @@ public class AuthService : IAuthService
         _tokenService = tokenService;
     }
 
-    public Task<LoginResponse> LoginAsync(LoginRequest request)
+    public async Task<LoginResponse> LoginAsync(LoginRequest request)
     {
-        throw new NotImplementedException();
+        // 1. Find user by username (case-insensitive)
+        var user = await _context.Users
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
+
+        if (user is null)
+            throw new UnauthorizedAccessException("Invalid username or password.");
+
+        // 2. Verify password hash
+        if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
+            throw new UnauthorizedAccessException("Invalid username or password.");
+
+        // 3. Generate JWT token carrying all claims needed downstream
+        var token = _tokenService.GenerateToken(user);
+
+        return new LoginResponse
+        {
+            UserId       = user.Id,
+            Username     = user.Username,
+            Role         = user.Role,
+            Token        = token,
+            CompanyId    = user.CompanyId,
+            DepartmentId = user.DepartmentId
+        };
     }
 }
