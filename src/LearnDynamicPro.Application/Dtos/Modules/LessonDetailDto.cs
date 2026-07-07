@@ -1,0 +1,15 @@
+namespace LearnDynamicPro.Application.Dtos.Modules;
+
+public class LessonDetailDto
+{
+    public Guid Id { get; set; }
+    public Guid UnitId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string VideoUrl { get; set; } = string.Empty;
+    public Guid LevelId { get; set; }
+    public string LevelLabel { get; set; } = string.Empty;
+    public Guid TypeId { get; set; }
+    public string TypeLabel { get; set; } = string.Empty;
+    public int OrderIndex { get; set; }
+    public bool IsCompleted { get; set; }
+}
