@@ -13,7 +13,7 @@ import { AdminService, CompanyDto } from '../../../core/services/admin.service';
         <button class="btn-back" (click)="goBack()">← Back to Dashboard</button>
         <div class="d-flex justify-between w-100 mt-2">
           <h2>Companies Management</h2>
-          <button class="btn-primary" (click)="notImplemented('Add New Company')">+ Add New Company</button>
+          <button class="btn-primary" (click)="addNewCompany()">+ Add New Company</button>
         </div>
       </header>
 
@@ -94,6 +94,19 @@ export class UsersManagerComponent implements OnInit {
 
   goBack() {
     this.router.navigate(['/admin']);
+  }
+
+  addNewCompany() {
+    const name = prompt('Enter New Company Name:');
+    if (!name) return;
+    
+    this.adminService.createCompany(name).subscribe({
+      next: () => {
+        alert('Company added successfully!');
+        this.ngOnInit(); // reload list
+      },
+      error: (err) => alert('Failed to add company: ' + (err.error?.detail || err.message))
+    });
   }
 
   notImplemented(feature: string) {

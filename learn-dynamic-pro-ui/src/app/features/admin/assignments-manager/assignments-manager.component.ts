@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
+import { AdminService } from '../../../core/services/admin.service';
 
 @Component({
   selector: 'app-assignments-manager',
@@ -12,7 +13,7 @@ import { Router } from '@angular/router';
         <button class="btn-back" (click)="goBack()">← Back to Dashboard</button>
         <div class="d-flex justify-between w-100 mt-2">
           <h2>Department Assignments</h2>
-          <button class="btn-primary" (click)="notImplemented('Assign New Module')">Assign New Module</button>
+          <button class="btn-primary" (click)="assignNewModule()">Assign New Module</button>
         </div>
       </header>
 
@@ -71,9 +72,22 @@ import { Router } from '@angular/router';
 })
 export class AssignmentsManagerComponent {
   private router = inject(Router);
+  private adminService = inject(AdminService);
   
   goBack() {
     this.router.navigate(['/admin']);
+  }
+
+  assignNewModule() {
+    const moduleId = prompt('Enter Module ID to assign:');
+    if (!moduleId) return;
+    const deptId = prompt('Enter Department ID:');
+    if (!deptId) return;
+
+    this.adminService.assignModule(moduleId, deptId).subscribe({
+      next: () => alert('Module assigned to department successfully!'),
+      error: (err) => alert('Failed to assign module: ' + (err.error?.detail || err.message))
+    });
   }
 
   notImplemented(feature: string) {

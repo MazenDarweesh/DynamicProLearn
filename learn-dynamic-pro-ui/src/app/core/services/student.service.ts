@@ -28,4 +28,8 @@ export class StudentService {
   getModuleUnits(moduleId: string): Observable<UnitDto[]> {
     return this.http.get<UnitDto[]>(`${this.apiUrl}/modules/${moduleId}/units`);
   }
+
+  completeLesson(lessonId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/lessons/${lessonId}/complete`, true);
+  }
 }

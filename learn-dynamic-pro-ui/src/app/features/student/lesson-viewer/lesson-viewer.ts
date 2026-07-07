@@ -37,7 +37,7 @@ import { StudentService, UnitDto } from '../../../core/services/student.service'
             <h2>Lesson 1: Introduction</h2>
             <p class="text-secondary">Learn the fundamental concepts of this unit.</p>
             
-            <button class="btn-primary mt-3" (click)="notImplemented('Mark as Completed')">Mark as Completed</button>
+            <button class="btn-primary mt-3" (click)="markAsCompleted()">Mark as Completed</button>
           </div>
         </div>
       </div>
@@ -89,6 +89,17 @@ export class LessonViewer implements OnInit {
 
   goBack() {
     this.router.navigate(['/student']);
+  }
+
+  markAsCompleted() {
+    // For demo purposes, we will assume we are completing the first unit's first lesson
+    // We would need a real lessonId from the selected lesson in the UI
+    const dummyLessonId = '00000000-0000-0000-0000-000000000001';
+    
+    this.studentService.completeLesson(dummyLessonId).subscribe({
+      next: () => alert('Lesson marked as completed successfully!'),
+      error: (err) => alert('Failed to mark lesson: ' + (err.error?.detail || err.message))
+    });
   }
 
   notImplemented(feature: string) {

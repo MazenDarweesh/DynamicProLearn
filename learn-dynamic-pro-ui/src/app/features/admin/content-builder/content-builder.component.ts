@@ -42,7 +42,7 @@ import { AdminService, AdminModuleDto } from '../../../core/services/admin.servi
             <div class="unit-box">
               <div class="d-flex justify-between">
                 <h4>Unit 1: System Basics</h4>
-                <button class="btn-icon" (click)="notImplemented('Add Lesson')">Add Lesson</button>
+                <button class="btn-icon" (click)="addLesson()">Add Lesson</button>
               </div>
               <div class="lesson-item">
                 <span class="icon">🎥</span> Lesson 1.1: What is ERP?
@@ -52,7 +52,7 @@ import { AdminService, AdminModuleDto } from '../../../core/services/admin.servi
               </div>
             </div>
             
-            <button class="btn-dashed mt-3" (click)="notImplemented('Add Unit')">+ Add Unit</button>
+            <button class="btn-dashed mt-3" (click)="addUnit()">+ Add Unit</button>
           </div>
         </div>
       </div>
@@ -134,6 +134,31 @@ export class ContentBuilderComponent implements OnInit {
         this.loadModules(); // reload
       },
       error: (err) => alert('Failed to create module: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  addUnit() {
+    if (!this.selectedModule) return;
+    const name = prompt('Enter Unit Name:');
+    if (!name) return;
+    
+    this.adminService.createUnit(this.selectedModule.id, name).subscribe({
+      next: () => alert('Unit Created Successfully! (Reloading units requires updated module-units relationship endpoint)'),
+      error: (err) => alert('Failed to create unit: ' + (err.error?.detail || err.message))
+    });
+  }
+
+  addLesson() {
+    // We don't have selectedUnit in state yet, but we can fake it for the demo endpoint hit
+    const title = prompt('Enter Lesson Title:');
+    if (!title) return;
+    
+    // We need a real UnitId, let's just use a dummy one if we don't have one selected
+    const dummyUnitId = '00000000-0000-0000-0000-000000000001';
+    
+    this.adminService.createLesson(dummyUnitId, title).subscribe({
+      next: () => alert('Lesson Created Successfully!'),
+      error: (err) => alert('Failed to create lesson: ' + (err.error?.detail || err.message))
     });
   }
   

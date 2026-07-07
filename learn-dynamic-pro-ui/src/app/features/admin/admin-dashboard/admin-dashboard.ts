@@ -51,7 +51,7 @@ import { Router } from '@angular/router';
       <div class="content-section">
         <div class="section-header">
           <h3>Content Modules</h3>
-          <button class="btn-primary">+ Create Module</button>
+          <button class="btn-primary" (click)="notImplemented('Create Module')">+ Create Module</button>
         </div>
         
         <div class="card table-card">
@@ -78,8 +78,8 @@ import { Router } from '@angular/router';
                   </span>
                 </td>
                 <td class="actions">
-                  <button class="btn-icon">Edit</button>
-                  <button class="btn-icon text-danger">Delete</button>
+                  <button class="btn-icon" (click)="notImplemented('Edit Module')">Edit</button>
+                  <button class="btn-icon text-danger" (click)="notImplemented('Delete Module')">Delete</button>
                 </td>
               </tr>
             </tbody>
@@ -132,8 +132,6 @@ import { Router } from '@angular/router';
     .badge-warning { background: var(--color-accent-light); color: var(--color-accent); }
     
     .actions { display: flex; gap: 10px; }
-    .btn-icon { background: none; border: none; font-family: 'Readex Pro', sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; padding: 4px 8px; border-radius: 4px; color: var(--color-primary); }
-    .btn-icon:hover { background-color: var(--color-bg-page); }
     
     .loading, .empty-state { padding: 40px; text-align: center; color: var(--color-text-secondary); }
   `]
@@ -168,5 +166,9 @@ export class AdminDashboardComponent implements OnInit {
 
   goTo(path: string) {
     this.router.navigate([`/${path}`]);
+  }
+
+  notImplemented(feature: string) {
+    alert(`[UI Demo] The '${feature}' feature will be connected to the backend soon!`);
   }
 }
