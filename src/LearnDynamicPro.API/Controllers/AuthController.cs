@@ -18,14 +18,13 @@ public class AuthController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        try
+        var result = await _authService.LoginAsync(request);
+        
+        if (!result.IsSuccess)
         {
-            var response = await _authService.LoginAsync(request);
-            return Ok(response);
+            return Unauthorized(new { message = result.Error });
         }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(new { message = ex.Message });
-        }
+
+        return Ok(result.Value);
     }
 }

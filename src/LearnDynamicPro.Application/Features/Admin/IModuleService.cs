@@ -1,25 +1,26 @@
 using LearnDynamicPro.Application.Dtos.Modules;
+using LearnDynamicPro.Application.Common;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
 public interface IModuleService
 {
     // Module CRUD
-    Task<ModuleDto> CreateModuleAsync(CreateModuleRequest request);
-    Task<ModuleDto> UpdateModuleAsync(Guid id, UpdateModuleRequest request);
-    Task DeleteModuleAsync(Guid id);
-    Task<List<ModuleDto>> GetAllModulesAsync();
+    Task<Result<ModuleDto>> CreateModuleAsync(CreateModuleRequest request);
+    Task<Result<ModuleDto>> UpdateModuleAsync(Guid id, UpdateModuleRequest request);
+    Task<Result> DeleteModuleAsync(Guid id);
+    Task<Result<List<ModuleDto>>> GetAllModulesAsync();
 
     // Unit CRUD
-    Task<UnitDto> CreateUnitAsync(CreateUnitRequest request);
-    Task<UnitDto> UpdateUnitAsync(Guid id, UpdateUnitRequest request);
-    Task DeleteUnitAsync(Guid id);
-    Task<List<UnitDto>> GetUnitsByModuleAsync(Guid moduleId);
+    Task<Result<UnitDto>> CreateUnitAsync(CreateUnitRequest request);
+    Task<Result<UnitDto>> UpdateUnitAsync(Guid id, UpdateUnitRequest request);
+    Task<Result> DeleteUnitAsync(Guid id);
+    Task<Result<List<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId);
 
     // Lesson CRUD
-    Task<LessonDto> CreateLessonAsync(CreateLessonRequest request);
-    Task<LessonDto> UpdateLessonAsync(Guid id, UpdateLessonRequest request);
-    Task DeleteLessonAsync(Guid id);
-    Task<List<LessonDto>> GetLessonsByUnitAsync(Guid unitId);
-    Task<LessonDetailDto> GetLessonDetailAsync(Guid lessonId);
+    Task<Result<LessonDto>> CreateLessonAsync(CreateLessonRequest request);
+    Task<Result<LessonDto>> UpdateLessonAsync(Guid id, UpdateLessonRequest request);
+    Task<Result> DeleteLessonAsync(Guid id);
+    Task<Result<List<LessonDto>>> GetLessonsByUnitAsync(Guid unitId);
+    Task<Result<LessonDetailDto>> GetLessonDetailAsync(Guid lessonId);
 }

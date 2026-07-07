@@ -20,28 +20,32 @@ public class TesterController : ControllerBase
     [HttpGet("versions")]
     public async Task<IActionResult> GetVersions()
     {
-        var versions = await _testerService.GetAllErpVersionsAsync();
-        return Ok(versions);
+        var result = await _testerService.GetAllErpVersionsAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 
     [HttpPost("active-version")]
     public async Task<IActionResult> SetActiveVersion([FromBody] SetActiveVersionRequest request)
     {
-        await _testerService.SetActiveVersionAsync(request);
+        var result = await _testerService.SetActiveVersionAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
         return NoContent();
     }
 
     [HttpPost("feedback")]
     public async Task<IActionResult> SubmitFeedback([FromBody] SubmitFeedbackRequest request)
     {
-        var feedback = await _testerService.SubmitFeedbackAsync(request);
-        return Ok(feedback);
+        var result = await _testerService.SubmitFeedbackAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 
     [HttpGet("feedback")]
     public async Task<IActionResult> GetFeedbackByVersion()
     {
-        var feedbacks = await _testerService.GetFeedbackByActiveVersionAsync();
-        return Ok(feedbacks);
+        var result = await _testerService.GetFeedbackByActiveVersionAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 }

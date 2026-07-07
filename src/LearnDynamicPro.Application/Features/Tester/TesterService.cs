@@ -1,5 +1,6 @@
 using LearnDynamicPro.Application.Dtos.Tester;
 using LearnDynamicPro.Application.Interfaces;
+using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,24 +17,26 @@ public class TesterService : ITesterService
         _currentUserService = currentUserService;
     }
 
-    public async Task<ErpVersionDto> CreateErpVersionAsync(CreateErpVersionRequest request)
+    public async Task<Result<ErpVersionDto>> CreateErpVersionAsync(CreateErpVersionRequest request)
     {
         var version = new ErpVersion { VersionLabel = request.VersionLabel };
         _context.ErpVersions.Add(version);
         await _context.SaveChangesAsync(default);
 
-        return new ErpVersionDto { Id = version.Id, VersionLabel = version.VersionLabel };
+        return Result<ErpVersionDto>.Success(new ErpVersionDto { Id = version.Id, VersionLabel = version.VersionLabel });
     }
 
-    public async Task<List<ErpVersionDto>> GetAllErpVersionsAsync()
+    public async Task<Result<List<ErpVersionDto>>> GetAllErpVersionsAsync()
     {
-        return await _context.ErpVersions
+        var versions = await _context.ErpVersions
             .AsNoTracking()
             .Select(v => new ErpVersionDto { Id = v.Id, VersionLabel = v.VersionLabel })
             .ToListAsync();
+            
+        return Result<List<ErpVersionDto>>.Success(versions);
     }
 
-    public async Task SetActiveVersionAsync(SetActiveVersionRequest request)
+    public async Task<Result> SetActiveVersionAsync(SetActiveVersionRequest request)
     {
         var userId = _currentUserService.UserId;
 
@@ -55,9 +58,10 @@ public class TesterService : ITesterService
         }
 
         await _context.SaveChangesAsync(default);
+        return Result.Success();
     }
 
-    public async Task<FeedbackDto> SubmitFeedbackAsync(SubmitFeedbackRequest request)
+    public async Task<Result<FeedbackDto>> SubmitFeedbackAsync(SubmitFeedbackRequest request)
     {
         var userId = _currentUserService.UserId;
 
@@ -66,7 +70,7 @@ public class TesterService : ITesterService
             .FirstOrDefaultAsync(t => t.UserId == userId);
 
         if (activeVersion == null)
-            throw new InvalidOperationException("No active ERP version set for this tester.");
+            return Result<FeedbackDto>.Failure(AppErrors.Tester.NoActiveVersion);
 
         var feedback = new TesterFeedback
         {
@@ -80,7 +84,7 @@ public class TesterService : ITesterService
         _context.TesterFeedbacks.Add(feedback);
         await _context.SaveChangesAsync(default);
 
-        return new FeedbackDto
+        return Result<FeedbackDto>.Success(new FeedbackDto
         {
             Id = feedback.Id,
             LessonId = feedback.LessonId,
@@ -88,10 +92,10 @@ public class TesterService : ITesterService
             ConditionOptionId = feedback.ConditionOptionId,
             Notes = feedback.Notes,
             CreatedAt = feedback.CreatedAt
-        };
+        });
     }
 
-    public async Task<List<FeedbackDto>> GetFeedbackByActiveVersionAsync()
+    public async Task<Result<List<FeedbackDto>>> GetFeedbackByActiveVersionAsync()
     {
         var userId = _currentUserService.UserId;
 
@@ -100,9 +104,9 @@ public class TesterService : ITesterService
             .FirstOrDefaultAsync(t => t.UserId == userId);
 
         if (activeVersion == null)
-            return new List<FeedbackDto>();
+            return Result<List<FeedbackDto>>.Success(new List<FeedbackDto>());
 
-        return await _context.TesterFeedbacks
+        var feedbacks = await _context.TesterFeedbacks
             .AsNoTracking()
             .Where(f => f.ErpVersionId == activeVersion.ErpVersionId && f.UserId == userId)
             .Select(f => new FeedbackDto
@@ -115,6 +119,8 @@ public class TesterService : ITesterService
                 CreatedAt = f.CreatedAt
             })
             .ToListAsync();
+            
+        return Result<List<FeedbackDto>>.Success(feedbacks);
     }
 }
 

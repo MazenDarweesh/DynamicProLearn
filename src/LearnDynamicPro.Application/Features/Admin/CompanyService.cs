@@ -1,5 +1,6 @@
 using LearnDynamicPro.Application.Dtos.Companies;
 using LearnDynamicPro.Application.Interfaces;
+using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -16,24 +17,26 @@ public class CompanyService : ICompanyService
         _passwordHasher = passwordHasher;
     }
 
-    public async Task<CompanyDto> CreateCompanyAsync(CreateCompanyRequest request)
+    public async Task<Result<CompanyDto>> CreateCompanyAsync(CreateCompanyRequest request)
     {
         var company = new Company { Name = request.Name };
         _context.Companies.Add(company);
         await _context.SaveChangesAsync(default);
 
-        return new CompanyDto { Id = company.Id, Name = company.Name };
+        return Result<CompanyDto>.Success(new CompanyDto { Id = company.Id, Name = company.Name });
     }
 
-    public async Task<List<CompanyDto>> GetAllCompaniesAsync()
+    public async Task<Result<List<CompanyDto>>> GetAllCompaniesAsync()
     {
-        return await _context.Companies
+        var companies = await _context.Companies
             .AsNoTracking()
             .Select(c => new CompanyDto { Id = c.Id, Name = c.Name })
             .ToListAsync();
+            
+        return Result<List<CompanyDto>>.Success(companies);
     }
 
-    public async Task<DepartmentDto> CreateDepartmentAsync(CreateDepartmentRequest request)
+    public async Task<Result<DepartmentDto>> CreateDepartmentAsync(CreateDepartmentRequest request)
     {
         var department = new Department 
         { 
@@ -43,24 +46,26 @@ public class CompanyService : ICompanyService
         _context.Departments.Add(department);
         await _context.SaveChangesAsync(default);
 
-        return new DepartmentDto 
+        return Result<DepartmentDto>.Success(new DepartmentDto 
         { 
             Id = department.Id, 
             Name = department.Name, 
             CompanyId = department.CompanyId 
-        };
+        });
     }
 
-    public async Task<List<DepartmentDto>> GetDepartmentsByCompanyAsync(Guid companyId)
+    public async Task<Result<List<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId)
     {
-        return await _context.Departments
+        var departments = await _context.Departments
             .AsNoTracking()
             .Where(d => d.CompanyId == companyId)
             .Select(d => new DepartmentDto { Id = d.Id, Name = d.Name, CompanyId = d.CompanyId })
             .ToListAsync();
+            
+        return Result<List<DepartmentDto>>.Success(departments);
     }
 
-    public async Task<UserDto> CreateUserAsync(CreateUserRequest request)
+    public async Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request)
     {
         // Get department to resolve CompanyId
         var department = await _context.Departments
@@ -68,7 +73,7 @@ public class CompanyService : ICompanyService
             .FirstOrDefaultAsync(d => d.Id == request.DepartmentId);
             
         if (department == null)
-            throw new KeyNotFoundException("Department not found");
+            return Result<UserDto>.Failure(AppErrors.General.NotFound);
 
         var user = new User
         {
@@ -82,19 +87,19 @@ public class CompanyService : ICompanyService
         _context.Users.Add(user);
         await _context.SaveChangesAsync(default);
 
-        return new UserDto 
+        return Result<UserDto>.Success(new UserDto 
         { 
             Id = user.Id, 
             Username = user.Username, 
             Role = user.Role, 
             DepartmentId = user.DepartmentId,
             CompanyId = user.CompanyId 
-        };
+        });
     }
 
-    public async Task<List<UserDto>> GetUsersByDepartmentAsync(Guid departmentId)
+    public async Task<Result<List<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId)
     {
-        return await _context.Users
+        var users = await _context.Users
             .AsNoTracking()
             .Where(u => u.DepartmentId == departmentId)
             .Select(u => new UserDto 
@@ -106,6 +111,8 @@ public class CompanyService : ICompanyService
                 CompanyId = u.CompanyId 
             })
             .ToListAsync();
+            
+        return Result<List<UserDto>>.Success(users);
     }
 }
 

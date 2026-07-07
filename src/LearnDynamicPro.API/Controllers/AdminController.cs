@@ -29,109 +29,183 @@ public class AdminController : ControllerBase
     // ── Companies ───────────────────────────────────────────────────────────
     [HttpPost("companies")]
     public async Task<IActionResult> CreateCompany([FromBody] CreateCompanyRequest request)
-        => Ok(await _companyService.CreateCompanyAsync(request));
+    {
+        var result = await _companyService.CreateCompanyAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("companies")]
     public async Task<IActionResult> GetAllCompanies()
-        => Ok(await _companyService.GetAllCompaniesAsync());
+    {
+        var result = await _companyService.GetAllCompaniesAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     // ── Departments ─────────────────────────────────────────────────────────
     [HttpPost("departments")]
     public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentRequest request)
-        => Ok(await _companyService.CreateDepartmentAsync(request));
+    {
+        var result = await _companyService.CreateDepartmentAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("companies/{companyId}/departments")]
     public async Task<IActionResult> GetDepartments(Guid companyId)
-        => Ok(await _companyService.GetDepartmentsByCompanyAsync(companyId));
+    {
+        var result = await _companyService.GetDepartmentsByCompanyAsync(companyId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     // ── Users ───────────────────────────────────────────────────────────────
     [HttpPost("users")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)
-        => Ok(await _companyService.CreateUserAsync(request));
+    {
+        var result = await _companyService.CreateUserAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("departments/{departmentId}/users")]
     public async Task<IActionResult> GetUsers(Guid departmentId)
-        => Ok(await _companyService.GetUsersByDepartmentAsync(departmentId));
+    {
+        var result = await _companyService.GetUsersByDepartmentAsync(departmentId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     // ── Modules ─────────────────────────────────────────────────────────────
     [HttpPost("modules")]
     public async Task<IActionResult> CreateModule([FromBody] CreateModuleRequest request)
-        => Ok(await _moduleService.CreateModuleAsync(request));
+    {
+        var result = await _moduleService.CreateModuleAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("modules")]
     public async Task<IActionResult> GetAllModules()
-        => Ok(await _moduleService.GetAllModulesAsync());
+    {
+        var result = await _moduleService.GetAllModulesAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpPost("modules/{id}")]
     public async Task<IActionResult> UpdateModule(Guid id, [FromBody] UpdateModuleRequest request)
-        => Ok(await _moduleService.UpdateModuleAsync(id, request));
+    {
+        var result = await _moduleService.UpdateModuleAsync(id, request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpDelete("modules/{id}")]
     public async Task<IActionResult> DeleteModule(Guid id)
     {
-        await _moduleService.DeleteModuleAsync(id);
+        var result = await _moduleService.DeleteModuleAsync(id);
+        if (!result.IsSuccess) return BadRequest(result.Error);
         return NoContent();
     }
 
     // ── Units ───────────────────────────────────────────────────────────────
     [HttpPost("units")]
     public async Task<IActionResult> CreateUnit([FromBody] CreateUnitRequest request)
-        => Ok(await _moduleService.CreateUnitAsync(request));
+    {
+        var result = await _moduleService.CreateUnitAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("modules/{moduleId}/units")]
     public async Task<IActionResult> GetUnits(Guid moduleId)
-        => Ok(await _moduleService.GetUnitsByModuleAsync(moduleId));
+    {
+        var result = await _moduleService.GetUnitsByModuleAsync(moduleId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpPost("units/{id}")]
     public async Task<IActionResult> UpdateUnit(Guid id, [FromBody] UpdateUnitRequest request)
-        => Ok(await _moduleService.UpdateUnitAsync(id, request));
+    {
+        var result = await _moduleService.UpdateUnitAsync(id, request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpDelete("units/{id}")]
     public async Task<IActionResult> DeleteUnit(Guid id)
     {
-        await _moduleService.DeleteUnitAsync(id);
+        var result = await _moduleService.DeleteUnitAsync(id);
+        if (!result.IsSuccess) return BadRequest(result.Error);
         return NoContent();
     }
 
     // ── Lessons ─────────────────────────────────────────────────────────────
     [HttpPost("lessons")]
     public async Task<IActionResult> CreateLesson([FromBody] CreateLessonRequest request)
-        => Ok(await _moduleService.CreateLessonAsync(request));
+    {
+        var result = await _moduleService.CreateLessonAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("units/{unitId}/lessons")]
     public async Task<IActionResult> GetLessons(Guid unitId)
-        => Ok(await _moduleService.GetLessonsByUnitAsync(unitId));
+    {
+        var result = await _moduleService.GetLessonsByUnitAsync(unitId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("lessons/{lessonId}")]
     public async Task<IActionResult> GetLessonDetail(Guid lessonId)
-        => Ok(await _moduleService.GetLessonDetailAsync(lessonId));
+    {
+        var result = await _moduleService.GetLessonDetailAsync(lessonId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpPost("lessons/{id}")]
     public async Task<IActionResult> UpdateLesson(Guid id, [FromBody] UpdateLessonRequest request)
-        => Ok(await _moduleService.UpdateLessonAsync(id, request));
+    {
+        var result = await _moduleService.UpdateLessonAsync(id, request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpDelete("lessons/{id}")]
     public async Task<IActionResult> DeleteLesson(Guid id)
     {
-        await _moduleService.DeleteLessonAsync(id);
+        var result = await _moduleService.DeleteLessonAsync(id);
+        if (!result.IsSuccess) return BadRequest(result.Error);
         return NoContent();
     }
 
     // ── Assignments ─────────────────────────────────────────────────────────
     [HttpPost("assignments")]
     public async Task<IActionResult> AssignModule([FromBody] AssignModuleRequest request)
-        => Ok(await _assignmentService.AssignModuleToDepartmentAsync(request));
+    {
+        var result = await _assignmentService.AssignModuleToDepartmentAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpGet("departments/{departmentId}/assignments")]
     public async Task<IActionResult> GetAssignments(Guid departmentId)
-        => Ok(await _assignmentService.GetAssignmentsByDepartmentAsync(departmentId));
+    {
+        var result = await _assignmentService.GetAssignmentsByDepartmentAsync(departmentId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 
     [HttpDelete("assignments/{id}")]
     public async Task<IActionResult> RemoveAssignment(Guid id)
     {
-        await _assignmentService.RemoveAssignmentAsync(id);
+        var result = await _assignmentService.RemoveAssignmentAsync(id);
+        if (!result.IsSuccess) return BadRequest(result.Error);
         return NoContent();
     }
-    
-    // Note: Progress, Lookups, and ERP Versions management endpoints would also go here.
 }

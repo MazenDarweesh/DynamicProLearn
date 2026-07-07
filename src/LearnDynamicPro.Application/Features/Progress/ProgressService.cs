@@ -1,5 +1,6 @@
 using LearnDynamicPro.Application.Dtos.Progress;
 using LearnDynamicPro.Application.Interfaces;
+using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using LearnDynamicPro.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
@@ -17,7 +18,7 @@ public class ProgressService : IProgressService
         _currentUserService = currentUserService;
     }
 
-    public async Task<LessonProgressDto> MarkLessonProgressAsync(MarkCompleteRequest request)
+    public async Task<Result<LessonProgressDto>> MarkLessonProgressAsync(MarkCompleteRequest request)
     {
         var userId = _currentUserService.UserId;
         
@@ -46,16 +47,16 @@ public class ProgressService : IProgressService
 
         await _context.SaveChangesAsync(default);
 
-        return new LessonProgressDto
+        return Result<LessonProgressDto>.Success(new LessonProgressDto
         {
             UserId = progress.UserId,
             LessonId = progress.LessonId,
             IsCompleted = progress.IsCompleted,
             CompletedAt = progress.CompletedAt
-        };
+        });
     }
 
-    public async Task<LessonProgressDto> AdminOverrideProgressAsync(AdminOverrideProgressRequest request)
+    public async Task<Result<LessonProgressDto>> AdminOverrideProgressAsync(AdminOverrideProgressRequest request)
     {
         var adminId = _currentUserService.UserId;
         
@@ -85,23 +86,23 @@ public class ProgressService : IProgressService
 
         await _context.SaveChangesAsync(default);
 
-        return new LessonProgressDto
+        return Result<LessonProgressDto>.Success(new LessonProgressDto
         {
             UserId = progress.UserId,
             LessonId = progress.LessonId,
             IsCompleted = progress.IsCompleted,
             CompletedAt = progress.CompletedAt
-        };
+        });
     }
 
-    public async Task<UserProgressDto> GetUserProgressAsync(Guid userId)
+    public async Task<Result<UserProgressDto>> GetUserProgressAsync(Guid userId)
     {
         var user = await _context.Users
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId);
             
         if (user == null)
-            throw new KeyNotFoundException($"User {userId} not found.");
+            return Result<UserProgressDto>.Failure(AppErrors.Authentication.UserNotFound);
 
         // 1. IQueryable for user's department assignments
         var deptAssignments = _context.DepartmentModuleAssignments
@@ -127,7 +128,7 @@ public class ProgressService : IProgressService
             .OrderBy(m => m.ModuleName)
             .ToListAsync();
 
-        return new UserProgressDto
+        var response = new UserProgressDto
         {
             UserId = userId,
             Username = user.Username,
@@ -135,6 +136,7 @@ public class ProgressService : IProgressService
             CompletedLessons = modulesProgress.Sum(m => m.CompletedLessons),
             ModulesProgress = modulesProgress
         };
+        return Result<UserProgressDto>.Success(response);
     }
 }
 

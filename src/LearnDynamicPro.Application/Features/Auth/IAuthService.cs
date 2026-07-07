@@ -1,8 +1,10 @@
 using LearnDynamicPro.Application.Dtos.Auth;
 
+using LearnDynamicPro.Application.Common;
+
 namespace LearnDynamicPro.Application.Features.Auth;
 
 public interface IAuthService
 {
-    Task<LoginResponse> LoginAsync(LoginRequest request);
+    Task<Result<LoginResponse>> LoginAsync(LoginRequest request);
 }

@@ -1,5 +1,6 @@
 using LearnDynamicPro.Application.Dtos.Assignments;
 using LearnDynamicPro.Application.Interfaces;
+using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -14,7 +15,7 @@ public class AssignmentService : IAssignmentService
         _context = context;
     }
 
-    public async Task<DepartmentModuleDto> AssignModuleToDepartmentAsync(AssignModuleRequest request)
+    public async Task<Result<DepartmentModuleDto>> AssignModuleToDepartmentAsync(AssignModuleRequest request)
     {
         var assignment = new DepartmentModuleAssignment
         {
@@ -27,17 +28,17 @@ public class AssignmentService : IAssignmentService
         _context.DepartmentModuleAssignments.Add(assignment);
         await _context.SaveChangesAsync(default);
 
-        return new DepartmentModuleDto
+        return Result<DepartmentModuleDto>.Success(new DepartmentModuleDto
         {
             Id = assignment.Id,
             DepartmentId = assignment.DepartmentId,
             ModuleId = assignment.ModuleId,
             LevelId = assignment.LevelId,
             TypeId = assignment.TypeId
-        };
+        });
     }
 
-    public async Task RemoveAssignmentAsync(Guid assignmentId)
+    public async Task<Result> RemoveAssignmentAsync(Guid assignmentId)
     {
         var assignment = await _context.DepartmentModuleAssignments.FindAsync(assignmentId);
         if (assignment != null)
@@ -45,11 +46,12 @@ public class AssignmentService : IAssignmentService
             _context.DepartmentModuleAssignments.Remove(assignment);
             await _context.SaveChangesAsync(default);
         }
+        return Result.Success();
     }
 
-    public async Task<List<DepartmentModuleDto>> GetAssignmentsByDepartmentAsync(Guid departmentId)
+    public async Task<Result<List<DepartmentModuleDto>>> GetAssignmentsByDepartmentAsync(Guid departmentId)
     {
-        return await _context.DepartmentModuleAssignments
+        var assignments = await _context.DepartmentModuleAssignments
             .AsNoTracking()
             .Where(a => a.DepartmentId == departmentId)
             .Select(a => new DepartmentModuleDto
@@ -61,6 +63,8 @@ public class AssignmentService : IAssignmentService
                 TypeId = a.TypeId
             })
             .ToListAsync();
+            
+        return Result<List<DepartmentModuleDto>>.Success(assignments);
     }
 }
 

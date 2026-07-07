@@ -29,40 +29,39 @@ public class StudentController : ControllerBase
     [HttpGet("modules")]
     public async Task<IActionResult> GetAssignedModules()
     {
-        var modules = await _studentService.GetAssignedModulesAsync(_currentUserService.UserId);
-        return Ok(modules);
+        var result = await _studentService.GetAssignedModulesAsync(_currentUserService.UserId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 
     [HttpGet("modules/{moduleId}/units")]
     public async Task<IActionResult> GetUnits(Guid moduleId)
     {
-        var units = await _studentService.GetUnitsByModuleAsync(moduleId);
-        return Ok(units);
+        var result = await _studentService.GetUnitsByModuleAsync(moduleId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 
     [HttpGet("units/{unitId}/lessons")]
     public async Task<IActionResult> GetLessons(Guid unitId)
     {
-        var lessons = await _studentService.GetLessonsByUnitAsync(unitId, _currentUserService.UserId);
-        return Ok(lessons);
+        var result = await _studentService.GetLessonsByUnitAsync(unitId, _currentUserService.UserId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 
     [HttpGet("lessons/{lessonId}")]
     public async Task<IActionResult> GetLessonDetail(Guid lessonId)
     {
-        try
+        var result = await _studentService.GetLessonDetailAsync(lessonId, _currentUserService.UserId);
+        if (!result.IsSuccess) 
         {
-            var lesson = await _studentService.GetLessonDetailAsync(lessonId, _currentUserService.UserId);
-            return Ok(lesson);
+            if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+                return Forbid(result.Error);
+                
+            return NotFound(result.Error);
         }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Forbid(ex.Message);
-        }
-        catch (KeyNotFoundException ex)
-        {
-            return NotFound(ex.Message);
-        }
+        return Ok(result.Value);
     }
 
     [HttpPost("lessons/{lessonId}/complete")]
@@ -70,13 +69,15 @@ public class StudentController : ControllerBase
     {
         var request = new MarkCompleteRequest { LessonId = lessonId, IsCompleted = isCompleted };
         var result = await _progressService.MarkLessonProgressAsync(request);
-        return Ok(result);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 
     [HttpGet("progress")]
     public async Task<IActionResult> GetProgress()
     {
-        var progress = await _progressService.GetUserProgressAsync(_currentUserService.UserId);
-        return Ok(progress);
+        var result = await _progressService.GetUserProgressAsync(_currentUserService.UserId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 }

@@ -1,18 +1,19 @@
 using LearnDynamicPro.Application.Dtos.Companies;
+using LearnDynamicPro.Application.Common;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
 public interface ICompanyService
 {
     // Company CRUD
-    Task<CompanyDto> CreateCompanyAsync(CreateCompanyRequest request);
-    Task<List<CompanyDto>> GetAllCompaniesAsync();
+    Task<Result<CompanyDto>> CreateCompanyAsync(CreateCompanyRequest request);
+    Task<Result<List<CompanyDto>>> GetAllCompaniesAsync();
 
     // Department CRUD
-    Task<DepartmentDto> CreateDepartmentAsync(CreateDepartmentRequest request);
-    Task<List<DepartmentDto>> GetDepartmentsByCompanyAsync(Guid companyId);
+    Task<Result<DepartmentDto>> CreateDepartmentAsync(CreateDepartmentRequest request);
+    Task<Result<List<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId);
 
     // User CRUD
-    Task<UserDto> CreateUserAsync(CreateUserRequest request);
-    Task<List<UserDto>> GetUsersByDepartmentAsync(Guid departmentId);
+    Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request);
+    Task<Result<List<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId);
 }
