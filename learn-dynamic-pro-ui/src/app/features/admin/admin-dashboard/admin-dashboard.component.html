@@ -1,0 +1,212 @@
+    <div class="console-container" dir="rtl">
+      <!-- Header -->
+      <header class="console-header">
+        <div class="header-content">
+          <div class="brand w-100 d-flex justify-between align-center">
+            <h1>DynamicProLearn <span class="font-light">لوحة تحكم الأدمن</span></h1>
+            <div class="logout-container">
+              <button class="btn-logout" (click)="logout()">تسجيل الخروج</button>
+            </div>
+          </div>
+          <nav class="header-nav">
+            <button class="nav-btn active">الرئيسية <span class="icon">🏠</span></button>
+            <button class="nav-btn" (click)="goTo('admin/users')">الشركات <span class="icon">🏢</span></button>
+            <button class="nav-btn" (click)="goTo('admin/content')">الموديولات <span class="icon">📚</span></button>
+            <button class="nav-btn" (click)="goTo('admin/assignments')">التحليلات <span class="icon">📊</span></button>
+          </nav>
+        </div>
+      </header>
+
+      <div class="console-body">
+        
+        <!-- Stats Row -->
+        <div class="stats-grid">
+          <div class="stat-card">
+            <p>الشركات</p>
+            <h3>12</h3>
+          </div>
+          <div class="stat-card">
+            <p>متعلمون نشطون</p>
+            <h3>184</h3>
+          </div>
+          <div class="stat-card">
+            <p>موديولات منشورة</p>
+            <h3>9</h3>
+          </div>
+          <div class="stat-card">
+            <p>متوسط الإنجاز</p>
+            <h3 class="text-primary">63%</h3>
+          </div>
+        </div>
+
+        <!-- PANEL 1: Companies -->
+        <div class="panel">
+          <div class="panel-header d-flex justify-between align-center">
+            <h3 class="panel-title">🏢 الشركات</h3>
+            <button class="btn-accent" (click)="notImplemented('إضافة شركة')">+ إضافة شركة</button>
+          </div>
+          <div class="panel-content">
+            <!-- Company 1 -->
+            <div class="item-card">
+              <div class="d-flex justify-between align-start">
+                <div>
+                  <h4 class="text-primary">الأمل للتجارة</h4>
+                  <div class="badges-row">
+                    <span class="badge badge-primary">الحسابات والمالية</span>
+                    <span class="badge badge-primary">سلسلة التوريد والموارد البشرية</span>
+                  </div>
+                </div>
+                <div class="actions-left d-flex align-center gap-3">
+                  <span class="text-secondary text-sm">5 مستخدمين</span>
+                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')" title="تعديل">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button class="icon-btn text-danger" (click)="notImplemented('حذف')" title="حذف">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Company 2 -->
+            <div class="item-card mt-3">
+              <div class="d-flex justify-between align-start">
+                <div>
+                  <h4 class="text-primary">دلتا لوجيستكس</h4>
+                  <div class="badges-row">
+                    <span class="badge badge-primary">إدارة العمليات</span>
+                  </div>
+                </div>
+                <div class="actions-left d-flex align-center gap-3">
+                  <span class="text-secondary text-sm">2 مستخدمين</span>
+                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')" title="تعديل">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button class="icon-btn text-danger" (click)="notImplemented('حذف')" title="حذف">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 2: Modules -->
+        <div class="panel mt-4">
+          <div class="panel-header d-flex justify-between align-center">
+            <h3 class="panel-title">📚 الموديولات</h3>
+            <button class="btn-accent" (click)="notImplemented('إنشاء موديول')">+ إنشاء موديول</button>
+          </div>
+          <div class="panel-content">
+            <div class="item-card module-card">
+              <div class="d-flex justify-between align-start mb-2">
+                <h4 class="text-primary">موديول 01: المحاسبة المالية</h4>
+                <div class="actions-left d-flex gap-2">
+                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')" title="تعديل">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                  <button class="icon-btn text-danger" (click)="notImplemented('حذف')" title="حذف">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                  </button>
+                </div>
+              </div>
+              <h5 class="text-secondary mb-3">الوحدة 1.1: قواعد قيد اليومية</h5>
+              
+              <div class="lesson-row d-flex justify-between mb-2">
+                <span class="text-secondary">مقدمة في المدين والدائن</span>
+                <div class="d-flex gap-3 align-center">
+                  <span class="badge badge-primary-light">نظري • مبتدئ</span>
+                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="lesson-row d-flex justify-between">
+                <span class="text-secondary">التحقق من ترحيل الأستاذ</span>
+                <div class="d-flex gap-3 align-center">
+                  <span class="badge badge-accent-light">تطبيق ERP • متوسط</span>
+                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div class="info-note mt-3">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+              <span>أي تعديل هنا يوصل فورًا لكل الأقسام المرتبطة.</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 3: User Progress -->
+        <div class="panel mt-4">
+          <div class="panel-header text-right">
+            <h3 class="panel-title">📊 متابعة المستخدمين</h3>
+          </div>
+          <div class="panel-content">
+            
+            <div class="filters-row d-flex gap-4 mb-4">
+              <div class="select-group flex-1">
+                <label class="d-block text-secondary text-sm mb-2 text-right">اختر الشركة</label>
+                <div class="custom-select-wrapper">
+                  <select class="form-control blue-select">
+                    <option>الأمل للتجارة</option>
+                  </select>
+                </div>
+              </div>
+              <div class="select-group flex-1">
+                <label class="d-block text-secondary text-sm mb-2 text-right">اختر القسم</label>
+                <div class="custom-select-wrapper">
+                  <select class="form-control blue-select">
+                    <option>الحسابات والمالية</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <table class="data-table mt-4">
+              <thead>
+                <tr>
+                  <th>المستخدم</th>
+                  <th>الدور</th>
+                  <th>الموديولات</th>
+                  <th>مكتمل</th>
+                  <th class="text-right">التقدم</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="fw-500">مازن درويش</td>
+                  <td class="text-secondary">طالب</td>
+                  <td class="text-secondary">المحاسبة</td>
+                  <td class="text-secondary">10 / 8</td>
+                  <td class="progress-cell">
+                    <div class="progress-track"><div class="progress-fill" style="width: 80%"></div></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="fw-500">أحمد كيو إيه</td>
+                  <td class="text-secondary">مختبر</td>
+                  <td class="text-secondary">المحاسبة</td>
+                  <td class="text-secondary">10 / 5</td>
+                  <td class="progress-cell">
+                    <div class="progress-track"><div class="progress-fill" style="width: 50%"></div></div>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="fw-500">سارة فين</td>
+                  <td class="text-secondary">طالبة</td>
+                  <td class="text-secondary">المحاسبة</td>
+                  <td class="text-secondary">10 / 2</td>
+                  <td class="progress-cell">
+                    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        
+      </div>
+    </div>
