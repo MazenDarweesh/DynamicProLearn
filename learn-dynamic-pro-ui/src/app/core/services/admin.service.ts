@@ -59,6 +59,10 @@ export class AdminService {
     return this.http.get<any[]>(`${this.apiUrl}/companies/${companyId}/departments`);
   }
 
+  createDepartment(companyId: string, name: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/departments`, { companyId, name });
+  }
+
   getUsers(departmentId: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/departments/${departmentId}/users`);
   }

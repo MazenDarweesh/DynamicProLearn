@@ -27,6 +27,13 @@ export class AdminDashboardComponent implements OnInit {
   departments: any[] = [];
   progressUsers: any[] = [];
 
+  // Add Company Modal State
+  showAddCompanyModal = false;
+  newCompanyName = '';
+  newCompanyStatus = 'active';
+  newDepartmentName = '';
+  newDepartmentsList: string[] = [];
+
   ngOnInit() {
     this.loadStats();
     this.loadCompanies();
@@ -174,5 +181,62 @@ export class AdminDashboardComponent implements OnInit {
 
   notImplemented(feature: string) {
     alert(`[الربط قادم قريباً] جارِ تطوير الـ Backend الخاص بـ '${feature}'. الرجاء مراجعة قائمة المهام.`);
+  }
+
+  // --- Modal Logic ---
+  openAddCompanyModal() {
+    this.showAddCompanyModal = true;
+    this.newCompanyName = '';
+    this.newCompanyStatus = 'active';
+    this.newDepartmentName = '';
+    this.newDepartmentsList = [];
+  }
+
+  closeAddCompanyModal() {
+    this.showAddCompanyModal = false;
+  }
+
+  addDepartmentToList() {
+    if (this.newDepartmentName.trim()) {
+      this.newDepartmentsList.push(this.newDepartmentName.trim());
+      this.newDepartmentName = '';
+    }
+  }
+
+  removeDepartmentFromList(index: number) {
+    this.newDepartmentsList.splice(index, 1);
+  }
+
+  saveCompany() {
+    if (!this.newCompanyName.trim()) {
+      alert('الرجاء إدخال اسم الشركة');
+      return;
+    }
+    this.adminService.createCompany(this.newCompanyName).subscribe({
+      next: (comp) => {
+        const companyId = comp.id;
+        if (this.newDepartmentsList.length > 0) {
+          let completed = 0;
+          this.newDepartmentsList.forEach(deptName => {
+            this.adminService.createDepartment(companyId, deptName).subscribe(() => {
+              completed++;
+              if (completed === this.newDepartmentsList.length) {
+                this.closeAddCompanyModal();
+                this.loadCompanies();
+                this.loadStats();
+              }
+            });
+          });
+        } else {
+          this.closeAddCompanyModal();
+          this.loadCompanies();
+          this.loadStats();
+        }
+      },
+      error: (err) => {
+        console.error('Error creating company', err);
+        alert('حدث خطأ أثناء إنشاء الشركة.');
+      }
+    });
   }
 }
