@@ -246,7 +246,7 @@
 }
 .modal-header {
   background: var(--color-primary);
-  padding: 20px;
+  padding: 20px 25px;
 }
 .modal-body {
   padding: 25px;
@@ -254,14 +254,28 @@
   overflow-y: auto;
 }
 .modal-footer {
-  padding: 20px;
+  padding: 20px 25px;
   border-top: 1px solid var(--color-border);
   background: #f8f9fa;
 }
 .section-title {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
+}
+.modal-input {
+  border: 1px solid var(--color-navy);
+  border-radius: 6px;
+  padding: 10px 15px;
+  font-family: inherit;
+  font-size: 14px;
+  background: transparent;
+  color: var(--color-navy);
+}
+.modal-input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(46, 95, 217, 0.1);
 }
 .radio-card {
   border: 1px solid var(--color-border);

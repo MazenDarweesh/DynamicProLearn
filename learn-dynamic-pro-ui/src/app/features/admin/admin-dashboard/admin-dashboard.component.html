@@ -1,285 +1,362 @@
-    <div class="console-container" dir="rtl">
-      <!-- Header -->
-      <header class="console-header">
-        <div class="header-content">
-          <div class="brand w-100 d-flex justify-between align-center">
-            <h1>DynamicProLearn <span class="font-light">لوحة تحكم الأدمن</span></h1>
-            <div class="logout-container">
-              <button class="btn-logout" (click)="logout()">تسجيل الخروج</button>
-            </div>
-          </div>
-          <nav class="header-nav">
-            <button class="nav-btn active">الرئيسية <span class="icon">🏠</span></button>
-            <button class="nav-btn" (click)="goTo('admin/users')">الشركات <span class="icon">🏢</span></button>
-            <button class="nav-btn" (click)="goTo('admin/content')">الموديولات <span class="icon">📚</span></button>
-            <button class="nav-btn" (click)="goTo('admin/assignments')">التحليلات <span class="icon">📊</span></button>
-          </nav>
+<div class="console-container" dir="rtl">
+  <!-- Header -->
+  <header class="console-header">
+    <div class="header-content">
+      <div class="brand w-100 d-flex justify-between align-center">
+        <h1>DynamicProLearn <span class="font-light">لوحة تحكم الأدمن</span></h1>
+        <div class="logout-container">
+          <button class="btn-logout" (click)="logout()">تسجيل الخروج</button>
         </div>
-      </header>
+      </div>
+      <nav class="header-nav">
+        <button class="nav-btn active">الرئيسية <span class="icon">🏠</span></button>
+        <button class="nav-btn" (click)="goTo('admin/users')">الشركات <span class="icon">🏢</span></button>
+        <button class="nav-btn" (click)="goTo('admin/content')">الموديولات <span class="icon">📚</span></button>
+        <button class="nav-btn" (click)="goTo('admin/assignments')">التحليلات <span class="icon">📊</span></button>
+      </nav>
+    </div>
+  </header>
 
-      <div class="console-body">
-        
-        <!-- Stats Row -->
-        <div class="stats-grid">
-          <div class="stat-card">
-            <p>الشركات</p>
-            <h3>{{ stats.companies }}</h3>
-          </div>
-          <div class="stat-card">
-            <p>متعلمون نشطون</p>
-            <h3>{{ stats.users }}</h3>
-          </div>
-          <div class="stat-card">
-            <p>موديولات منشورة</p>
-            <h3>{{ stats.modules }}</h3>
-          </div>
-          <div class="stat-card">
-            <p>متوسط الإنجاز</p>
-            <h3 class="text-primary">{{ stats.progress }}</h3>
-          </div>
-        </div>
+  <div class="console-body">
 
-        <!-- PANEL 1: Companies -->
-        <div class="panel">
-          <div class="panel-header d-flex justify-between align-center">
-            <h3 class="panel-title">🏢 الشركات</h3>
-            <button class="btn-accent" (click)="openAddCompanyModal()">+ إضافة شركة</button>
-          </div>
-          <div class="panel-content">
-            <!-- Company List -->
-            <div class="item-card mb-3" *ngFor="let comp of companies">
-              <div class="d-flex justify-between align-start">
-                <div>
-                  <h4 class="text-primary">{{ comp.name }}</h4>
-                  <div class="badges-row">
-                    <span class="badge badge-primary" *ngFor="let d of comp.departments">{{ d.name }}</span>
-                    <span class="text-secondary text-sm" *ngIf="!comp.departments || comp.departments.length === 0">لا توجد أقسام</span>
-                  </div>
-                </div>
-                <div class="actions-left d-flex align-center gap-3">
-                  <span class="text-secondary text-sm">{{ comp.totalUsers || 0 }} مستخدمين</span>
-                  <button class="icon-btn text-secondary" (click)="editCompany(comp)" title="تعديل">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                  </button>
-                  <button class="icon-btn text-danger" (click)="deleteCompany(comp)" title="حذف">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- PANEL 2: Modules -->
-        <div class="panel mt-4">
-          <div class="panel-header d-flex justify-between align-center">
-            <h3 class="panel-title">📚 الموديولات</h3>
-            <button class="btn-accent" (click)="notImplemented('إنشاء موديول')">+ إنشاء موديول</button>
-          </div>
-          <div class="panel-content">
-            <div class="item-card module-card mb-4" *ngFor="let mod of modules">
-              <div class="d-flex justify-between align-start mb-2">
-                <h4 class="text-primary">موديول: {{ mod.name }}</h4>
-                <div class="actions-left d-flex gap-2">
-                  <button class="icon-btn text-secondary" (click)="editModule(mod)" title="تعديل">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                  </button>
-                  <button class="icon-btn text-danger" (click)="deleteModule(mod)" title="حذف">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                  </button>
-                </div>
-              </div>
-              
-              <div class="unit-group mt-3" *ngFor="let u of mod.units">
-                <div class="d-flex justify-between align-center mb-2">
-                  <h5 class="text-secondary m-0">الوحدة: {{ u.name }}</h5>
-                  <div class="actions-left d-flex gap-2">
-                    <button class="icon-btn text-secondary" (click)="editUnit(u)" title="تعديل الوحدة">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                    </button>
-                    <button class="icon-btn text-danger" (click)="deleteUnit(u)" title="حذف الوحدة">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                  </div>
-                </div>
-                
-                <div class="lesson-row d-flex justify-between" *ngFor="let lesson of u.lessons">
-                  <span class="text-secondary">- {{ lesson.title }}</span>
-                  <div class="d-flex gap-3 align-center">
-                    <span class="badge badge-primary-light">درس</span>
-                    <button class="icon-btn text-secondary" (click)="editLesson(lesson)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                    </button>
-                    <button class="icon-btn text-danger" (click)="deleteLesson(lesson)">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <div class="info-note mt-3">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-              <span>أي تعديل هنا يوصل فورًا لكل الأقسام المرتبطة.</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- PANEL 3: User Progress -->
-        <div class="panel mt-4">
-          <div class="panel-header text-right">
-            <h3 class="panel-title">📊 متابعة المستخدمين</h3>
-          </div>
-          <div class="panel-content">
-            
-            <div class="filters-row d-flex gap-4 mb-4">
-              <div class="select-group flex-1">
-                <label class="d-block text-secondary text-sm mb-2 text-right">اختر الشركة</label>
-                <div class="custom-select-wrapper">
-                  <select class="form-control blue-select" [(ngModel)]="selectedCompanyId" (change)="onCompanyChange()">
-                    <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
-                  </select>
-                </div>
-              </div>
-              <div class="select-group flex-1">
-                <label class="d-block text-secondary text-sm mb-2 text-right">اختر القسم</label>
-                <div class="custom-select-wrapper">
-                  <select class="form-control blue-select" [(ngModel)]="selectedDepartmentId" (change)="onDepartmentChange()">
-                    <option *ngFor="let d of departments" [value]="d.id">{{ d.name }}</option>
-                    <option *ngIf="departments.length === 0" value="">لا توجد أقسام</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            <table class="data-table mt-4">
-              <thead>
-                <tr>
-                  <th>المستخدم</th>
-                  <th>الدور</th>
-                  <th>الموديولات</th>
-                  <th>مكتمل</th>
-                  <th class="text-right">التقدم</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr *ngFor="let u of progressUsers">
-                  <td class="fw-500">{{ u.name }}</td>
-                  <td class="text-secondary">{{ u.role }}</td>
-                  <td class="text-secondary">{{ u.assignedModules }}</td>
-                  <td class="text-secondary">{{ u.completed }}</td>
-                  <td class="progress-cell">
-                    <div class="progress-track"><div class="progress-fill" [style.width]="u.progressValue + '%'"></div></div>
-                  </td>
-                </tr>
-                <tr *ngIf="progressUsers.length === 0">
-                  <td colspan="5" style="text-align: center; color: var(--color-text-secondary);">لا يوجد مستخدمين لعرضهم</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-        
+    <!-- Stats Row -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <p>الشركات</p>
+        <h3>{{ stats.companies }}</h3>
+      </div>
+      <div class="stat-card">
+        <p>متعلمون نشطون</p>
+        <h3>{{ stats.users }}</h3>
+      </div>
+      <div class="stat-card">
+        <p>موديولات منشورة</p>
+        <h3>{{ stats.modules }}</h3>
+      </div>
+      <div class="stat-card">
+        <p>متوسط الإنجاز</p>
+        <h3 class="text-primary">{{ stats.progress }}</h3>
       </div>
     </div>
 
-<!-- Add Company Modal -->
-<div class="modal-overlay" *ngIf="showAddCompanyModal">
-  <div class="modal-container">
-    <div class="modal-header">
-      <div class="d-flex justify-between align-center">
-        <div>
-          <h3 class="m-0 text-white d-flex align-center gap-2">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18"></path><path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16"></path><path d="M9 21v-4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v4"></path></svg>
-            تسجيل شركة عميل جديدة
-          </h3>
-          <p class="text-white-50 m-0 text-sm mt-1">تحديد البيانات الأساسية وهيكل الأقسام</p>
+    <!-- PANEL 1: Companies -->
+    <div class="panel">
+      <div class="panel-header d-flex justify-between align-center">
+        <h3 class="panel-title">🏢 الشركات</h3>
+        <button class="btn-accent" (click)="openAddCompanyModal()">+ إضافة شركة</button>
+      </div>
+      <div class="panel-content">
+        <!-- Company List -->
+        <div class="item-card mb-3" *ngFor="let comp of companies">
+          <div class="d-flex justify-between align-start">
+            <div>
+              <h4 class="text-primary">{{ comp.name }}</h4>
+              <div class="badges-row">
+                <span class="badge badge-primary" *ngFor="let d of comp.departments">{{ d.name }}</span>
+                <span class="text-secondary text-sm" *ngIf="!comp.departments || comp.departments.length === 0">لا توجد
+                  أقسام</span>
+              </div>
+            </div>
+            <div class="actions-left d-flex align-center gap-3">
+              <span class="text-secondary text-sm">{{ comp.totalUsers || 0 }} مستخدمين</span>
+              <button class="icon-btn text-secondary" (click)="editCompany(comp)" title="تعديل">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="icon-btn text-danger" (click)="deleteCompany(comp)" title="حذف">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
-        <button class="icon-btn text-white" (click)="closeAddCompanyModal()">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-        </button>
       </div>
     </div>
-    
-    <div class="modal-body">
-      <!-- Section 1: Company Profile -->
-      <div class="modal-section mb-4">
-        <h4 class="section-title d-flex align-center gap-2 text-primary">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-          ملف تعريف الشركة
-        </h4>
-        <div class="form-group mt-3">
-          <label class="text-secondary text-sm">اسم الشركة الرسمي *</label>
-          <input type="text" class="form-control mt-1" [(ngModel)]="newCompanyName" placeholder="مثال: شركة الأمل للتجارة والتوزيع">
-        </div>
-      </div>
 
-      <!-- Section 2: Account Status -->
-      <div class="modal-section mb-4">
-        <label class="text-secondary text-sm d-block mb-2">حالة الحساب الابتدائية</label>
-        
-        <div class="radio-card mb-2" [class.active]="newCompanyStatus === 'active'" (click)="newCompanyStatus = 'active'">
-          <div class="d-flex align-center gap-2">
-            <input type="radio" name="status" value="active" [(ngModel)]="newCompanyStatus">
-            <div class="status-indicator active-indicator"></div>
-            <span class="text-primary fw-500">نشط — تفعيل التدريب فوراً</span>
+    <!-- PANEL 2: Modules -->
+    <div class="panel mt-4">
+      <div class="panel-header d-flex justify-between align-center">
+        <h3 class="panel-title">📚 الموديولات</h3>
+        <button class="btn-accent" (click)="notImplemented('إنشاء موديول')">+ إنشاء موديول</button>
+      </div>
+      <div class="panel-content">
+        <div class="item-card module-card mb-4" *ngFor="let mod of modules">
+          <div class="d-flex justify-between align-start mb-2">
+            <h4 class="text-primary">موديول: {{ mod.name }}</h4>
+            <div class="actions-left d-flex gap-2">
+              <button class="icon-btn text-secondary" (click)="editModule(mod)" title="تعديل">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                </svg>
+              </button>
+              <button class="icon-btn text-danger" (click)="deleteModule(mod)" title="حذف">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                  stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 6h18"></path>
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  <line x1="10" y1="11" x2="10" y2="17"></line>
+                  <line x1="14" y1="11" x2="14" y2="17"></line>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <div class="unit-group mt-3" *ngFor="let u of mod.units">
+            <div class="d-flex justify-between align-center mb-2">
+              <h5 class="text-secondary m-0">الوحدة: {{ u.name }}</h5>
+              <div class="actions-left d-flex gap-2">
+                <button class="icon-btn text-secondary" (click)="editUnit(u)" title="تعديل الوحدة">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <button class="icon-btn text-danger" (click)="deleteUnit(u)" title="حذف الوحدة">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="lesson-row d-flex justify-between" *ngFor="let lesson of u.lessons">
+              <span class="text-secondary">- {{ lesson.title }}</span>
+              <div class="d-flex gap-3 align-center">
+                <span class="badge badge-primary-light">درس</span>
+                <button class="icon-btn text-secondary" (click)="editLesson(lesson)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
+                </button>
+                <button class="icon-btn text-danger" (click)="deleteLesson(lesson)">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18"></path>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-        
-        <div class="radio-card" [class.active]="newCompanyStatus === 'pending'" (click)="newCompanyStatus = 'pending'">
-          <div class="d-flex align-center gap-2">
-            <input type="radio" name="status" value="pending" [(ngModel)]="newCompanyStatus">
-            <div class="status-indicator pending-indicator"></div>
-            <span class="text-secondary fw-500">معلّق — قيد المراجعة والتعاقد</span>
-          </div>
+
+        <div class="info-note mt-3">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M12 16v-4"></path>
+            <path d="M12 8h.01"></path>
+          </svg>
+          <span>أي تعديل هنا يوصل فورًا لكل الأقسام المرتبطة.</span>
         </div>
       </div>
+    </div>
 
-      <!-- Section 3: Departments Structure -->
-      <div class="modal-section mb-2">
-        <h4 class="section-title d-flex align-center gap-2 text-primary">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"></circle><line x1="12" y1="22" x2="12" y2="8"></line><path d="M5 12H2a10 10 0 0 0 20 0h-3"></path></svg>
-          هيكل الأقسام الداخلية
-        </h4>
-        <p class="text-secondary text-sm m-0 mb-3">أدخل أسماء الأقسام اللي هتقسم عليها الموظفين والموديولات</p>
-        
-        <div class="d-flex gap-3 mb-3">
-          <button class="btn-outline-primary whitespace-nowrap" (click)="addDepartmentToList()">+ إضافة للقائمة</button>
-          <input type="text" class="form-control flex-1" [(ngModel)]="newDepartmentName" placeholder="اسم القسم الجديد" (keyup.enter)="addDepartmentToList()">
+    <!-- PANEL 3: User Progress -->
+    <div class="panel mt-4">
+      <div class="panel-header text-right">
+        <h3 class="panel-title">📊 متابعة المستخدمين</h3>
+      </div>
+      <div class="panel-content">
+
+        <div class="filters-row d-flex gap-4 mb-4">
+          <div class="select-group flex-1">
+            <label class="d-block text-secondary text-sm mb-2 text-right">اختر الشركة</label>
+            <div class="custom-select-wrapper">
+              <select class="form-control blue-select" [(ngModel)]="selectedCompanyId" (change)="onCompanyChange()">
+                <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+              </select>
+            </div>
+          </div>
+          <div class="select-group flex-1">
+            <label class="d-block text-secondary text-sm mb-2 text-right">اختر القسم</label>
+            <div class="custom-select-wrapper">
+              <select class="form-control blue-select" [(ngModel)]="selectedDepartmentId"
+                (change)="onDepartmentChange()">
+                <option *ngFor="let d of departments" [value]="d.id">{{ d.name }}</option>
+                <option *ngIf="departments.length === 0" value="">لا توجد أقسام</option>
+              </select>
+            </div>
+          </div>
         </div>
 
-        <table class="data-table departments-table">
+        <table class="data-table mt-4">
           <thead>
             <tr>
-              <th width="40">#</th>
-              <th>اسم القسم</th>
-              <th width="60" class="text-center">إجراءات</th>
+              <th>المستخدم</th>
+              <th>الدور</th>
+              <th>الموديولات</th>
+              <th>مكتمل</th>
+              <th class="text-right">التقدم</th>
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let dept of newDepartmentsList; let i = index">
-              <td class="text-secondary">{{ i + 1 }}</td>
-              <td class="fw-500">{{ dept }}</td>
-              <td class="text-center">
-                <button class="icon-btn text-danger" (click)="removeDepartmentFromList(i)">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
-                </button>
+            <tr *ngFor="let u of progressUsers">
+              <td class="fw-500">{{ u.name }}</td>
+              <td class="text-secondary">{{ u.role }}</td>
+              <td class="text-secondary">{{ u.assignedModules }}</td>
+              <td class="text-secondary">{{ u.completed }}</td>
+              <td class="progress-cell">
+                <div class="progress-track">
+                  <div class="progress-fill" [style.width]="u.progressValue + '%'"></div>
+                </div>
               </td>
             </tr>
-            <tr *ngIf="newDepartmentsList.length === 0">
-              <td colspan="3" class="text-center text-secondary py-4">لم يتم إضافة أي أقسام بعد</td>
+            <tr *ngIf="progressUsers.length === 0">
+              <td colspan="5" style="text-align: center; color: var(--color-text-secondary);">لا يوجد مستخدمين لعرضهم
+              </td>
             </tr>
           </tbody>
         </table>
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- Add Company Modal -->
+<div class="modal-overlay" *ngIf="showAddCompanyModal" dir="rtl">
+  <div class="modal-container">
+    <div class="modal-header">
+      <div class="d-flex justify-between align-center">
+        <div>
+          <h3 class="m-0 text-white d-flex align-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14"></path>
+              <path d="M2 22h20"></path>
+              <path d="M9 13h6"></path>
+              <path d="M9 9h6"></path>
+              <path d="M9 17h.01"></path>
+            </svg>
+            تسجيل شركة عميل جديدة
+          </h3>
+          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">تحديد البيانات الأساسية وهيكل الأقسام
+          </p>
+        </div>
+        <button class="icon-btn text-white" (click)="closeAddCompanyModal()" style="margin-left: -10px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <!-- Section 1: Company Profile -->
+      <div class="modal-section mb-4">
+        <h4 class="section-title d-flex align-center gap-2 text-primary mb-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+            <polyline points="14 2 14 8 20 8"></polyline>
+            <line x1="16" y1="13" x2="8" y2="13"></line>
+            <line x1="16" y1="17" x2="8" y2="17"></line>
+            <polyline points="10 9 9 9 8 9"></polyline>
+          </svg>
+          ملف تعريف الشركة
+        </h4>
+        <div style="padding-right: 28px;">
+          <div class="form-group">
+            <label class="text-secondary text-sm d-block mb-1">* اسم الشركة الرسمي</label>
+            <input type="text" class="form-control modal-input" [(ngModel)]="newCompanyName"
+              placeholder="مثال: شركة الأمل للتجارة والتوزيع">
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 2: Account Status
+      <div class="modal-section mb-4">
+        <label class="text-secondary text-sm d-block mb-2">حالة الحساب الابتدائية</label>
+
+        <div class="radio-card mb-2" [class.active]="newCompanyStatus === 'active'"
+          (click)="newCompanyStatus = 'active'">
+          <div class="d-flex align-center gap-2">
+            <input type="radio" name="status" value="active" [(ngModel)]="newCompanyStatus">
+            <div class="status-indicator active-indicator"></div>
+            <span class="text-navy fw-500 text-lg">نشط — تفعيل التدريب فوراً</span>
+          </div>
+        </div> 
+
+        <div class="radio-card" [class.active]="newCompanyStatus === 'pending'" (click)="newCompanyStatus = 'pending'">
+          <div class="d-flex align-center gap-2">
+            <input type="radio" name="status" value="pending" [(ngModel)]="newCompanyStatus">
+            <div class="status-indicator pending-indicator"></div>
+            <span class="text-navy fw-500 text-lg">معلّق — قيد المراجعة والتعاقد</span>
+          </div>
+        </div>
+      </div>-->
+
+      <!-- Section 3: Departments Structure -->
+      <div class="modal-section mb-2">
+        <h4 class="section-title d-flex align-center gap-2 text-primary mb-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="5" r="3"></circle>
+            <line x1="12" y1="22" x2="12" y2="8"></line>
+            <path d="M5 12H2a10 10 0 0 0 20 0h-3"></path>
+          </svg>
+          هيكل الأقسام الداخلية
+        </h4>
+        <div style="padding-right: 28px;">
+          <p class="text-secondary text-sm m-1 mb-3">أدخل أسماء الأقسام اللي هتقسم عليها الموظفين والموديولات</p>
+
+          <div class="d-flex gap-3 mb-3">
+            <input type="text" class="form-control modal-input flex-1" [(ngModel)]="newDepartmentName"
+              placeholder="اسم القسم الجديد" (keyup.enter)="addDepartmentToList()">
+            <button class="btn-outline-primary whitespace-nowrap" (click)="addDepartmentToList()">+ إضافة
+              للقائمة</button>
+          </div>
+
+          <table class="data-table departments-table mt-2">
+            <thead>
+              <tr>
+                <th width="40" class="text-right text-secondary">#</th>
+                <th class="text-right text-secondary">اسم القسم</th>
+                <th width="80" class="text-left text-secondary">إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let dept of newDepartmentsList; let i = index">
+                <td class="text-secondary text-right">{{ i + 1 }}</td>
+                <td class="fw-500 text-navy text-right">{{ dept }}</td>
+                <td class="text-left">
+                  <button class="icon-btn text-danger" (click)="removeDepartmentFromList(i)" style="opacity: 0.7;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M3 6h18"></path>
+                      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+              <tr *ngIf="newDepartmentsList.length === 0">
+                <td colspan="3" class="text-center text-secondary py-4" style="border-bottom: none;">لم يتم إضافة أي
+                  أقسام بعد</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="modal-footer d-flex gap-3">
-      <button class="btn-secondary flex-1" (click)="closeAddCompanyModal()">إلغاء الأمر</button>
       <button class="btn-accent flex-2 d-flex justify-center align-center gap-2" (click)="saveCompany()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
         حفظ وإنشاء الشركة
       </button>
+      <button class="btn-secondary flex-1" (click)="closeAddCompanyModal()">إلغاء الأمر</button>
     </div>
   </div>
 </div>
