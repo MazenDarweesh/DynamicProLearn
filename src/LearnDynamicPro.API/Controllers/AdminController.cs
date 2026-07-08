@@ -43,6 +43,22 @@ public class AdminController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpPut("companies/{id}")]
+    public async Task<IActionResult> UpdateCompany(Guid id, [FromBody] UpdateCompanyRequest request)
+    {
+        var result = await _companyService.UpdateCompanyAsync(id, request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok();
+    }
+
+    [HttpDelete("companies/{id}")]
+    public async Task<IActionResult> DeleteCompany(Guid id)
+    {
+        var result = await _companyService.DeleteCompanyAsync(id);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return NoContent();
+    }
+
     // ── Departments ─────────────────────────────────────────────────────────
     [HttpPost("departments")]
     public async Task<IActionResult> CreateDepartment([FromBody] CreateDepartmentRequest request)
@@ -58,6 +74,22 @@ public class AdminController : ControllerBase
         var result = await _companyService.GetDepartmentsByCompanyAsync(companyId);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
+    }
+
+    [HttpPut("departments/{id}")]
+    public async Task<IActionResult> UpdateDepartment(Guid id, [FromBody] UpdateDepartmentRequest request)
+    {
+        var result = await _companyService.UpdateDepartmentAsync(id, request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok();
+    }
+
+    [HttpDelete("departments/{id}")]
+    public async Task<IActionResult> DeleteDepartment(Guid id)
+    {
+        var result = await _companyService.DeleteDepartmentAsync(id);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return NoContent();
     }
 
     // ── Users ───────────────────────────────────────────────────────────────
@@ -207,5 +239,22 @@ public class AdminController : ControllerBase
         var result = await _assignmentService.RemoveAssignmentAsync(id);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return NoContent();
+    }
+
+    // ── Analytics & Progress ────────────────────────────────────────────────
+    [HttpGet("stats")]
+    public async Task<IActionResult> GetDashboardStats()
+    {
+        var result = await _companyService.GetDashboardStatsAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("departments/{departmentId}/users-progress")]
+    public async Task<IActionResult> GetUsersProgress(Guid departmentId)
+    {
+        var result = await _companyService.GetDepartmentUsersProgressAsync(departmentId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 }

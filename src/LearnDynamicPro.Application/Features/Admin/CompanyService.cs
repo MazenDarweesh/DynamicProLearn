@@ -114,5 +114,144 @@ public class CompanyService : ICompanyService
             
         return Result<List<UserDto>>.Success(users);
     }
+
+    public async Task<Result<bool>> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request)
+    {
+        var company = await _context.Companies.FindAsync(id);
+        if (company == null)
+            return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        company.Name = request.Name;
+        await _context.SaveChangesAsync(default);
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<bool>> DeleteCompanyAsync(Guid id)
+    {
+        var company = await _context.Companies.FindAsync(id);
+        if (company == null)
+            return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        _context.Companies.Remove(company);
+        await _context.SaveChangesAsync(default);
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<bool>> UpdateDepartmentAsync(Guid id, UpdateDepartmentRequest request)
+    {
+        var department = await _context.Departments.FindAsync(id);
+        if (department == null)
+            return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        department.Name = request.Name;
+        await _context.SaveChangesAsync(default);
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<bool>> DeleteDepartmentAsync(Guid id)
+    {
+        var department = await _context.Departments.FindAsync(id);
+        if (department == null)
+            return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        _context.Departments.Remove(department);
+        await _context.SaveChangesAsync(default);
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<IEnumerable<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId)
+    {
+        // Get all users in department
+        var users = await _context.Users
+            .AsNoTracking()
+            .Where(u => u.DepartmentId == departmentId)
+            .ToListAsync();
+
+        // Get assigned modules for department
+        var assignments = await _context.DepartmentModuleAssignments
+            .AsNoTracking()
+            .Include(a => a.Module)
+                .ThenInclude(m => m.Units)
+                    .ThenInclude(u => u.Lessons)
+            .Where(a => a.DepartmentId == departmentId)
+            .ToListAsync();
+
+        var assignedModulesNames = string.Join(", ", assignments.Select(a => a.Module.Name));
+        
+        // Calculate total lessons in all assigned modules
+        var totalLessons = assignments
+            .SelectMany(a => a.Module.Units)
+            .SelectMany(u => u.Lessons)
+            .Count();
+
+        var lessonIds = assignments
+            .SelectMany(a => a.Module.Units)
+            .SelectMany(u => u.Lessons)
+            .Select(l => l.Id)
+            .ToList();
+
+        // Get completed lessons for all these users
+        var userIds = users.Select(u => u.Id).ToList();
+        var completions = await _context.LessonProgresses
+            .AsNoTracking()
+            .Where(p => userIds.Contains(p.UserId) && p.IsCompleted && lessonIds.Contains(p.LessonId))
+            .ToListAsync();
+
+        var progressList = users.Select(u => {
+            var completedCount = completions.Count(c => c.UserId == u.Id);
+            return new UserProgressDto
+            {
+                UserId = u.Id,
+                UserName = u.Username,
+                Role = u.Role.ToString(),
+                AssignedModules = string.IsNullOrEmpty(assignedModulesNames) ? "لا يوجد" : assignedModulesNames,
+                CompletedLessons = completedCount,
+                TotalLessons = totalLessons
+            };
+        }).ToList();
+
+        return Result<IEnumerable<UserProgressDto>>.Success(progressList);
+    }
+
+    public async Task<Result<DashboardStatsDto>> GetDashboardStatsAsync()
+    {
+        var totalCompanies = await _context.Companies.CountAsync();
+        var activeUsers = await _context.Users.CountAsync();
+        var publishedModules = await _context.Modules.CountAsync();
+
+        // Average progress = total completions / total assigned lessons across everyone
+        // For simplicity, we can calculate total possible vs total completed.
+        // A more exact metric would need user-assignment mapping.
+        // Let's do a fast approximation:
+        var totalAssignments = await _context.DepartmentModuleAssignments
+            .Include(a => a.Department)
+                .ThenInclude(d => d.Users)
+            .Include(a => a.Module)
+                .ThenInclude(m => m.Units)
+                    .ThenInclude(u => u.Lessons)
+            .ToListAsync();
+
+        int totalPossibleLessons = 0;
+        foreach(var assignment in totalAssignments)
+        {
+            var userCount = assignment.Department.Users.Count;
+            var lessonCount = assignment.Module.Units.SelectMany(u => u.Lessons).Count();
+            totalPossibleLessons += userCount * lessonCount;
+        }
+
+        int totalCompleted = await _context.LessonProgresses.CountAsync(p => p.IsCompleted);
+
+        double averageProgress = totalPossibleLessons == 0 
+            ? 0 
+            : Math.Round((double)totalCompleted / totalPossibleLessons * 100, 1);
+
+        return Result<DashboardStatsDto>.Success(new DashboardStatsDto
+        {
+            TotalCompanies = totalCompanies,
+            ActiveUsers = activeUsers,
+            PublishedModules = publishedModules,
+            AverageProgress = averageProgress
+        });
+    }
 }
 

@@ -23,19 +23,19 @@
         <div class="stats-grid">
           <div class="stat-card">
             <p>الشركات</p>
-            <h3>12</h3>
+            <h3>{{ stats.companies }}</h3>
           </div>
           <div class="stat-card">
             <p>متعلمون نشطون</p>
-            <h3>184</h3>
+            <h3>{{ stats.users }}</h3>
           </div>
           <div class="stat-card">
             <p>موديولات منشورة</p>
-            <h3>9</h3>
+            <h3>{{ stats.modules }}</h3>
           </div>
           <div class="stat-card">
             <p>متوسط الإنجاز</p>
-            <h3 class="text-primary">63%</h3>
+            <h3 class="text-primary">{{ stats.progress }}</h3>
           </div>
         </div>
 
@@ -46,43 +46,22 @@
             <button class="btn-accent" (click)="notImplemented('إضافة شركة')">+ إضافة شركة</button>
           </div>
           <div class="panel-content">
-            <!-- Company 1 -->
-            <div class="item-card">
+            <!-- Company List -->
+            <div class="item-card mb-3" *ngFor="let comp of companies">
               <div class="d-flex justify-between align-start">
                 <div>
-                  <h4 class="text-primary">الأمل للتجارة</h4>
+                  <h4 class="text-primary">{{ comp.name }}</h4>
                   <div class="badges-row">
-                    <span class="badge badge-primary">الحسابات والمالية</span>
-                    <span class="badge badge-primary">سلسلة التوريد والموارد البشرية</span>
+                    <span class="badge badge-primary" *ngFor="let d of comp.departments">{{ d.name }}</span>
+                    <span class="text-secondary text-sm" *ngIf="!comp.departments || comp.departments.length === 0">لا توجد أقسام</span>
                   </div>
                 </div>
                 <div class="actions-left d-flex align-center gap-3">
-                  <span class="text-secondary text-sm">5 مستخدمين</span>
-                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')" title="تعديل">
+                  <span class="text-secondary text-sm">{{ comp.totalUsers || 0 }} مستخدمين</span>
+                  <button class="icon-btn text-secondary" (click)="editCompany(comp)" title="تعديل">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                   </button>
-                  <button class="icon-btn text-danger" (click)="notImplemented('حذف')" title="حذف">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <!-- Company 2 -->
-            <div class="item-card mt-3">
-              <div class="d-flex justify-between align-start">
-                <div>
-                  <h4 class="text-primary">دلتا لوجيستكس</h4>
-                  <div class="badges-row">
-                    <span class="badge badge-primary">إدارة العمليات</span>
-                  </div>
-                </div>
-                <div class="actions-left d-flex align-center gap-3">
-                  <span class="text-secondary text-sm">2 مستخدمين</span>
-                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')" title="تعديل">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                  </button>
-                  <button class="icon-btn text-danger" (click)="notImplemented('حذف')" title="حذف">
+                  <button class="icon-btn text-danger" (click)="deleteCompany(comp)" title="حذف">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                   </button>
                 </div>
@@ -98,36 +77,43 @@
             <button class="btn-accent" (click)="notImplemented('إنشاء موديول')">+ إنشاء موديول</button>
           </div>
           <div class="panel-content">
-            <div class="item-card module-card">
+            <div class="item-card module-card mb-4" *ngFor="let mod of modules">
               <div class="d-flex justify-between align-start mb-2">
-                <h4 class="text-primary">موديول 01: المحاسبة المالية</h4>
+                <h4 class="text-primary">موديول: {{ mod.name }}</h4>
                 <div class="actions-left d-flex gap-2">
-                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')" title="تعديل">
+                  <button class="icon-btn text-secondary" (click)="editModule(mod)" title="تعديل">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
                   </button>
-                  <button class="icon-btn text-danger" (click)="notImplemented('حذف')" title="حذف">
+                  <button class="icon-btn text-danger" (click)="deleteModule(mod)" title="حذف">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
                   </button>
                 </div>
               </div>
-              <h5 class="text-secondary mb-3">الوحدة 1.1: قواعد قيد اليومية</h5>
               
-              <div class="lesson-row d-flex justify-between mb-2">
-                <span class="text-secondary">مقدمة في المدين والدائن</span>
-                <div class="d-flex gap-3 align-center">
-                  <span class="badge badge-primary-light">نظري • مبتدئ</span>
-                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                  </button>
+              <div class="unit-group mt-3" *ngFor="let u of mod.units">
+                <div class="d-flex justify-between align-center mb-2">
+                  <h5 class="text-secondary m-0">الوحدة: {{ u.name }}</h5>
+                  <div class="actions-left d-flex gap-2">
+                    <button class="icon-btn text-secondary" (click)="editUnit(u)" title="تعديل الوحدة">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                    <button class="icon-btn text-danger" (click)="deleteUnit(u)" title="حذف الوحدة">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                  </div>
                 </div>
-              </div>
-              <div class="lesson-row d-flex justify-between">
-                <span class="text-secondary">التحقق من ترحيل الأستاذ</span>
-                <div class="d-flex gap-3 align-center">
-                  <span class="badge badge-accent-light">تطبيق ERP • متوسط</span>
-                  <button class="icon-btn text-secondary" (click)="notImplemented('تعديل')">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
-                  </button>
+                
+                <div class="lesson-row d-flex justify-between" *ngFor="let lesson of u.lessons">
+                  <span class="text-secondary">- {{ lesson.title }}</span>
+                  <div class="d-flex gap-3 align-center">
+                    <span class="badge badge-primary-light">درس</span>
+                    <button class="icon-btn text-secondary" (click)="editLesson(lesson)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                    </button>
+                    <button class="icon-btn text-danger" (click)="deleteLesson(lesson)">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -150,16 +136,17 @@
               <div class="select-group flex-1">
                 <label class="d-block text-secondary text-sm mb-2 text-right">اختر الشركة</label>
                 <div class="custom-select-wrapper">
-                  <select class="form-control blue-select">
-                    <option>الأمل للتجارة</option>
+                  <select class="form-control blue-select" [(ngModel)]="selectedCompanyId" (change)="onCompanyChange()">
+                    <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
                   </select>
                 </div>
               </div>
               <div class="select-group flex-1">
                 <label class="d-block text-secondary text-sm mb-2 text-right">اختر القسم</label>
                 <div class="custom-select-wrapper">
-                  <select class="form-control blue-select">
-                    <option>الحسابات والمالية</option>
+                  <select class="form-control blue-select" [(ngModel)]="selectedDepartmentId" (change)="onDepartmentChange()">
+                    <option *ngFor="let d of departments" [value]="d.id">{{ d.name }}</option>
+                    <option *ngIf="departments.length === 0" value="">لا توجد أقسام</option>
                   </select>
                 </div>
               </div>
@@ -176,32 +163,17 @@
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td class="fw-500">مازن درويش</td>
-                  <td class="text-secondary">طالب</td>
-                  <td class="text-secondary">المحاسبة</td>
-                  <td class="text-secondary">10 / 8</td>
+                <tr *ngFor="let u of progressUsers">
+                  <td class="fw-500">{{ u.name }}</td>
+                  <td class="text-secondary">{{ u.role }}</td>
+                  <td class="text-secondary">{{ u.assignedModules }}</td>
+                  <td class="text-secondary">{{ u.completed }}</td>
                   <td class="progress-cell">
-                    <div class="progress-track"><div class="progress-fill" style="width: 80%"></div></div>
+                    <div class="progress-track"><div class="progress-fill" [style.width]="u.progressValue + '%'"></div></div>
                   </td>
                 </tr>
-                <tr>
-                  <td class="fw-500">أحمد كيو إيه</td>
-                  <td class="text-secondary">مختبر</td>
-                  <td class="text-secondary">المحاسبة</td>
-                  <td class="text-secondary">10 / 5</td>
-                  <td class="progress-cell">
-                    <div class="progress-track"><div class="progress-fill" style="width: 50%"></div></div>
-                  </td>
-                </tr>
-                <tr>
-                  <td class="fw-500">سارة فين</td>
-                  <td class="text-secondary">طالبة</td>
-                  <td class="text-secondary">المحاسبة</td>
-                  <td class="text-secondary">10 / 2</td>
-                  <td class="progress-cell">
-                    <div class="progress-track"><div class="progress-fill" style="width: 20%"></div></div>
-                  </td>
+                <tr *ngIf="progressUsers.length === 0">
+                  <td colspan="5" style="text-align: center; color: var(--color-text-secondary);">لا يوجد مستخدمين لعرضهم</td>
                 </tr>
               </tbody>
             </table>

@@ -98,4 +98,41 @@ export class AdminService {
       orderIndex: 1 
     });
   }
+
+  deleteModule(id: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/modules/${id}`);
+  }
+
+  deleteUnit(id: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/units/${id}`);
+  }
+
+  deleteLesson(id: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/lessons/${id}`);
+  }
+
+  // --- New Endpoints ---
+  updateCompany(id: string, name: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/companies/${id}`, { name });
+  }
+
+  deleteCompany(id: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/companies/${id}`);
+  }
+
+  updateDepartment(id: string, name: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/departments/${id}`, { name });
+  }
+
+  deleteDepartment(id: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/departments/${id}`);
+  }
+
+  getDashboardStats(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/stats`);
+  }
+
+  getUsersProgress(departmentId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/departments/${departmentId}/users-progress`);
+  }
 }
