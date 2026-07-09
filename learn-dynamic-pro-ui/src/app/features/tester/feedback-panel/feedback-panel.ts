@@ -80,10 +80,10 @@ export interface ModuleOverview {
             
             <form (ngSubmit)="submitFeedback()" class="feedback-form">
               <div class="form-group">
-                <label>Select System Status/Condition:</label>
+                <label>حالة النظام / التقييم (System Status):</label>
                 <div class="custom-select-wrapper">
                   <select class="form-control status-select" [(ngModel)]="selectedConditionId" name="condition" required>
-                    <option value="" disabled selected>-- Select Inspected Status --</option>
+                    <option value="" disabled selected>-- اختر حالة التقييم المرجعية --</option>
                     <option *ngFor="let cond of conditions" [value]="cond.id">
                       {{ cond.label }}
                     </option>
@@ -92,13 +92,13 @@ export interface ModuleOverview {
               </div>
 
               <div class="form-group mt-4">
-                <label>📝 Tester Structural Notes</label>
+                <label>📝 الملاحظات الهيكلية للمختبر (أسباب المشكلة أو التفاصيل):</label>
                 <textarea 
                   class="form-control" 
                   [(ngModel)]="notes" 
                   name="notes" 
                   rows="4" 
-                  placeholder="اكتب ملاحظاتك الهيكلية هنا..." 
+                  placeholder="اكتب ملاحظاتك التقنية أو خطوات إعادة إنتاج الخطأ هنا..." 
                   required>
                 </textarea>
               </div>
@@ -106,7 +106,7 @@ export interface ModuleOverview {
               <div class="form-actions mt-4">
                 <button type="submit" class="btn-submit" [disabled]="isSubmitting || !selectedConditionId || !notes">
                   <span *ngIf="isSubmitting" class="spinner-small"></span>
-                  <span *ngIf="!isSubmitting">📤 LOG TESTER VERDICT TO VERSION DATABASE</span>
+                  <span *ngIf="!isSubmitting">📤 اعتماد النتيجة وحفظها في قاعدة الإصدار</span>
                 </button>
               </div>
 
@@ -283,28 +283,28 @@ export class FeedbackPanel implements OnInit {
       notes: this.notes
     };
 
-    this.testerService.submitFeedback(request).subscribe({
-      next: () => {
-        this.isSubmitting = false;
-        this.successMessage = 'تم تسجيل التقييم بنجاح وإرساله إلى قاعدة بيانات الإصدارات!';
-        
-        // Mark current lesson as complete locally
-        if (this.currentLesson) {
-          this.currentLesson.isCompleted = true;
-        }
-
-        this.notes = '';
-        this.selectedConditionId = '';
-        setTimeout(() => this.successMessage = '', 4000);
-      },
-      error: (err) => {
-        this.isSubmitting = false;
-        this.errorMessage = err.error?.detail || 'فشل في إرسال التقييم. تأكد من وجود إصدار نشط.';
+    // Parallel execution for saving feedback and marking lesson as complete
+    Promise.all([
+      this.testerService.submitFeedback(request).toPromise(),
+      this.studentService.completeLesson(this.currentLesson.id, true).toPromise().catch(e => console.warn('Progress already updated or failed', e))
+    ]).then(() => {
+      this.isSubmitting = false;
+      this.successMessage = 'تم تسجيل التقييم وتحديث نسبة التقدم بنجاح!';
+      
+      if (this.currentLesson) {
+        this.currentLesson.isCompleted = true;
       }
+
+      this.notes = '';
+      this.selectedConditionId = '';
+      setTimeout(() => this.successMessage = '', 4000);
+    }).catch(err => {
+      this.isSubmitting = false;
+      this.errorMessage = err.error?.detail || 'فشل في إرسال التقييم. تأكد من وجود إصدار نشط.';
     });
   }
 
   goBack() {
-    this.router.navigate(['/tester']);
+    this.router.navigate(['/tester/dashboard']);
   }
 }
