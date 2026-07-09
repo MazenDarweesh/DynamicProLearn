@@ -1,0 +1,144 @@
+<div class="console-container" dir="rtl">
+  <!-- Header -->
+  <header class="console-header">
+    <div class="header-content">
+      <div class="brand w-100 d-flex justify-between align-center">
+        <h1>DynamicProLearn <span class="font-light">لوحة تحكم الأدمن</span></h1>
+        <div class="logout-container">
+          <button class="btn-logout" (click)="logout()">تسجيل الخروج</button>
+        </div>
+      </div>
+      <nav class="header-nav">
+        <button class="nav-btn" (click)="goTo('admin')">الرئيسية <span class="icon">🏠</span></button>
+        <button class="nav-btn" (click)="goTo('admin/users')">الشركات <span class="icon">🏢</span></button>
+        <button class="nav-btn" (click)="goTo('admin/content')">الموديولات <span class="icon">📚</span></button>
+        <button class="nav-btn" (click)="goTo('admin/assignments')">التحليلات <span class="icon">📊</span></button>
+        <button class="nav-btn active">المختبرون <span class="icon">🧪</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="console-body">
+    <div class="panel">
+      <div class="panel-header d-flex justify-between align-center">
+        <div>
+          <h3 class="panel-title m-0 d-flex align-center gap-2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="9" cy="7" r="4"></circle>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+            </svg>
+            إدارة فريق الاختبار
+          </h3>
+          <p class="text-secondary text-sm m-0 mt-1">تتبع تقدم المختبرين وإضافة حسابات جديدة</p>
+        </div>
+        <button class="btn-accent" (click)="openAddTesterModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 4px; vertical-align: middle;">
+            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+            <circle cx="8.5" cy="7" r="4"></circle>
+            <line x1="20" y1="8" x2="20" y2="14"></line>
+            <line x1="23" y1="11" x2="17" y2="11"></line>
+          </svg>
+          إضافة مختبر جديد
+        </button>
+      </div>
+
+      <div class="panel-content mt-4">
+        <table class="data-table w-100">
+          <thead>
+            <tr>
+              <th>المختبر</th>
+              <th>الموديولات المتاحة</th>
+              <th>دروس مكتملة</th>
+              <th class="text-right">التقدم</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let t of testersProgress">
+              <td class="fw-500">{{ t.name }}</td>
+              <td class="text-secondary">{{ t.assignedModules }}</td>
+              <td class="text-secondary">{{ t.completed }} / {{ t.totalLessons }}</td>
+              <td class="progress-cell">
+                <div class="progress-track">
+                  <div class="progress-fill" [style.width]="t.progressValue + '%'"></div>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="testersProgress.length === 0">
+              <td colspan="4" style="text-align: center; color: var(--color-text-secondary); padding: 32px 0;">لا يوجد مختبرين حتى الآن</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Tester Modal -->
+<div class="modal-overlay" *ngIf="showAddTesterModal" dir="rtl">
+  <div class="modal-container" style="max-width: 500px;">
+    <div class="modal-header">
+      <div class="d-flex justify-between align-center">
+        <div>
+          <h3 class="m-0 text-white d-flex align-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8.5" cy="7" r="4"></circle>
+              <line x1="20" y1="8" x2="20" y2="14"></line>
+              <line x1="23" y1="11" x2="17" y2="11"></line>
+            </svg>
+            تسجيل مختبر جديد
+          </h3>
+          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">
+            أدخل بيانات المختبر، واختر القسم لتحديد الموديولات المتاحة له
+          </p>
+        </div>
+        <button class="icon-btn text-white" (click)="closeAddTesterModal()" style="margin-left: -10px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group mb-3">
+        <label class="form-label text-secondary text-sm mb-2 d-block">اسم المستخدم (المختبر)</label>
+        <input type="text" class="form-control" [(ngModel)]="newTesterUsername" placeholder="مثال: tester1">
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label text-secondary text-sm mb-2 d-block">كلمة المرور</label>
+        <input type="password" class="form-control" [(ngModel)]="newTesterPassword" placeholder="كلمة مرور قوية">
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label text-secondary text-sm mb-2 d-block">الشركة</label>
+        <div class="custom-select-wrapper">
+          <select class="form-control blue-select" [(ngModel)]="testerCompanyId" (change)="onTesterCompanyChange()">
+            <option value="" disabled selected>اختر الشركة...</option>
+            <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group mb-3">
+        <label class="form-label text-secondary text-sm mb-2 d-block">القسم (يحدد الموديولات المتاحة له)</label>
+        <div class="custom-select-wrapper">
+          <select class="form-control blue-select" [(ngModel)]="testerDepartmentId">
+            <option value="" disabled selected>اختر القسم...</option>
+            <option *ngFor="let d of testerDepartments" [value]="d.id">{{ d.name }}</option>
+            <option *ngIf="testerDepartments.length === 0" value="" disabled>لا توجد أقسام</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer d-flex justify-end gap-3 p-4 border-top">
+      <button class="btn-secondary" (click)="closeAddTesterModal()" [disabled]="isSubmitting">إلغاء</button>
+      <button class="btn-primary" (click)="submitTester()" [disabled]="isSubmitting">
+        <span *ngIf="isSubmitting" class="spinner"></span>
+        <span *ngIf="!isSubmitting">حفظ وإضافة</span>
+      </button>
+    </div>
+  </div>
+</div>

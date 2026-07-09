@@ -13,7 +13,7 @@
         <button class="nav-btn" (click)="goTo('admin/users')">الشركات <span class="icon">🏢</span></button>
         <button class="nav-btn" (click)="goTo('admin/content')">الموديولات <span class="icon">📚</span></button>
         <button class="nav-btn" (click)="goTo('admin/assignments')">التحليلات <span class="icon">📊</span></button>
-        <button class="nav-btn" (click)="scrollToTesters()">المختبرين <span class="icon">🧪</span></button>
+        <button class="nav-btn" (click)="goTo('admin/testers')">المختبرون <span class="icon">🧪</span></button>
       </nav>
     </div>
   </header>
@@ -304,9 +304,10 @@
         </div>
       </div>
     </div>
-
   </div>
 </div>
+
+
 
 <!-- Add Tester Modal -->
 <div class="modal-overlay" *ngIf="showAddTesterModal" dir="rtl">

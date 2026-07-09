@@ -55,6 +55,8 @@ export class AdminDashboardComponent implements OnInit {
   testerDepartmentId = '';
   testerDepartments: any[] = [];
 
+
+
   ngOnInit() {
     this.refreshAllData();
   }
@@ -633,9 +635,5 @@ export class AdminDashboardComponent implements OnInit {
         Dialog.alert('حدث خطأ أثناء الإضافة: ' + (err.error?.detail || err.message), 'خطأ', 'error');
       }
     });
-  }
-
-  scrollToTesters() {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }
 }

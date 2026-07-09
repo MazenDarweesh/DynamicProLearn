@@ -42,6 +42,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/assignments-manager/assignments-manager.component').then(m => m.AssignmentsManagerComponent)
   },
   {
+    path: 'admin/testers',
+    canActivate: [roleGuard(['Admin'])],
+    loadComponent: () => import('./features/admin/admin-testers/admin-testers.component').then(m => m.AdminTestersComponent)
+  },
+  {
     path: '',
     redirectTo: 'login',
     pathMatch: 'full'
