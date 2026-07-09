@@ -39,9 +39,16 @@ export class AdminDashboardComponent implements OnInit {
   newDepartmentsList: string[] = [];
 
   ngOnInit() {
+    this.refreshAllData();
+  }
+
+  refreshAllData() {
     this.loadStats();
     this.loadCompanies();
     this.loadModules();
+    if (this.selectedDepartmentId) {
+      this.onDepartmentChange();
+    }
   }
 
   loadStats() {
@@ -134,7 +141,7 @@ export class AdminDashboardComponent implements OnInit {
 
   deleteCompany(comp: any) {
     if (confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟')) {
-      this.adminService.deleteCompany(comp.id).subscribe(() => this.loadCompanies());
+      this.adminService.deleteCompany(comp.id).subscribe(() => this.refreshAllData());
     }
   }
 
@@ -146,7 +153,7 @@ export class AdminDashboardComponent implements OnInit {
 
   deleteModule(mod: any) {
     if (confirm('هل أنت متأكد من حذف الموديول؟')) {
-      this.adminService.deleteModule(mod.id).subscribe(() => this.loadModules());
+      this.adminService.deleteModule(mod.id).subscribe(() => this.refreshAllData());
     }
   }
 
@@ -158,7 +165,7 @@ export class AdminDashboardComponent implements OnInit {
 
   deleteUnit(unit: any) {
     if (confirm('هل أنت متأكد من حذف الوحدة؟')) {
-      this.adminService.deleteUnit(unit.id).subscribe(() => this.loadModules());
+      this.adminService.deleteUnit(unit.id).subscribe(() => this.refreshAllData());
     }
   }
 
@@ -170,7 +177,7 @@ export class AdminDashboardComponent implements OnInit {
 
   deleteLesson(lesson: any) {
     if (confirm('هل أنت متأكد من حذف الدرس؟')) {
-      this.adminService.deleteLesson(lesson.id).subscribe(() => this.loadModules());
+      this.adminService.deleteLesson(lesson.id).subscribe(() => this.refreshAllData());
     }
   }
 
@@ -226,15 +233,13 @@ export class AdminDashboardComponent implements OnInit {
               completed++;
               if (completed === this.newDepartmentsList.length) {
                 this.closeAddCompanyModal();
-                this.loadCompanies();
-                this.loadStats();
+                this.refreshAllData();
               }
             });
           });
         } else {
           this.closeAddCompanyModal();
-          this.loadCompanies();
-          this.loadStats();
+          this.refreshAllData();
         }
       },
       error: (err) => {
@@ -304,8 +309,7 @@ export class AdminDashboardComponent implements OnInit {
       }
 
       this.closeAddModuleModal();
-      this.loadModules();
-      this.loadStats();
+      this.refreshAllData();
     } catch (err) {
       console.error('Error creating module', err);
       alert('حدث خطأ أثناء إنشاء الموديول.');
@@ -357,10 +361,7 @@ export class AdminDashboardComponent implements OnInit {
     this.adminService.createUser(this.newUser.companyId, this.newUser.departmentId, this.newUser.username, this.newUser.password).subscribe({
       next: () => {
         this.closeAddUserModal();
-        this.loadStats();
-        if (this.selectedDepartmentId === this.newUser.departmentId) {
-          this.onDepartmentChange();
-        }
+        this.refreshAllData();
       },
       error: (err) => {
         console.error('Error creating user', err);
@@ -407,6 +408,7 @@ export class AdminDashboardComponent implements OnInit {
       this.adminService.assignModule(moduleId, this.assigningDepartment.id).subscribe({
         next: (assignment) => {
           this.assignedModules.push(assignment);
+          this.refreshAllData();
         },
         error: (err) => {
           console.error('Error assigning module', err);
@@ -420,6 +422,7 @@ export class AdminDashboardComponent implements OnInit {
         this.adminService.removeAssignment(assignment.id).subscribe({
           next: () => {
             this.assignedModules = this.assignedModules.filter(a => a.id !== assignment.id);
+            this.refreshAllData();
           },
           error: (err) => {
             console.error('Error removing assignment', err);
