@@ -350,7 +350,18 @@ export class AdminDashboardComponent implements OnInit {
       return;
     }
     
-    this.notImplemented('إضافة مستخدم');
-    this.closeAddUserModal();
+    this.adminService.createUser(this.newUser.companyId, this.newUser.departmentId, this.newUser.username, this.newUser.password).subscribe({
+      next: () => {
+        this.closeAddUserModal();
+        this.loadStats();
+        if (this.selectedDepartmentId === this.newUser.departmentId) {
+          this.onDepartmentChange();
+        }
+      },
+      error: (err) => {
+        console.error('Error creating user', err);
+        alert('حدث خطأ أثناء إضافة المستخدم.');
+      }
+    });
   }
 }
