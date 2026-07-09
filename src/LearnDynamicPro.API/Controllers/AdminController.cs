@@ -36,9 +36,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("companies")]
-    public async Task<IActionResult> GetAllCompanies()
+    public async Task<IActionResult> GetAllCompanies([FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _companyService.GetAllCompaniesAsync();
+        var result = await _companyService.GetAllCompaniesAsync(page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
@@ -119,9 +119,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("modules")]
-    public async Task<IActionResult> GetAllModules()
+    public async Task<IActionResult> GetAllModules([FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _moduleService.GetAllModulesAsync();
+        var result = await _moduleService.GetAllModulesAsync(page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }

@@ -47,10 +47,14 @@ public class ModuleService : IModuleService
         return Result.Success();
     }
 
-    public async Task<Result<List<ModuleDto>>> GetAllModulesAsync()
+    public async Task<Result<PagedList<ModuleDto>>> GetAllModulesAsync(int page = 1, int pageSize = 100)
     {
-        var modules = await _context.Modules
-            .AsNoTracking()
+        var query = _context.Modules.AsNoTracking();
+        var totalCount = await query.CountAsync();
+
+        var modules = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Include(m => m.Assignments)
                 .ThenInclude(a => a.Department)
                     .ThenInclude(d => d.Company)
@@ -64,7 +68,9 @@ public class ModuleService : IModuleService
                     .ToList()
             })
             .ToListAsync();
-        return Result<List<ModuleDto>>.Success(modules);
+            
+        var pagedList = new PagedList<ModuleDto>(modules, totalCount, page, pageSize);
+        return Result<PagedList<ModuleDto>>.Success(pagedList);
     }
 
     public async Task<Result<UnitDto>> CreateUnitAsync(CreateUnitRequest request)

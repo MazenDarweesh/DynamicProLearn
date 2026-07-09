@@ -1,6 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { map } from 'rxjs/operators';
 
 export interface AdminModuleDto {
   id: string;
@@ -24,8 +25,10 @@ export class AdminService {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:5115/api/admin';
 
-  getModules(): Observable<AdminModuleDto[]> {
-    return this.http.get<AdminModuleDto[]>(`${this.apiUrl}/modules`);
+  getModules(page = 1, pageSize = 100): Observable<AdminModuleDto[]> {
+    return this.http.get<any>(`${this.apiUrl}/modules?page=${page}&pageSize=${pageSize}`).pipe(
+      map(res => res.items ? res.items : res)
+    );
   }
 
   createModule(name: string, description: string): Observable<any> {
@@ -48,8 +51,10 @@ export class AdminService {
     });
   }
 
-  getCompanies(): Observable<CompanyDto[]> {
-    return this.http.get<CompanyDto[]>(`${this.apiUrl}/companies`);
+  getCompanies(page = 1, pageSize = 100): Observable<CompanyDto[]> {
+    return this.http.get<any>(`${this.apiUrl}/companies?page=${page}&pageSize=${pageSize}`).pipe(
+      map(res => res.items ? res.items : res)
+    );
   }
 
   createCompany(name: string): Observable<any> {

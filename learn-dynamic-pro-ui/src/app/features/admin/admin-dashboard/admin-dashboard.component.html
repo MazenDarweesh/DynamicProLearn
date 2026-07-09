@@ -136,7 +136,7 @@
             </div>
           </div>
 
-          <div class="unit-group mt-3" *ngFor="let u of mod.units">
+          <div class="unit-group mt-3" *ngFor="let u of (mod._showAllUnits ? mod.units : (mod.units | slice:0:3))">
             <div class="d-flex justify-between align-center mb-2">
               <h5 class="text-secondary m-0">الوحدة: {{ u.name }}</h5>
               <div class="actions-left d-flex gap-2">
@@ -155,7 +155,7 @@
               </div>
             </div>
 
-            <div class="lesson-row d-flex justify-between" *ngFor="let lesson of u.lessons">
+            <div class="lesson-row d-flex justify-between" *ngFor="let lesson of (u._showAllLessons ? u.lessons : (u.lessons | slice:0:3))">
               <span class="text-secondary">- {{ lesson.title }}</span>
               <div class="d-flex gap-3 align-center">
                 <span class="badge badge-primary-light">درس</span>
@@ -173,6 +173,17 @@
                 </button>
               </div>
             </div>
+            <div class="text-center mt-2" *ngIf="u.lessons && u.lessons.length > 3">
+              <button class="btn-back" (click)="u._showAllLessons = !u._showAllLessons" style="margin: 0 auto; color: var(--color-primary); font-size: 11px;">
+                {{ u._showAllLessons ? 'عرض أقل ⬆️' : 'عرض باقي الدروس (' + (u.lessons.length - 3) + ') ⬇️' }}
+              </button>
+            </div>
+          </div>
+
+          <div class="text-center mt-3 border-top pt-2" *ngIf="mod.units && mod.units.length > 3">
+            <button class="btn-back" (click)="mod._showAllUnits = !mod._showAllUnits" style="margin: 0 auto; color: var(--color-primary); font-weight: 500;">
+              {{ mod._showAllUnits ? 'إخفاء باقي الوحدات ⬆️' : 'عرض المزيد من الوحدات (' + (mod.units.length - 3) + ') ⬇️' }}
+            </button>
           </div>
         </div>
 

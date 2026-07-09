@@ -9,7 +9,7 @@ public interface IModuleService
     Task<Result<ModuleDto>> CreateModuleAsync(CreateModuleRequest request);
     Task<Result<ModuleDto>> UpdateModuleAsync(Guid id, UpdateModuleRequest request);
     Task<Result> DeleteModuleAsync(Guid id);
-    Task<Result<List<ModuleDto>>> GetAllModulesAsync();
+    Task<Result<PagedList<ModuleDto>>> GetAllModulesAsync(int page = 1, int pageSize = 100);
 
     // Unit CRUD
     Task<Result<UnitDto>> CreateUnitAsync(CreateUnitRequest request);

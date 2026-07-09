@@ -26,14 +26,19 @@ public class CompanyService : ICompanyService
         return Result<CompanyDto>.Success(new CompanyDto { Id = company.Id, Name = company.Name });
     }
 
-    public async Task<Result<List<CompanyDto>>> GetAllCompaniesAsync()
+    public async Task<Result<PagedList<CompanyDto>>> GetAllCompaniesAsync(int page = 1, int pageSize = 100)
     {
-        var companies = await _context.Companies
-            .AsNoTracking()
+        var query = _context.Companies.AsNoTracking();
+        var totalCount = await query.CountAsync();
+
+        var companies = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(c => new CompanyDto { Id = c.Id, Name = c.Name })
             .ToListAsync();
             
-        return Result<List<CompanyDto>>.Success(companies);
+        var pagedList = new PagedList<CompanyDto>(companies, totalCount, page, pageSize);
+        return Result<PagedList<CompanyDto>>.Success(pagedList);
     }
 
     public async Task<Result<DepartmentDto>> CreateDepartmentAsync(CreateDepartmentRequest request)

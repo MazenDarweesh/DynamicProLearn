@@ -7,7 +7,7 @@ public interface ICompanyService
 {
     // Company CRUD
     Task<Result<CompanyDto>> CreateCompanyAsync(CreateCompanyRequest request);
-    Task<Result<List<CompanyDto>>> GetAllCompaniesAsync();
+    Task<Result<PagedList<CompanyDto>>> GetAllCompaniesAsync(int page = 1, int pageSize = 100);
     Task<Result<bool>> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request);
     Task<Result<bool>> DeleteCompanyAsync(Guid id);
 
