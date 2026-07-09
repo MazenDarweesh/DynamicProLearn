@@ -39,6 +39,10 @@ export class StudentService {
     return this.http.get<ModuleDto[]>(`${this.apiUrl}/modules`);
   }
 
+  getProgress(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/progress`);
+  }
+
   getModuleUnits(moduleId: string): Observable<UnitDto[]> {
     return this.http.get<UnitDto[]>(`${this.apiUrl}/modules/${moduleId}/units`);
   }
@@ -51,7 +55,7 @@ export class StudentService {
     return this.http.get<LessonDetailDto>(`${this.apiUrl}/lessons/${lessonId}`);
   }
 
-  completeLesson(lessonId: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/lessons/${lessonId}/complete`, true);
+  completeLesson(lessonId: string, isCompleted: boolean): Observable<any> {
+    return this.http.post(`${this.apiUrl}/lessons/${lessonId}/complete`, isCompleted);
   }
 }

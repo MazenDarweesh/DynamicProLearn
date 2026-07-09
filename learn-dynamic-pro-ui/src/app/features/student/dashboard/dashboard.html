@@ -38,10 +38,9 @@
             
             <div class="mt-auto pt-3 border-top" style="border-top: 1px solid var(--color-border); margin-top: 15px;">
               <div class="progress-track" style="margin-bottom: 8px;">
-                <!-- progress logic will be dynamic later, hardcoded to 0% for now -->
-                <div class="progress-fill" style="width: 0%;"></div>
+                <div class="progress-fill" [style.width.%]="mod.progressPercent"></div>
               </div>
-              <span class="text-secondary text-xs font-medium d-block mb-3">0% مكتمل</span>
+              <span class="text-secondary text-xs font-medium d-block mb-3">{{ mod.progressPercent || 0 }}% مكتمل</span>
               
               <button class="btn-accent w-100 d-flex justify-center align-center gap-2" (click)="openLesson(mod.id)">
                 ابدأ التعلم

@@ -4,6 +4,10 @@ import { AuthService } from '../../../core/services/auth.service';
 import { StudentService, ModuleDto } from '../../../core/services/student.service';
 import { Router } from '@angular/router';
 
+export interface DashboardModule extends ModuleDto {
+  progressPercent: number;
+}
+
 @Component({
   selector: 'app-dashboard',
   standalone: true,
@@ -16,24 +20,43 @@ export class DashboardComponent implements OnInit {
   private studentService = inject(StudentService);
   private router = inject(Router);
 
-  modules: ModuleDto[] = [];
+  modules: DashboardModule[] = [];
   isLoading = true;
 
   ngOnInit() {
-    this.studentService.getAssignedModules().subscribe({
-      next: (data) => {
-        this.modules = data;
-        this.isLoading = false;
-      },
-      error: (err) => {
-        console.error('Failed to load modules', err);
-        // Mock data fallback just for demo
-        this.modules = [
-          { id: 'm1', name: 'مقدمة عن نظام DynamicPro', description: 'تعلم الأساسيات الخاصة بنظام إدارة المؤسسات الخاص بنا.' },
-          { id: 'm2', name: 'المحاسبة المالية', description: 'إتقان موديولات الحسابات العامة والمدفوعات والمقبوضات.' }
-        ];
-        this.isLoading = false;
+    // Fetch modules and progress concurrently
+    Promise.all([
+      this.studentService.getAssignedModules().toPromise(),
+      this.studentService.getProgress().toPromise().catch(() => null)
+    ]).then(([modulesData, progressData]) => {
+      
+      const mods = modulesData || [];
+      const progressMap = new Map<string, any>();
+      
+      if (progressData && progressData.modulesProgress) {
+        progressData.modulesProgress.forEach((p: any) => {
+          progressMap.set(p.moduleId, p);
+        });
       }
+
+      this.modules = mods.map(m => {
+        let percent = 0;
+        const prog = progressMap.get(m.id);
+        if (prog && prog.totalLessons > 0) {
+          percent = Math.round((prog.completedLessons / prog.totalLessons) * 100);
+        }
+        return {
+          ...m,
+          progressPercent: percent
+        };
+      });
+      
+    }).catch(err => {
+      console.error('Failed to load dashboard data', err);
+      // Fallback
+      this.modules = [];
+    }).finally(() => {
+      this.isLoading = false;
     });
   }
 

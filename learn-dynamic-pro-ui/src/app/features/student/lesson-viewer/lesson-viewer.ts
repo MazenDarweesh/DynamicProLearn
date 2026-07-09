@@ -25,6 +25,7 @@ export class LessonViewer implements OnInit {
   isLoading = true;
   activeLesson: LessonDetailDto | null = null;
   isLoadingLesson = false;
+  isSubmitting = false;
   safeVideoUrl: SafeResourceUrl | null = null;
 
   ngOnInit() {
@@ -89,20 +90,27 @@ export class LessonViewer implements OnInit {
     this.router.navigate(['/student']);
   }
 
-  markAsCompleted() {
-    if (!this.activeLesson || this.activeLesson.isCompleted) return;
+  toggleCompletion() {
+    if (!this.activeLesson) return;
     
-    this.studentService.completeLesson(this.activeLesson.id).subscribe({
+    this.isSubmitting = true;
+    const newStatus = !this.activeLesson.isCompleted;
+
+    this.studentService.completeLesson(this.activeLesson.id, newStatus).subscribe({
       next: () => {
-        this.activeLesson!.isCompleted = true;
+        this.activeLesson!.isCompleted = newStatus;
         // Also update it in the units list sidebar
         const u = this.units.find(u => u.id === this.activeLesson?.unitId);
         if (u) {
           const l = u.lessons.find(l => l.id === this.activeLesson?.id);
-          if (l) l.isCompleted = true;
+          if (l) l.isCompleted = newStatus;
         }
+        this.isSubmitting = false;
       },
-      error: (err: any) => alert('فشل في تحديث حالة الدرس.')
+      error: (err: any) => {
+        alert('فشل في تحديث حالة الدرس.');
+        this.isSubmitting = false;
+      }
     });
   }
 }

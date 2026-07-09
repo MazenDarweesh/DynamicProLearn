@@ -84,19 +84,16 @@
             </div>
             
             <div>
-              <button *ngIf="!activeLesson.isCompleted" class="btn-accent" (click)="markAsCompleted()">
+              <button class="btn-accent" 
+                      [class.btn-success]="activeLesson.isCompleted" 
+                      [disabled]="isSubmitting"
+                      (click)="toggleCompletion()">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                  <path *ngIf="!activeLesson.isCompleted" d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline *ngIf="!activeLesson.isCompleted" points="22 4 12 14.01 9 11.01"></polyline>
+                  <polyline *ngIf="activeLesson.isCompleted" points="20 6 9 17 4 12"></polyline>
                 </svg>
-                تحديد كمكتمل
-              </button>
-              
-              <button *ngIf="activeLesson.isCompleted" class="btn-success">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-                مكتمل
+                {{ isSubmitting ? 'جاري الحفظ...' : (activeLesson.isCompleted ? 'إلغاء التحديد كمكتمل' : 'تحديد كمكتمل') }}
               </button>
             </div>
           </div>
