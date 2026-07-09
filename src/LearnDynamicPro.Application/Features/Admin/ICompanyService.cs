@@ -21,7 +21,7 @@ public interface ICompanyService
     Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request);
     Task<Result<PagedList<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 10);
     Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 10);
-
+    Task<Result<PagedList<UserProgressDto>>> GetAllTestersProgressAsync(int page = 1, int pageSize = 10);
     // Dashboard Stats
     Task<Result<DashboardStatsDto>> GetDashboardStatsAsync();
 }

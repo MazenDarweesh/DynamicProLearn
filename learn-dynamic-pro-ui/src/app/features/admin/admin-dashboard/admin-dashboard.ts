@@ -42,6 +42,16 @@ export class AdminDashboardComponent implements OnInit {
   newDepartmentName = '';
   newDepartmentsList: { id?: string, name: string }[] = [];
 
+  // Testers Panel State
+  testersProgress: any[] = [];
+  showAllTesters = false;
+  showAddTesterModal = false;
+  newTesterUsername = '';
+  newTesterPassword = '';
+  testerCompanyId = '';
+  testerDepartmentId = '';
+  testerDepartments: any[] = [];
+
   ngOnInit() {
     this.refreshAllData();
   }
@@ -50,6 +60,7 @@ export class AdminDashboardComponent implements OnInit {
     this.loadStats();
     this.loadCompanies();
     this.loadModules();
+    this.loadTestersProgress();
     if (this.selectedDepartmentId) {
       this.onDepartmentChange();
     }
@@ -541,5 +552,62 @@ export class AdminDashboardComponent implements OnInit {
         });
       }
     }
+  }
+
+  // ── Testers Panel Methods ───────────────────────────────────────────────────
+  loadTestersProgress() {
+    this.adminService.getTestersProgress(1, 100).subscribe({
+      next: (testers) => {
+        this.testersProgress = testers.map((t: any) => ({
+          name: t.userName,
+          role: 'مختبر نظام',
+          assignedModules: t.assignedModules,
+          completed: t.completedLessons,
+          totalLessons: t.totalLessons,
+          progressValue: t.totalLessons ? Math.round((t.completedLessons / t.totalLessons) * 100) : 0
+        }));
+      },
+      error: (err) => console.error('Error fetching testers', err)
+    });
+  }
+
+  openAddTesterModal() {
+    this.newTesterUsername = '';
+    this.newTesterPassword = '';
+    this.testerCompanyId = '';
+    this.testerDepartmentId = '';
+    this.testerDepartments = [];
+    this.showAddTesterModal = true;
+  }
+
+  closeAddTesterModal() {
+    this.showAddTesterModal = false;
+  }
+
+  onTesterCompanyChange() {
+    const company = this.companies.find(c => c.id === this.testerCompanyId);
+    this.testerDepartments = company ? company.departments : [];
+    this.testerDepartmentId = '';
+  }
+
+  submitTester() {
+    if (!this.newTesterUsername || !this.newTesterPassword || !this.testerCompanyId || !this.testerDepartmentId) {
+      Dialog.alert('الرجاء إكمال جميع الحقول المطلوبة للمختبر.', 'حقول مفقودة', 'info');
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.adminService.createUser(this.testerCompanyId, this.testerDepartmentId, this.newTesterUsername, this.newTesterPassword, 2).subscribe({
+      next: () => {
+        this.isSubmitting = false;
+        Dialog.alert('تمت إضافة المختبر بنجاح!', 'نجاح', 'success');
+        this.closeAddTesterModal();
+        this.refreshAllData();
+      },
+      error: (err) => {
+        this.isSubmitting = false;
+        Dialog.alert('حدث خطأ أثناء الإضافة: ' + (err.error?.detail || err.message), 'خطأ', 'error');
+      }
+    });
   }
 }

@@ -239,6 +239,68 @@ public class CompanyService : ICompanyService
         return Result<PagedList<UserProgressDto>>.Success(pagedList);
     }
 
+    public async Task<Result<PagedList<UserProgressDto>>> GetAllTestersProgressAsync(int page = 1, int pageSize = 10)
+    {
+        // Get all testers
+        var query = _context.Users
+            .AsNoTracking()
+            .Where(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
+            
+        var totalCount = await query.CountAsync();
+
+        var users = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var departmentIds = users.Select(u => u.DepartmentId).Distinct().ToList();
+
+        // Get assigned modules for these departments
+        var assignments = await _context.DepartmentModuleAssignments
+            .AsNoTracking()
+            .Include(a => a.Module)
+                .ThenInclude(m => m.Units)
+                    .ThenInclude(u => u.Lessons)
+            .Where(a => departmentIds.Contains(a.DepartmentId))
+            .ToListAsync();
+
+        var lessonIds = assignments
+            .SelectMany(a => a.Module.Units)
+            .SelectMany(u => u.Lessons)
+            .Select(l => l.Id)
+            .ToList();
+
+        var userIds = users.Select(u => u.Id).ToList();
+        var completions = await _context.LessonProgresses
+            .AsNoTracking()
+            .Where(p => userIds.Contains(p.UserId) && p.IsCompleted && lessonIds.Contains(p.LessonId))
+            .ToListAsync();
+
+        var progressList = users.Select(u => {
+            var userAssignments = assignments.Where(a => a.DepartmentId == u.DepartmentId).ToList();
+            var assignedModulesNames = string.Join(", ", userAssignments.Select(a => a.Module.Name));
+            
+            var totalLessons = userAssignments
+                .SelectMany(a => a.Module.Units)
+                .SelectMany(un => un.Lessons)
+                .Count();
+
+            var completedCount = completions.Count(c => c.UserId == u.Id);
+            return new UserProgressDto
+            {
+                UserId = u.Id,
+                UserName = u.Username,
+                Role = u.Role.ToString(),
+                AssignedModules = string.IsNullOrEmpty(assignedModulesNames) ? "لا يوجد" : assignedModulesNames,
+                CompletedLessons = completedCount,
+                TotalLessons = totalLessons
+            };
+        }).ToList();
+
+        var pagedList = new PagedList<UserProgressDto>(progressList, totalCount, page, pageSize);
+        return Result<PagedList<UserProgressDto>>.Success(pagedList);
+    }
+
     public async Task<Result<DashboardStatsDto>> GetDashboardStatsAsync()
     {
         var totalCompanies = await _context.Companies.CountAsync();

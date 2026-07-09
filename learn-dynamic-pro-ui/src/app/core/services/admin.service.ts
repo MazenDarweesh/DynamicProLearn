@@ -141,12 +141,18 @@ export class AdminService {
     );
   }
 
-  createUser(companyId: string, departmentId: string, username: string, password: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/users`, { companyId, departmentId, username, password, role: 1 });
+  createUser(companyId: string, departmentId: string, username: string, password: string, role: number = 1): Observable<any> {
+    return this.http.post(`${this.apiUrl}/users`, { companyId, departmentId, username, password, role });
   }
 
   getUsersProgress(departmentId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/departments/${departmentId}/users-progress?page=${page}&pageSize=${pageSize}`).pipe(
+      map(res => res.items ? res.items : res)
+    );
+  }
+
+  getTestersProgress(page = 1, pageSize = 10): Observable<any[]> {
+    return this.http.get<any>(`${this.apiUrl}/testers-progress?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
   }

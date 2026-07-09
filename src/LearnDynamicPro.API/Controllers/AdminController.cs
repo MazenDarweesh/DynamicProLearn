@@ -135,6 +135,14 @@ public class AdminController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpGet("testers-progress")]
+    public async Task<IActionResult> GetTestersProgress([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        var result = await _companyService.GetAllTestersProgressAsync(page, pageSize);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     // ── Modules ─────────────────────────────────────────────────────────────
     [HttpPost("modules")]
     public async Task<IActionResult> CreateModule([FromBody] CreateModuleRequest request)
