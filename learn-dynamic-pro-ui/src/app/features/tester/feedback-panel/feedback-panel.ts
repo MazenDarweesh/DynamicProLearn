@@ -22,160 +22,333 @@ export interface ModuleOverview {
   standalone: true,
   imports: [CommonModule, FormsModule],
   template: `
-    <div class="viewer-container" dir="rtl">
-      <!-- Sidebar -->
-      <aside class="sidebar">
-        <div class="sidebar-header">
-          <button class="back-btn" (click)="goBack()">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            عودة
-          </button>
-          <h2>{{ module?.name || 'جاري التحميل...' }}</h2>
-        </div>
-
-        <div class="module-content">
-          <div class="unit-group" *ngFor="let unit of module?.units">
-            <h3 class="unit-title">{{ unit.title }}</h3>
-            <ul class="lesson-list">
-              <li class="lesson-item" 
-                  *ngFor="let lesson of unit.lessons"
-                  [class.active]="lesson.id === currentLesson?.id"
-                  (click)="selectLesson(lesson)">
-                <div class="lesson-info">
-                  <span class="status-icon" [class.completed]="lesson.isCompleted">
-                    <svg *ngIf="lesson.isCompleted" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                    <div *ngIf="!lesson.isCompleted" class="circle"></div>
-                  </span>
-                  <span class="lesson-title">{{ lesson.title }}</span>
-                </div>
-              </li>
-            </ul>
-          </div>
-        </div>
-      </aside>
-
-      <!-- Main Content -->
-      <main class="main-content">
-        <div *ngIf="isLoading" class="loading-state">
-          <div class="spinner"></div>
-          <p>جاري تحميل بيانات الموديول...</p>
-        </div>
-
-        <div *ngIf="!isLoading && currentLesson" class="lesson-content">
-          <div class="lesson-header">
-            <h1>{{ currentLesson.title }}</h1>
-          </div>
-
-          <div class="tester-panel">
-            <div class="panel-heading">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-              </svg>
-              <h3>تقييم جودة النظام (QA)</h3>
+    <div class="console-container" dir="rtl">
+      <!-- Header -->
+      <header class="console-header">
+        <div class="header-content">
+          <div class="brand w-100 d-flex justify-between align-center">
+            <h1>DynamicProLearn <span class="font-light">نافذة التقييم (QA)</span></h1>
+            <div>
+              <button class="btn-back" (click)="goBack()">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M9 14l-4-4 4-4"></path>
+                  <path d="M5 10h11a4 4 0 1 1 0 8h-1"></path>
+                </svg>
+                العودة للوحة المختبر
+              </button>
             </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="console-body">
+        <!-- Sidebar -->
+        <div class="viewer-sidebar">
+          <div *ngIf="isLoading" class="loading">جاري تحميل الوحدات...</div>
+          <div *ngIf="!isLoading && module?.units?.length === 0" class="empty-state">لا يوجد وحدات في هذا الموديول.</div>
+          
+          <div class="unit" *ngFor="let unit of module?.units; let i = index">
+            <h4>{{ i + 1 }}. {{ unit.title }}</h4>
             
-            <form (ngSubmit)="submitFeedback()" class="feedback-form">
-              <div class="form-group">
-                <label>حالة النظام / التقييم (System Status):</label>
-                <div class="custom-select-wrapper">
-                  <select class="form-control status-select" [(ngModel)]="selectedConditionId" name="condition" required>
-                    <option value="" disabled selected>-- اختر حالة التقييم المرجعية --</option>
-                    <option *ngFor="let cond of conditions" [value]="cond.id">
-                      {{ cond.label }}
-                    </option>
-                  </select>
-                </div>
+            <div *ngIf="unit.lessons && unit.lessons.length === 0" class="text-secondary text-sm" style="padding-right: 15px;">
+              لا توجد دروس
+            </div>
+
+            <div class="lesson-item" 
+                 *ngFor="let lesson of unit.lessons; let lIndex = index"
+                 [class.active]="currentLesson?.id === lesson.id"
+                 (click)="selectLesson(lesson)">
+              
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <svg *ngIf="lesson.typeLabel === 'Video'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+                <svg *ngIf="lesson.typeLabel !== 'Video'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                
+                <span>{{ i + 1 }}.{{ lIndex + 1 }} {{ lesson.title }}</span>
               </div>
 
-              <div class="form-group mt-4">
-                <label>📝 الملاحظات الهيكلية للمختبر (أسباب المشكلة أو التفاصيل):</label>
-                <textarea 
-                  class="form-control" 
-                  [(ngModel)]="notes" 
-                  name="notes" 
-                  rows="4" 
-                  placeholder="اكتب ملاحظاتك التقنية أو خطوات إعادة إنتاج الخطأ هنا..." 
-                  required>
-                </textarea>
+              <div class="lesson-status" [class.completed]="lesson.isCompleted">
+                <svg *ngIf="lesson.isCompleted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
               </div>
-
-              <div class="form-actions mt-4">
-                <button type="submit" class="btn-submit" [disabled]="isSubmitting || !selectedConditionId || !notes">
-                  <span *ngIf="isSubmitting" class="spinner-small"></span>
-                  <span *ngIf="!isSubmitting">📤 اعتماد النتيجة وحفظها في قاعدة الإصدار</span>
-                </button>
-              </div>
-
-              <div *ngIf="successMessage" class="alert alert-success mt-3">{{ successMessage }}</div>
-              <div *ngIf="errorMessage" class="alert alert-danger mt-3">{{ errorMessage }}</div>
-            </form>
+            </div>
           </div>
         </div>
 
-        <div *ngIf="!isLoading && !currentLesson && module?.units?.length" class="empty-state">
-          <div class="icon">👈</div>
-          <p>اختر درساً من القائمة الجانبية للبدء في التقييم</p>
+        <!-- Main Content -->
+        <div class="viewer-main">
+          <div *ngIf="isLoading" class="video-placeholder text-white">
+            جاري تحميل الدرس...
+          </div>
+
+          <div *ngIf="!isLoading && !currentLesson && module?.units?.length" class="video-placeholder text-white" style="background-color: var(--color-bg-card); color: var(--color-navy) !important; border: 1px solid var(--color-border);">
+            يرجى اختيار درس من القائمة الجانبية
+          </div>
+
+          <div *ngIf="!isLoading && currentLesson">
+            <div class="lesson-details" style="margin-top: 0; margin-bottom: 25px;">
+              <div class="d-flex justify-between align-start">
+                <div>
+                  <div class="badge">{{ currentLesson.levelLabel }} - {{ currentLesson.typeLabel }}</div>
+                  <h2>{{ currentLesson.title }}</h2>
+                  <p class="text-secondary">يرجى فحص هذه الشاشة بعناية وتسجيل الملاحظات الهيكلية حولها لضمان خلوها من العيوب قبل إطلاقها للطلاب.</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="lesson-details" style="margin-top: 0;">
+              <div class="panel-heading" style="display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); color: var(--color-primary);">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                </svg>
+                <h3 style="margin: 0; font-size: 20px; color: var(--color-navy);">لوحة التقييم والجودة (QA)</h3>
+              </div>
+              
+              <form (ngSubmit)="submitFeedback()" class="feedback-form">
+                <div class="form-group">
+                  <label style="display: block; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--color-navy);">حالة النظام / التقييم (System Status):</label>
+                  <div class="custom-select-wrapper">
+                    <select class="form-control status-select" [(ngModel)]="selectedConditionId" name="condition" required style="width: 100%; padding: 14px 16px; border: 1px solid var(--color-border); border-radius: 8px; background-color: var(--color-bg-main); color: var(--color-navy); font-family: inherit; font-size: 15px; transition: border-color 0.2s; appearance: none; background-image: url('data:image/svg+xml,%3Csvg width=\'24\' height=\'24\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'%23666\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpolyline points=\'6 9 12 15 18 9\'%3E%3C/polyline%3E%3C/svg%3E'); background-repeat: no-repeat; background-position: left 12px center; background-size: 16px; padding-left: 40px;">
+                      <option value="" disabled selected>-- اختر حالة التقييم المرجعية --</option>
+                      <option *ngFor="let cond of conditions" [value]="cond.id">
+                        {{ cond.label }}
+                      </option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-top: 1.5rem;">
+                  <label style="display: block; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--color-navy);">📝 الملاحظات الهيكلية للمختبر (أسباب المشكلة أو التفاصيل):</label>
+                  <textarea 
+                    class="form-control" 
+                    [(ngModel)]="notes" 
+                    name="notes" 
+                    rows="4" 
+                    placeholder="اكتب ملاحظاتك التقنية أو خطوات إعادة إنتاج الخطأ هنا..." 
+                    required style="width: 100%; padding: 14px 16px; border: 1px solid var(--color-border); border-radius: 8px; background-color: var(--color-bg-main); color: var(--color-navy); font-family: inherit; font-size: 15px; transition: border-color 0.2s;">
+                  </textarea>
+                </div>
+
+                <div class="form-actions" style="margin-top: 1.5rem;">
+                  <button type="submit" class="btn-accent w-100" style="justify-content: center; font-size: 16px; letter-spacing: 0.5px;" [disabled]="isSubmitting || !selectedConditionId || !notes">
+                    <span *ngIf="isSubmitting" class="spinner-small"></span>
+                    <span *ngIf="!isSubmitting">📤 اعتماد النتيجة وحفظها في قاعدة الإصدار</span>
+                  </button>
+                </div>
+
+                <div *ngIf="successMessage" class="alert-success mt-3">{{ successMessage }}</div>
+                <div *ngIf="errorMessage" class="alert-danger mt-3">{{ errorMessage }}</div>
+              </form>
+            </div>
+          </div>
         </div>
-      </main>
+      </div>
     </div>
   `,
   styles: [`
-    .viewer-container { display: flex; height: 100vh; background-color: var(--color-bg-main); overflow: hidden; }
-    
+    .console-container { 
+      background-color: var(--color-bg-page); 
+      min-height: 100vh; 
+      padding-bottom: 50px; 
+      font-family: 'Readex Pro', sans-serif; 
+      text-align: right; 
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    .console-header { 
+      background-color: var(--color-primary); 
+      color: white; 
+      padding: 25px 0; 
+    }
+
+    .header-content { 
+      max-width: 1400px; 
+      margin: 0 auto; 
+      padding: 0 30px; 
+      display: flex; 
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand h1 { 
+      margin: 0; 
+      font-size: 24px; 
+      font-weight: 600; 
+      color: white; 
+      display: flex; 
+      align-items: center; 
+      gap: 8px; 
+    }
+    .font-light { font-weight: 400; font-size: 16px; opacity: 0.9; margin-right: 5px; }
+
+    .btn-back {
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      color: white;
+      padding: 6px 15px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-back:hover { background: rgba(255,255,255,0.2); }
+
+    /* Body */
+    .console-body { 
+      flex: 1;
+      padding: 30px; 
+      max-width: 1400px; 
+      width: 100%;
+      margin: 0 auto; 
+      display: flex;
+      gap: 30px;
+    }
+
     /* Sidebar */
-    .sidebar { width: 320px; background-color: var(--color-bg-page); border-left: 1px solid var(--color-border); display: flex; flex-direction: column; }
-    .sidebar-header { padding: 20px; border-bottom: 1px solid var(--color-border); }
-    .back-btn { display: flex; align-items: center; gap: 8px; background: none; border: none; color: var(--color-text-secondary); cursor: pointer; font-family: inherit; font-size: 14px; margin-bottom: 15px; padding: 0; }
-    .back-btn:hover { color: var(--color-primary); }
-    .sidebar-header h2 { margin: 0; font-size: 18px; color: var(--color-text-primary); }
-    
-    .module-content { flex: 1; overflow-y: auto; padding: 20px 0; }
-    .unit-group { margin-bottom: 24px; }
-    .unit-title { padding: 0 20px; margin: 0 0 10px 0; font-size: 14px; color: var(--color-text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
-    
-    .lesson-list { list-style: none; padding: 0; margin: 0; }
-    .lesson-item { padding: 12px 20px; cursor: pointer; transition: all 0.2s; border-right: 3px solid transparent; }
-    .lesson-item:hover { background-color: rgba(59, 110, 243, 0.05); }
-    .lesson-item.active { background-color: rgba(59, 110, 243, 0.1); border-right-color: var(--color-primary); }
-    
-    .lesson-info { display: flex; align-items: center; gap: 12px; }
-    .status-icon { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; color: var(--color-text-secondary); }
-    .status-icon.completed { color: #137333; background-color: #E6F4EA; }
-    .circle { width: 12px; height: 12px; border: 2px solid var(--color-border); border-radius: 50%; }
-    .active .circle { border-color: var(--color-primary); }
-    .lesson-title { font-size: 14px; color: var(--color-text-primary); font-weight: 500; }
-    
-    /* Main Content */
-    .main-content { flex: 1; overflow-y: auto; padding: 40px; background-color: var(--color-bg-main); }
-    .lesson-header { max-width: 800px; margin: 0 auto 40px auto; }
-    .lesson-header h1 { margin: 0 0 10px 0; font-size: 32px; color: var(--color-text-primary); }
-    
-    .tester-panel { max-width: 800px; margin: 0 auto; background-color: var(--color-bg-page); border: 1px solid var(--color-border); border-radius: 12px; padding: 32px; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
-    .panel-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid var(--color-border); color: var(--color-primary); }
-    .panel-heading h3 { margin: 0; font-size: 20px; color: var(--color-text-primary); }
-    
-    .form-group label { display: block; margin-bottom: 10px; font-weight: 600; font-size: 14px; color: var(--color-text-primary); }
-    .form-control { width: 100%; padding: 14px 16px; border: 1px solid var(--color-border); border-radius: 8px; background-color: var(--color-bg-main); color: var(--color-text-primary); font-family: inherit; font-size: 15px; transition: border-color 0.2s; }
+    .viewer-sidebar {
+      width: 320px;
+      background: white;
+      border-radius: 12px;
+      border: 1px solid var(--color-border);
+      padding: 20px;
+      height: calc(100vh - 150px);
+      overflow-y: auto;
+    }
+
+    .unit {
+      margin-bottom: 25px;
+    }
+    .unit h4 {
+      font-size: 15px;
+      color: var(--color-text-secondary);
+      margin: 0 0 10px 0;
+      font-weight: 600;
+      border-bottom: 1px solid var(--color-border);
+      padding-bottom: 8px;
+    }
+
+    .lesson-item {
+      padding: 12px 15px;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 5px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: 0.2s;
+      color: var(--color-navy);
+    }
+    .lesson-item:hover { background-color: var(--color-bg-page); }
+    .lesson-item.active { 
+      background-color: var(--color-primary-light); 
+      color: var(--color-primary); 
+      font-weight: 600; 
+    }
+    .lesson-status {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #ccc;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lesson-status.completed {
+      border-color: #28a745;
+      background: #28a745;
+      color: white;
+    }
+    .lesson-status svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    /* Main Area */
+    .viewer-main { 
+      flex: 1; 
+      display: flex; 
+      flex-direction: column; 
+      overflow-y: auto; 
+      height: calc(100vh - 150px);
+    }
+
+    .video-placeholder { 
+      background-color: #111; 
+      aspect-ratio: 16/9; 
+      border-radius: 12px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+
+    .lesson-details { 
+      background: white;
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      padding: 30px; 
+    }
+    .badge { 
+      background: var(--color-accent-light); 
+      color: #B35E11; 
+      padding: 4px 12px; 
+      border-radius: 6px; 
+      display: inline-block; 
+      font-size: 13px; 
+      font-weight: 600; 
+      margin-bottom: 15px; 
+    }
+    .lesson-details h2 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      color: var(--color-navy);
+    }
+    .text-secondary { color: var(--color-text-secondary); line-height: 1.6; }
+
+    /* Buttons */
+    .btn-accent { 
+      background-color: var(--color-accent); 
+      color: white; 
+      border: none; 
+      padding: 12px 24px; 
+      border-radius: 6px; 
+      font-family: inherit; 
+      font-weight: 600; 
+      font-size: 15px; 
+      cursor: pointer; 
+      transition: 0.2s; 
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .btn-accent:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(254, 147, 46, 0.3); }
+    .btn-accent:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+
+    .loading, .empty-state { padding: 40px; text-align: center; color: var(--color-text-secondary); font-size: 16px; background: var(--color-bg-page); border-radius: 8px; border: 1px dashed var(--color-border); }
+
+    /* Utilities */
+    .w-100 { width: 100%; }
+    .d-flex { display: flex; }
+    .justify-between { justify-content: space-between; }
+    .align-start { align-items: flex-start; }
+    .align-center { align-items: center; }
+    .text-white { color: white; }
+    .text-center { text-align: center; }
+    .text-sm { font-size: 13px; }
+
     .form-control:focus { outline: none; border-color: var(--color-primary); }
+
+    .alert-success { background-color: #E6F4EA; color: #137333; border: 1px solid #CEEAD6; padding: 16px; border-radius: 8px; font-size: 14px; font-weight: 500; text-align: center; }
+    .alert-danger { background-color: #FCE8E6; color: #C5221F; border: 1px solid #FAD2CF; padding: 16px; border-radius: 8px; font-size: 14px; font-weight: 500; text-align: center; }
     
-    .status-select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: left 12px center; background-size: 16px; padding-left: 40px; }
-    
-    .btn-submit { display: flex; justify-content: center; align-items: center; gap: 10px; width: 100%; padding: 16px; background-color: var(--color-primary); color: white; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background-color 0.2s; letter-spacing: 0.5px; }
-    .btn-submit:hover:not(:disabled) { background-color: #2b57cc; }
-    .btn-submit:disabled { opacity: 0.7; cursor: not-allowed; }
-    
-    .alert { padding: 16px; border-radius: 8px; font-size: 14px; font-weight: 500; text-align: center; }
-    .alert-success { background-color: #E6F4EA; color: #137333; border: 1px solid #CEEAD6; }
-    .alert-danger { background-color: #FCE8E6; color: #C5221F; border: 1px solid #FAD2CF; }
-    
-    .loading-state, .empty-state { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: var(--color-text-secondary); text-align: center; }
-    .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
-    
-    .mt-4 { margin-top: 1.5rem; }
     .mt-3 { margin-top: 1rem; }
   `]
 })
