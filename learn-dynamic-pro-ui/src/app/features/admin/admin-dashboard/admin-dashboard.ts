@@ -24,6 +24,7 @@ export class AdminDashboardComponent implements OnInit {
   showAllCompanies = false;
   showAllModules = false;
   showAllUsers = false;
+  isSubmitting = false;
   
   // Progress Table tracking
   selectedCompanyId: string = '';
@@ -219,30 +220,40 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   saveCompany() {
+    if (this.isSubmitting) return;
     if (!this.newCompanyName.trim()) {
       alert('الرجاء إدخال اسم الشركة');
       return;
     }
+    
+    this.isSubmitting = true;
     this.adminService.createCompany(this.newCompanyName).subscribe({
       next: (comp) => {
         const companyId = comp.id;
         if (this.newDepartmentsList.length > 0) {
-          let completed = 0;
-          this.newDepartmentsList.forEach(deptName => {
-            this.adminService.createDepartment(companyId, deptName).subscribe(() => {
-              completed++;
-              if (completed === this.newDepartmentsList.length) {
-                this.closeAddCompanyModal();
-                this.refreshAllData();
-              }
-            });
+          const deptPromises = this.newDepartmentsList.map(deptName => 
+            this.adminService.createDepartment(companyId, deptName).toPromise()
+          );
+          
+          Promise.all(deptPromises).then(() => {
+            this.isSubmitting = false;
+            this.closeAddCompanyModal();
+            this.refreshAllData();
+          }).catch(err => {
+            this.isSubmitting = false;
+            console.error('Error creating departments', err);
+            alert('تم إنشاء الشركة لكن حدث خطأ في بعض الأقسام.');
+            this.closeAddCompanyModal();
+            this.refreshAllData();
           });
         } else {
+          this.isSubmitting = false;
           this.closeAddCompanyModal();
           this.refreshAllData();
         }
       },
       error: (err) => {
+        this.isSubmitting = false;
         console.error('Error creating company', err);
         alert('حدث خطأ أثناء إنشاء الشركة.');
       }
@@ -285,32 +296,38 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   async saveModule() {
+    if (this.isSubmitting) return;
     if (!this.newModuleName.trim()) {
       alert('الرجاء إدخال اسم الموديول');
       return;
     }
 
+    this.isSubmitting = true;
     try {
       const descriptionToSave = this.newModuleDescription.trim() || 'وصف تلقائي';
       const mod = await this.adminService.createModule(this.newModuleName, descriptionToSave).toPromise();
       const moduleId = mod.id;
 
-      for (const unit of this.newUnitsList) {
-        if (unit.name.trim()) {
-          const newUnit = await this.adminService.createUnit(moduleId, unit.name.trim()).toPromise();
-          const unitId = newUnit.id;
+      // Smart parallel saving for Units and Lessons
+      const validUnits = this.newUnitsList.filter(u => u.name.trim());
+      const unitPromises = validUnits.map(async unit => {
+        const newUnit = await this.adminService.createUnit(moduleId, unit.name.trim()).toPromise();
+        
+        const validLessons = unit.lessons.filter(l => l.title.trim());
+        const lessonPromises = validLessons.map(lesson => 
+          this.adminService.createLesson(newUnit.id, lesson.title.trim()).toPromise()
+        );
+        
+        return Promise.all(lessonPromises);
+      });
 
-          for (const lesson of unit.lessons) {
-            if (lesson.title.trim()) {
-              await this.adminService.createLesson(unitId, lesson.title.trim()).toPromise();
-            }
-          }
-        }
-      }
+      await Promise.all(unitPromises);
 
+      this.isSubmitting = false;
       this.closeAddModuleModal();
       this.refreshAllData();
     } catch (err) {
+      this.isSubmitting = false;
       console.error('Error creating module', err);
       alert('حدث خطأ أثناء إنشاء الموديول.');
     }
@@ -353,17 +370,21 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   saveUser() {
+    if (this.isSubmitting) return;
     if (!this.newUser.username || !this.newUser.password || !this.newUser.companyId || !this.newUser.departmentId) {
       alert('الرجاء تعبئة جميع الحقول المطلوبة');
       return;
     }
     
+    this.isSubmitting = true;
     this.adminService.createUser(this.newUser.companyId, this.newUser.departmentId, this.newUser.username, this.newUser.password).subscribe({
       next: () => {
+        this.isSubmitting = false;
         this.closeAddUserModal();
         this.refreshAllData();
       },
       error: (err) => {
+        this.isSubmitting = false;
         console.error('Error creating user', err);
         alert('حدث خطأ أثناء إضافة المستخدم.');
       }
