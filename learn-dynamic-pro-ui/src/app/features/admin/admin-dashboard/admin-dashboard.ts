@@ -183,29 +183,7 @@ export class AdminDashboardComponent implements OnInit {
     }
   }
 
-  editUnit(unit: any) {
-    const newName = prompt('تعديل اسم الوحدة:', unit.name);
-    if (!newName) return;
-    this.adminService.updateUnit(unit.id, newName).subscribe(() => unit.name = newName);
-  }
 
-  deleteUnit(unit: any) {
-    if (confirm('هل أنت متأكد من حذف الوحدة؟')) {
-      this.adminService.deleteUnit(unit.id).subscribe(() => this.refreshAllData());
-    }
-  }
-
-  editLesson(lesson: any) {
-    const newName = prompt('تعديل اسم الدرس:', lesson.title);
-    if (!newName) return;
-    this.adminService.updateLesson(lesson.id, newName).subscribe(() => lesson.title = newName);
-  }
-
-  deleteLesson(lesson: any) {
-    if (confirm('هل أنت متأكد من حذف الدرس؟')) {
-      this.adminService.deleteLesson(lesson.id).subscribe(() => this.refreshAllData());
-    }
-  }
 
   logout() {
     this.auth.logout();
