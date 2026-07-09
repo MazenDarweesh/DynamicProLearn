@@ -14,6 +14,20 @@ export interface UnitDto {
   orderIndex: number;
 }
 
+export interface LessonDto {
+  id: string;
+  unitId: string;
+  title: string;
+  levelLabel: string;
+  typeLabel: string;
+  orderIndex: number;
+  isCompleted: boolean;
+}
+
+export interface LessonDetailDto extends LessonDto {
+  videoUrl: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -27,6 +41,14 @@ export class StudentService {
 
   getModuleUnits(moduleId: string): Observable<UnitDto[]> {
     return this.http.get<UnitDto[]>(`${this.apiUrl}/modules/${moduleId}/units`);
+  }
+
+  getUnitLessons(unitId: string): Observable<LessonDto[]> {
+    return this.http.get<LessonDto[]>(`${this.apiUrl}/units/${unitId}/lessons`);
+  }
+
+  getLessonDetail(lessonId: string): Observable<LessonDetailDto> {
+    return this.http.get<LessonDetailDto>(`${this.apiUrl}/lessons/${lessonId}`);
   }
 
   completeLesson(lessonId: string): Observable<any> {
