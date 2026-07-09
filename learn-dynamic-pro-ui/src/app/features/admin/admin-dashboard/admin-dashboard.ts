@@ -243,11 +243,13 @@ export class AdminDashboardComponent implements OnInit {
   // --- Add Module Modal Logic ---
   showAddModuleModal = false;
   newModuleName = '';
+  newModuleDescription = '';
   newUnitsList: { name: string, lessons: { title: string }[] }[] = [];
 
   openAddModuleModal() {
     this.showAddModuleModal = true;
     this.newModuleName = '';
+    this.newModuleDescription = '';
     this.newUnitsList = [
       { name: 'الوحدة الأولى', lessons: [{ title: '' }, { title: '' }] }
     ];
@@ -280,7 +282,8 @@ export class AdminDashboardComponent implements OnInit {
     }
 
     try {
-      const mod = await this.adminService.createModule(this.newModuleName, 'وصف تلقائي').toPromise();
+      const descriptionToSave = this.newModuleDescription.trim() || 'وصف تلقائي';
+      const mod = await this.adminService.createModule(this.newModuleName, descriptionToSave).toPromise();
       const moduleId = mod.id;
 
       for (const unit of this.newUnitsList) {
