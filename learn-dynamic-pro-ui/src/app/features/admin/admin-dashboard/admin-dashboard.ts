@@ -307,4 +307,50 @@ export class AdminDashboardComponent implements OnInit {
       alert('حدث خطأ أثناء إنشاء الموديول.');
     }
   }
+
+  // --- Add User Modal Logic ---
+  showAddUserModal = false;
+  newUser = { username: '', password: '', companyId: '', departmentId: '' };
+  newUserDepartments: any[] = [];
+
+  openAddUserModal() {
+    this.showAddUserModal = true;
+    this.newUser = { 
+      username: '', 
+      password: '', 
+      companyId: this.selectedCompanyId || '', 
+      departmentId: this.selectedDepartmentId || '' 
+    };
+    
+    if (this.newUser.companyId) {
+      this.onUserCompanyChange();
+    } else {
+      this.newUserDepartments = [];
+    }
+  }
+
+  closeAddUserModal() {
+    this.showAddUserModal = false;
+  }
+
+  onUserCompanyChange() {
+    if (!this.newUser.companyId) return;
+    this.adminService.getDepartments(this.newUser.companyId).subscribe(depts => {
+      this.newUserDepartments = depts;
+      // If the currently selected department is not in the new list, clear it
+      if (!depts.find(d => d.id === this.newUser.departmentId)) {
+        this.newUser.departmentId = '';
+      }
+    });
+  }
+
+  saveUser() {
+    if (!this.newUser.username || !this.newUser.password || !this.newUser.companyId || !this.newUser.departmentId) {
+      alert('الرجاء تعبئة جميع الحقول المطلوبة');
+      return;
+    }
+    
+    this.notImplemented('إضافة مستخدم');
+    this.closeAddUserModal();
+  }
 }
