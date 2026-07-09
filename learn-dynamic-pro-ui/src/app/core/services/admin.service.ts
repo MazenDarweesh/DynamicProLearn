@@ -39,12 +39,12 @@ export class AdminService {
     return this.http.post(`${this.apiUrl}/units`, { moduleId, name, orderIndex: 1 });
   }
 
-  createLesson(unitId: string, title: string): Observable<any> {
+  createLesson(unitId: string, title: string, videoUrl: string = ''): Observable<any> {
     // using dummy GUIDs for Level and Type for UI testing
     return this.http.post(`${this.apiUrl}/lessons`, { 
       unitId, 
       title, 
-      videoUrl: 'https://video.url', 
+      videoUrl: videoUrl || 'https://video.url', 
       levelId: '00000000-0000-0000-0000-000000000001', 
       typeId: '00000000-0000-0000-0000-000000000001', 
       orderIndex: 1 

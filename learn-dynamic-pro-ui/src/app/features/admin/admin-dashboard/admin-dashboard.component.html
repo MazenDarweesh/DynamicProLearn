@@ -469,12 +469,15 @@
 
           <!-- Lessons list -->
           <div class="lessons-list">
-            <div class="d-flex gap-2 align-center mb-2 lesson-item" *ngFor="let lesson of unit.lessons; let lIndex = index">
-              <button class="icon-btn text-danger" (click)="removeLessonFromUnit(uIndex, lIndex)" style="opacity: 0.7;">
+            <div class="d-flex gap-2 align-start mb-3 lesson-item" *ngFor="let lesson of unit.lessons; let lIndex = index">
+              <button class="icon-btn text-danger mt-1" (click)="removeLessonFromUnit(uIndex, lIndex)" style="opacity: 0.7;">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
               </button>
-              <input type="text" class="form-control modal-input flex-1 lesson-input" [(ngModel)]="lesson.title" placeholder="اسم الدرس">
-              <svg class="drag-handle text-secondary" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.4"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+              <div class="flex-1">
+                <input type="text" class="form-control modal-input lesson-input mb-2" [(ngModel)]="lesson.title" placeholder="اسم الدرس">
+                <input type="text" class="form-control modal-input text-sm" [(ngModel)]="lesson.videoUrl" placeholder="رابط فيديو الشرح (YouTube/Vimeo...)">
+              </div>
+              <svg class="drag-handle text-secondary mt-2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.4"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
             </div>
           </div>
           

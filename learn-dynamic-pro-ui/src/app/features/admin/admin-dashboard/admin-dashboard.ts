@@ -147,9 +147,8 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   editModule(mod: any) {
-    const newName = prompt('تعديل اسم الموديول:', mod.name);
-    if (!newName) return;
-    this.adminService.updateModule(mod.id, newName, mod.description || '').subscribe(() => mod.name = newName);
+    // Navigate to a dedicated page to edit module details, units, and lessons
+    this.router.navigate(['/admin/content', mod.id]);
   }
 
   deleteModule(mod: any) {
@@ -264,14 +263,14 @@ export class AdminDashboardComponent implements OnInit {
   showAddModuleModal = false;
   newModuleName = '';
   newModuleDescription = '';
-  newUnitsList: { name: string, lessons: { title: string }[] }[] = [];
+  newUnitsList: { name: string, lessons: { title: string, videoUrl: string }[] }[] = [];
 
   openAddModuleModal() {
     this.showAddModuleModal = true;
     this.newModuleName = '';
     this.newModuleDescription = '';
     this.newUnitsList = [
-      { name: 'الوحدة الأولى', lessons: [{ title: '' }, { title: '' }] }
+      { name: 'الوحدة الأولى', lessons: [{ title: '', videoUrl: '' }, { title: '', videoUrl: '' }] }
     ];
   }
 
@@ -288,7 +287,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   addLessonToUnit(unitIndex: number) {
-    this.newUnitsList[unitIndex].lessons.push({ title: '' });
+    this.newUnitsList[unitIndex].lessons.push({ title: '', videoUrl: '' });
   }
 
   removeLessonFromUnit(unitIndex: number, lessonIndex: number) {
@@ -315,7 +314,7 @@ export class AdminDashboardComponent implements OnInit {
         
         const validLessons = unit.lessons.filter(l => l.title.trim());
         const lessonPromises = validLessons.map(lesson => 
-          this.adminService.createLesson(newUnit.id, lesson.title.trim()).toPromise()
+          this.adminService.createLesson(newUnit.id, lesson.title.trim(), lesson.videoUrl.trim()).toPromise()
         );
         
         return Promise.all(lessonPromises);
