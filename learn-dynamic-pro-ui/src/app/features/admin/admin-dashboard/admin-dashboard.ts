@@ -376,9 +376,9 @@ export class AdminDashboardComponent implements OnInit {
           const validLessons = unit.lessons.filter(l => l.title.trim());
           const lessonPromises = validLessons.map(lesson => {
             if (lesson.id) {
-              return this.adminService.updateLesson(lesson.id, lesson.title.trim(), lesson.videoUrl.trim()).toPromise();
+              return this.adminService.updateLesson(lesson.id, { title: lesson.title.trim(), videoUrl: lesson.videoUrl.trim(), levelId: '00000000-0000-0000-0000-000000000001', typeId: '00000000-0000-0000-0000-000000000001', orderIndex: 1 }).toPromise();
             } else {
-              return this.adminService.createLesson(unitId!, lesson.title.trim(), lesson.videoUrl.trim()).toPromise();
+              return this.adminService.createLesson({ unitId: unitId!, title: lesson.title.trim(), videoUrl: lesson.videoUrl.trim(), levelId: '00000000-0000-0000-0000-000000000001', typeId: '00000000-0000-0000-0000-000000000001', orderIndex: 1 }).toPromise();
             }
           });
           
@@ -399,7 +399,7 @@ export class AdminDashboardComponent implements OnInit {
           
           const validLessons = unit.lessons.filter(l => l.title.trim());
           const lessonPromises = validLessons.map(lesson => 
-            this.adminService.createLesson(newUnit.id, lesson.title.trim(), lesson.videoUrl.trim()).toPromise()
+            this.adminService.createLesson({ unitId: newUnit.id, title: lesson.title.trim(), videoUrl: lesson.videoUrl.trim(), levelId: '00000000-0000-0000-0000-000000000001', typeId: '00000000-0000-0000-0000-000000000001', orderIndex: 1 }).toPromise()
           );
           
           return Promise.all(lessonPromises);

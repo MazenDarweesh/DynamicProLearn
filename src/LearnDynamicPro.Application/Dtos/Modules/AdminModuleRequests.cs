@@ -29,6 +29,7 @@ public class CreateLessonRequest
 {
     public Guid UnitId { get; set; }
     public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
     public string VideoUrl { get; set; } = string.Empty;
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
@@ -38,6 +39,7 @@ public class CreateLessonRequest
 public class UpdateLessonRequest
 {
     public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
     public string VideoUrl { get; set; } = string.Empty;
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }

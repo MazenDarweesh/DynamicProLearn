@@ -2,8 +2,10 @@ using LearnDynamicPro.Application.Dtos.Assignments;
 using LearnDynamicPro.Application.Dtos.Companies;
 using LearnDynamicPro.Application.Dtos.Modules;
 using LearnDynamicPro.Application.Features.Admin;
+using LearnDynamicPro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace LearnDynamicPro.API.Controllers;
 
@@ -15,15 +17,39 @@ public class AdminController : ControllerBase
     private readonly ICompanyService _companyService;
     private readonly IModuleService _moduleService;
     private readonly IAssignmentService _assignmentService;
+    private readonly IApplicationDbContext _context;
 
     public AdminController(
         ICompanyService companyService,
         IModuleService moduleService,
-        IAssignmentService assignmentService)
+        IAssignmentService assignmentService,
+        IApplicationDbContext context)
     {
         _companyService = companyService;
         _moduleService = moduleService;
         _assignmentService = assignmentService;
+        _context = context;
+    }
+
+    // ── Lookups ─────────────────────────────────────────────────────────────
+    [HttpGet("lookups/levels")]
+    public async Task<IActionResult> GetLevels()
+    {
+        var levels = await _context.LevelOptions
+            .AsNoTracking()
+            .Select(l => new { l.Id, l.Label })
+            .ToListAsync();
+        return Ok(levels);
+    }
+
+    [HttpGet("lookups/types")]
+    public async Task<IActionResult> GetTypes()
+    {
+        var types = await _context.TypeOptions
+            .AsNoTracking()
+            .Select(t => new { t.Id, t.Label })
+            .ToListAsync();
+        return Ok(types);
     }
 
     // ── Companies ───────────────────────────────────────────────────────────

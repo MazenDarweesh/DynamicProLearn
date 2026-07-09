@@ -137,6 +137,7 @@ public class ModuleService : IModuleService
             UnitId = request.UnitId,
             LevelId = levelId,
             TypeId = typeId,
+            Description = request.Description,
             OrderIndex = request.OrderIndex
         };
         _context.Lessons.Add(lesson);
@@ -149,6 +150,7 @@ public class ModuleService : IModuleService
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
+            Description = lesson.Description,
             OrderIndex = lesson.OrderIndex 
         });
     }
@@ -170,6 +172,7 @@ public class ModuleService : IModuleService
         lesson.VideoUrl = request.VideoUrl;
         lesson.LevelId = levelId;
         lesson.TypeId = typeId;
+        lesson.Description = request.Description;
         lesson.OrderIndex = request.OrderIndex;
         await _context.SaveChangesAsync(default);
 
@@ -180,6 +183,7 @@ public class ModuleService : IModuleService
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
+            Description = lesson.Description,
             OrderIndex = lesson.OrderIndex 
         });
     }
@@ -212,6 +216,7 @@ public class ModuleService : IModuleService
             { 
                 Id = l.Id, 
                 Title = l.Title, 
+                Description = l.Description,
                 UnitId = l.UnitId, 
                 LevelId = l.LevelId,
                 LevelLabel = l.Level != null ? l.Level.Label : string.Empty,
@@ -239,6 +244,7 @@ public class ModuleService : IModuleService
         { 
             Id = lesson.Id, 
             Title = lesson.Title, 
+            Description = lesson.Description,
             VideoUrl = lesson.VideoUrl,
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
