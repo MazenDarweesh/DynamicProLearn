@@ -8,6 +8,7 @@ using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Domain.Enums;
 using LearnDynamicPro.Infrastructure.Identity;
 using LearnDynamicPro.Infrastructure.Persistence;
+using LearnDynamicPro.Infrastructure.Persistence.Interceptors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -31,9 +32,16 @@ builder.Host.UseSerilog();
 // Add services to the container.
 builder.Services.AddControllers();
 
+// Register Interceptors
+builder.Services.AddScoped<AuditableEntityInterceptor>();
+
 // Configure Database
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDbContext<AppDbContext>((sp, options) =>
+{
+    var interceptor = sp.GetRequiredService<AuditableEntityInterceptor>();
+    options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"))
+           .AddInterceptors(interceptor);
+});
 builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<AppDbContext>());
 
 // Configure JWT Settings

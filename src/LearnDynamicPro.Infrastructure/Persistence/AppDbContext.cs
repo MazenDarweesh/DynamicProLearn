@@ -1,5 +1,6 @@
 using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Domain.Entities;
+using LearnDynamicPro.Domain.Common;
 using Microsoft.EntityFrameworkCore;
 using DomainModule = LearnDynamicPro.Domain.Entities.Module;
 
@@ -7,7 +8,9 @@ namespace LearnDynamicPro.Infrastructure.Persistence;
 
 public class AppDbContext : DbContext, IApplicationDbContext
 {
-    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+    public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) 
+    { 
+    }
 
     // ── Lookup Tables ─────────────────────────────────────────────────
     public DbSet<LevelOption> LevelOptions => Set<LevelOption>();
