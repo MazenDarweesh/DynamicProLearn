@@ -7,12 +7,24 @@ export const roleGuard = (allowedRoles: string[]): CanActivateFn => {
     const authService = inject(AuthService);
     const router = inject(Router);
     const currentRole = authService.userRole();
+    const token = authService.token();
 
-    if (currentRole && allowedRoles.includes(currentRole)) {
+    // Not authenticated at all → go to login
+    if (!token || !currentRole) {
+      return router.parseUrl('/login');
+    }
+
+    // Has valid role for this route → allow
+    if (allowedRoles.includes(currentRole)) {
       return true;
     }
 
-    // Redirect to unauthorized or login
+    // Authenticated but wrong role → redirect to their own home page
+    if (currentRole === 'Admin') return router.parseUrl('/admin');
+    if (currentRole === 'Student') return router.parseUrl('/student');
+    if (currentRole === 'Tester') return router.parseUrl('/tester');
+
+    // Fallback
     return router.parseUrl('/login');
   };
 };
