@@ -34,10 +34,12 @@ export class AdminDashboardComponent implements OnInit {
 
   // Add Company Modal State
   showAddCompanyModal = false;
+  editingCompanyId: string | null = null;
+  originalDepartments: any[] = [];
   newCompanyName = '';
   newCompanyStatus = 'active';
   newDepartmentName = '';
-  newDepartmentsList: string[] = [];
+  newDepartmentsList: { id?: string, name: string }[] = [];
 
   ngOnInit() {
     this.refreshAllData();
@@ -135,9 +137,17 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   editCompany(comp: any) {
-    const newName = prompt('تعديل اسم الشركة:', comp.name);
-    if (!newName) return;
-    this.adminService.updateCompany(comp.id, newName).subscribe(() => comp.name = newName);
+    this.editingCompanyId = comp.id;
+    this.newCompanyName = comp.name;
+    
+    // Deep clone departments for editing
+    this.newDepartmentsList = (comp.departments || []).map((d: any) => ({
+      id: d.id,
+      name: d.name
+    }));
+    
+    this.originalDepartments = JSON.parse(JSON.stringify(this.newDepartmentsList));
+    this.showAddCompanyModal = true;
   }
 
   deleteCompany(comp: any) {
@@ -212,6 +222,8 @@ export class AdminDashboardComponent implements OnInit {
 
   // --- Modal Logic ---
   openAddCompanyModal() {
+    this.editingCompanyId = null;
+    this.originalDepartments = [];
     this.showAddCompanyModal = true;
     this.newCompanyName = '';
     this.newCompanyStatus = 'active';
@@ -225,7 +237,7 @@ export class AdminDashboardComponent implements OnInit {
 
   addDepartmentToList() {
     if (this.newDepartmentName.trim()) {
-      this.newDepartmentsList.push(this.newDepartmentName.trim());
+      this.newDepartmentsList.push({ name: this.newDepartmentName.trim() });
       this.newDepartmentName = '';
     }
   }
@@ -234,7 +246,7 @@ export class AdminDashboardComponent implements OnInit {
     this.newDepartmentsList.splice(index, 1);
   }
 
-  saveCompany() {
+  async saveCompany() {
     if (this.isSubmitting) return;
     if (!this.newCompanyName.trim()) {
       alert('الرجاء إدخال اسم الشركة');
@@ -242,37 +254,53 @@ export class AdminDashboardComponent implements OnInit {
     }
     
     this.isSubmitting = true;
-    this.adminService.createCompany(this.newCompanyName).subscribe({
-      next: (comp) => {
-        const companyId = comp.id;
-        if (this.newDepartmentsList.length > 0) {
-          const deptPromises = this.newDepartmentsList.map(deptName => 
-            this.adminService.createDepartment(companyId, deptName).toPromise()
-          );
-          
-          Promise.all(deptPromises).then(() => {
-            this.isSubmitting = false;
-            this.closeAddCompanyModal();
-            this.refreshAllData();
-          }).catch(err => {
-            this.isSubmitting = false;
-            console.error('Error creating departments', err);
-            alert('تم إنشاء الشركة لكن حدث خطأ في بعض الأقسام.');
-            this.closeAddCompanyModal();
-            this.refreshAllData();
-          });
-        } else {
-          this.isSubmitting = false;
-          this.closeAddCompanyModal();
-          this.refreshAllData();
+    try {
+      if (this.editingCompanyId) {
+        // --- EDIT MODE ---
+        await this.adminService.updateCompany(this.editingCompanyId, this.newCompanyName).toPromise();
+        
+        const currentDeptIds = this.newDepartmentsList.filter(d => d.id).map(d => d.id);
+        const originalDeptIds = this.originalDepartments.map(d => d.id);
+        
+        // Find deleted departments
+        const deptsToDelete = originalDeptIds.filter(id => !currentDeptIds.includes(id));
+        if (deptsToDelete.length > 0) {
+          await Promise.all(deptsToDelete.map(id => this.adminService.deleteDepartment(id).toPromise()));
         }
-      },
-      error: (err) => {
-        this.isSubmitting = false;
-        console.error('Error creating company', err);
-        alert('حدث خطأ أثناء إنشاء الشركة.');
+        
+        // Save/Update valid departments
+        const validDepts = this.newDepartmentsList.filter(d => d.name.trim());
+        const deptPromises = validDepts.map(dept => {
+          if (dept.id) {
+            return this.adminService.updateDepartment(dept.id, dept.name.trim()).toPromise();
+          } else {
+            return this.adminService.createDepartment(this.editingCompanyId!, dept.name.trim()).toPromise();
+          }
+        });
+        
+        await Promise.all(deptPromises);
+        
+      } else {
+        // --- CREATE MODE ---
+        const comp = await this.adminService.createCompany(this.newCompanyName).toPromise();
+        const companyId = comp.id;
+        
+        const validDepts = this.newDepartmentsList.filter(d => d.name.trim());
+        const deptPromises = validDepts.map(dept => 
+          this.adminService.createDepartment(companyId, dept.name.trim()).toPromise()
+        );
+        
+        await Promise.all(deptPromises);
       }
-    });
+      
+      this.isSubmitting = false;
+      this.closeAddCompanyModal();
+      this.refreshAllData();
+    } catch (err) {
+      this.isSubmitting = false;
+      console.error('Error saving company', err);
+      alert('حدث خطأ أثناء حفظ الشركة.');
+    }
   }
 
   // --- Add Module Modal Logic ---
