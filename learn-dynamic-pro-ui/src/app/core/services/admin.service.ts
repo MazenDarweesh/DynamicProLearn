@@ -8,6 +8,7 @@ export interface AdminModuleDto {
   description: string;
   isPublished: boolean;
   totalUnits: number;
+  assignedDepartments?: string[];
 }
 
 export interface CompanyDto {

@@ -51,7 +51,18 @@ public class ModuleService : IModuleService
     {
         var modules = await _context.Modules
             .AsNoTracking()
-            .Select(m => new ModuleDto { Id = m.Id, Name = m.Name, Description = m.Description })
+            .Include(m => m.Assignments)
+                .ThenInclude(a => a.Department)
+                    .ThenInclude(d => d.Company)
+            .Select(m => new ModuleDto { 
+                Id = m.Id, 
+                Name = m.Name, 
+                Description = m.Description,
+                AssignedDepartments = m.Assignments
+                    .Where(a => a.Department != null && a.Department.Company != null)
+                    .Select(a => $"{a.Department!.Name} ({a.Department.Company!.Name})")
+                    .ToList()
+            })
             .ToListAsync();
         return Result<List<ModuleDto>>.Success(modules);
     }

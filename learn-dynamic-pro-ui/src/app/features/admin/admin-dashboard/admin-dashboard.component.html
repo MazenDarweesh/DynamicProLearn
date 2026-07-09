@@ -54,13 +54,14 @@
               <div class="badges-row d-flex flex-wrap gap-2">
                 <div class="department-badge-group d-flex align-center" *ngFor="let d of comp.departments">
                   <span class="badge badge-primary">{{ d.name }}</span>
-                  <button class="icon-btn text-primary ms-1" style="transform: scale(0.85); margin-right: 4px;" (click)="openAssignModulesModal(comp, d)" title="إسناد موديولات">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <button class="icon-btn text-primary ms-1 d-flex align-center gap-1" style="transform: scale(0.9); margin-right: 4px; padding: 2px 6px; border-radius: 4px; background: rgba(0,123,255,0.05);" (click)="openAssignModulesModal(comp, d)" title="إسناد موديولات">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
                       <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
                       <path d="M9 14h6"></path>
                       <path d="M9 10h6"></path>
                     </svg>
+                    <span style="font-size: 12px; font-weight: 500;">إسناد موديولات</span>
                   </button>
                 </div>
                 <span class="text-secondary text-sm" *ngIf="!comp.departments || comp.departments.length === 0">لا توجد أقسام</span>
@@ -99,7 +100,17 @@
       <div class="panel-content">
         <div class="item-card module-card mb-4" *ngFor="let mod of modules">
           <div class="d-flex justify-between align-start mb-2">
-            <h4 class="text-primary">موديول: {{ mod.name }}</h4>
+            <div>
+              <h4 class="text-primary m-0 mb-1">موديول: {{ mod.name }}</h4>
+              
+              <div class="mt-2 mb-2 d-flex flex-wrap gap-2 align-center" *ngIf="mod.assignedDepartments && mod.assignedDepartments.length > 0">
+                <span class="text-secondary text-sm">🔗 مُسند إلى:</span>
+                <span class="badge badge-primary-light text-xs" *ngFor="let assigned of mod.assignedDepartments" style="padding: 2px 6px;">{{ assigned }}</span>
+              </div>
+              <div class="mt-1 mb-2" *ngIf="!mod.assignedDepartments || mod.assignedDepartments.length === 0">
+                <span class="text-secondary text-sm" style="font-size: 12px; opacity: 0.7;">غير مُسند لأي قسم حالياً.</span>
+              </div>
+            </div>
             <div class="actions-left d-flex gap-2">
               <button class="icon-btn text-secondary" (click)="editModule(mod)" title="تعديل">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
