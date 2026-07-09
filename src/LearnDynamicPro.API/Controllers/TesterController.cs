@@ -57,4 +57,12 @@ public class TesterController : ControllerBase
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
+
+    [HttpGet("conditions")]
+    public async Task<IActionResult> GetConditions()
+    {
+        var result = await _testerService.GetConditionOptionsAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 }

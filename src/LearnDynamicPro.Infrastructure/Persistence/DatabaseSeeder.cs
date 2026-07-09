@@ -71,12 +71,19 @@ public static class DatabaseSeeder
             }
 
             // 5. Seed FeedbackConditionOptions
+            if (await context.FeedbackConditionOptions.AnyAsync())
+            {
+                context.FeedbackConditionOptions.RemoveRange(context.FeedbackConditionOptions);
+                await context.SaveChangesAsync();
+            }
             if (!await context.FeedbackConditionOptions.AnyAsync())
             {
                 context.FeedbackConditionOptions.AddRange(
-                    new FeedbackConditionOption { Label = "Video Not Loading", IsActive = true, CreatedByAdminId = adminId },
-                    new FeedbackConditionOption { Label = "Audio Sync Issue", IsActive = true, CreatedByAdminId = adminId },
-                    new FeedbackConditionOption { Label = "Incorrect Information", IsActive = true, CreatedByAdminId = adminId }
+                    new FeedbackConditionOption { Label = "🟩 يعمل بكفاءة تامة (نجاح)", IsActive = true, CreatedByAdminId = adminId },
+                    new FeedbackConditionOption { Label = "🟨 خلل في واجهة المستخدم / عدم محاذاة", IsActive = true, CreatedByAdminId = adminId },
+                    new FeedbackConditionOption { Label = "🟥 خطأ في النظام / خطأ حسابي", IsActive = true, CreatedByAdminId = adminId },
+                    new FeedbackConditionOption { Label = "☠️ تعطل الصفحة / توقف كامل (Blocker)", IsActive = true, CreatedByAdminId = adminId },
+                    new FeedbackConditionOption { Label = "⚙️ يحتاج تدخل فريق البرمجة الأساسي", IsActive = true, CreatedByAdminId = adminId }
                 );
             }
 

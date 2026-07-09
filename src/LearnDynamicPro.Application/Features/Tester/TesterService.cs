@@ -124,5 +124,20 @@ public class TesterService : ITesterService
             
         return Result<List<FeedbackDto>>.Success(feedbacks);
     }
+
+    public async Task<Result<List<LookupDto>>> GetConditionOptionsAsync()
+    {
+        var options = await _context.FeedbackConditionOptions
+            .AsNoTracking()
+            .Where(o => o.IsActive)
+            .Select(o => new LookupDto
+            {
+                Id = o.Id.ToString(),
+                Label = o.Label
+            })
+            .ToListAsync();
+
+        return Result<List<LookupDto>>.Success(options);
+    }
 }
 

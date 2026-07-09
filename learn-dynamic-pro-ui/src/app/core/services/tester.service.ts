@@ -9,10 +9,14 @@ export interface ErpVersionDto {
 }
 
 export interface FeedbackRequest {
-  testerActiveVersionId: string;
+  lessonId: string;
   conditionOptionId: string;
   notes: string;
-  severity: number;
+}
+
+export interface LookupDto {
+  id: string;
+  label: string;
 }
 
 @Injectable({
@@ -24,6 +28,10 @@ export class TesterService {
 
   getVersions(): Observable<ErpVersionDto[]> {
     return this.http.get<ErpVersionDto[]>(`${this.apiUrl}/versions`);
+  }
+
+  getConditions(): Observable<LookupDto[]> {
+    return this.http.get<LookupDto[]>(`${this.apiUrl}/conditions`);
   }
 
   submitFeedback(feedback: FeedbackRequest): Observable<any> {

@@ -16,4 +16,5 @@ public interface ITesterService
     // Feedback submission & retrieval
     Task<Result<FeedbackDto>> SubmitFeedbackAsync(SubmitFeedbackRequest request);
     Task<Result<List<FeedbackDto>>> GetFeedbackByActiveVersionAsync();
+    Task<Result<List<LookupDto>>> GetConditionOptionsAsync();
 }
