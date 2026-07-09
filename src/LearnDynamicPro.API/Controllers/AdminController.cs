@@ -36,7 +36,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("companies")]
-    public async Task<IActionResult> GetAllCompanies([FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetAllCompanies([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _companyService.GetAllCompaniesAsync(page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -69,7 +69,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("companies/{companyId}/departments")]
-    public async Task<IActionResult> GetDepartments(Guid companyId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetDepartments(Guid companyId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _companyService.GetDepartmentsByCompanyAsync(companyId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -102,7 +102,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("departments/{departmentId}/users")]
-    public async Task<IActionResult> GetUsers(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetUsers(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _companyService.GetUsersByDepartmentAsync(departmentId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -119,7 +119,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("modules")]
-    public async Task<IActionResult> GetAllModules([FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetAllModules([FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _moduleService.GetAllModulesAsync(page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -152,7 +152,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("modules/{moduleId}/units")]
-    public async Task<IActionResult> GetUnits(Guid moduleId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetUnits(Guid moduleId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _moduleService.GetUnitsByModuleAsync(moduleId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -185,7 +185,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("units/{unitId}/lessons")]
-    public async Task<IActionResult> GetLessons(Guid unitId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetLessons(Guid unitId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _moduleService.GetLessonsByUnitAsync(unitId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -226,7 +226,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("departments/{departmentId}/assignments")]
-    public async Task<IActionResult> GetAssignments(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetAssignments(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _assignmentService.GetAssignmentsByDepartmentAsync(departmentId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -251,7 +251,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("departments/{departmentId}/users-progress")]
-    public async Task<IActionResult> GetUsersProgress(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
+    public async Task<IActionResult> GetUsersProgress(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _companyService.GetDepartmentUsersProgressAsync(departmentId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);

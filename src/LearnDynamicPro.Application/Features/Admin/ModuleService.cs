@@ -47,7 +47,7 @@ public class ModuleService : IModuleService
         return Result.Success();
     }
 
-    public async Task<Result<PagedList<ModuleDto>>> GetAllModulesAsync(int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<ModuleDto>>> GetAllModulesAsync(int page = 1, int pageSize = 10)
     {
         var query = _context.Modules.AsNoTracking();
         var totalCount = await query.CountAsync();
@@ -105,7 +105,7 @@ public class ModuleService : IModuleService
         return Result.Success();
     }
 
-    public async Task<Result<PagedList<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId, int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId, int page = 1, int pageSize = 10)
     {
         var query = _context.Units.AsNoTracking().Where(u => u.ModuleId == moduleId);
         var totalCount = await query.CountAsync();
@@ -195,7 +195,7 @@ public class ModuleService : IModuleService
         return Result.Success();
     }
 
-    public async Task<Result<PagedList<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, int page = 1, int pageSize = 10)
     {
         var query = _context.Lessons
             .AsNoTracking()

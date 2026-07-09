@@ -26,7 +26,7 @@ public class CompanyService : ICompanyService
         return Result<CompanyDto>.Success(new CompanyDto { Id = company.Id, Name = company.Name });
     }
 
-    public async Task<Result<PagedList<CompanyDto>>> GetAllCompaniesAsync(int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<CompanyDto>>> GetAllCompaniesAsync(int page = 1, int pageSize = 10)
     {
         var query = _context.Companies.AsNoTracking();
         var totalCount = await query.CountAsync();
@@ -59,7 +59,7 @@ public class CompanyService : ICompanyService
         });
     }
 
-    public async Task<Result<PagedList<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId, int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId, int page = 1, int pageSize = 10)
     {
         var query = _context.Departments
             .AsNoTracking()
@@ -109,7 +109,7 @@ public class CompanyService : ICompanyService
         });
     }
 
-    public async Task<Result<PagedList<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
         var query = _context.Users
             .AsNoTracking()
@@ -178,7 +178,7 @@ public class CompanyService : ICompanyService
         return Result<bool>.Success(true);
     }
 
-    public async Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
         // Get all users in department
         var query = _context.Users

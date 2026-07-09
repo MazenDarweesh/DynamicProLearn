@@ -9,7 +9,6 @@ public class TesterFeedback : BaseEntity
     public Guid ErpVersionId { get; set; }
     public Guid ConditionOptionId { get; set; }
     public string Notes { get; set; } = string.Empty;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
     public User? User { get; set; }

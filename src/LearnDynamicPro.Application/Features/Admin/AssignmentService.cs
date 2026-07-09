@@ -49,7 +49,7 @@ public class AssignmentService : IAssignmentService
         return Result.Success();
     }
 
-    public async Task<Result<PagedList<DepartmentModuleDto>>> GetAssignmentsByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 100)
+    public async Task<Result<PagedList<DepartmentModuleDto>>> GetAssignmentsByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
         var query = _context.DepartmentModuleAssignments
             .AsNoTracking()

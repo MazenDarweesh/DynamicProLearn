@@ -25,7 +25,7 @@ export class AdminService {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:5115/api/admin';
 
-  getModules(page = 1, pageSize = 100): Observable<AdminModuleDto[]> {
+  getModules(page = 1, pageSize = 10): Observable<AdminModuleDto[]> {
     return this.http.get<any>(`${this.apiUrl}/modules?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
@@ -51,7 +51,7 @@ export class AdminService {
     });
   }
 
-  getCompanies(page = 1, pageSize = 100): Observable<CompanyDto[]> {
+  getCompanies(page = 1, pageSize = 10): Observable<CompanyDto[]> {
     return this.http.get<any>(`${this.apiUrl}/companies?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
@@ -61,7 +61,7 @@ export class AdminService {
     return this.http.post(`${this.apiUrl}/companies`, { name });
   }
 
-  getDepartments(companyId: string, page = 1, pageSize = 100): Observable<any[]> {
+  getDepartments(companyId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/companies/${companyId}/departments?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
@@ -71,7 +71,7 @@ export class AdminService {
     return this.http.post(`${this.apiUrl}/departments`, { companyId, name });
   }
 
-  getUsers(departmentId: string, page = 1, pageSize = 100): Observable<any[]> {
+  getUsers(departmentId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/departments/${departmentId}/users?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
@@ -81,13 +81,13 @@ export class AdminService {
     return this.http.post(`${this.apiUrl}/users`, { companyId, departmentId, username, password, role: 1 });
   }
 
-  getUnits(moduleId: string, page = 1, pageSize = 100): Observable<any[]> {
+  getUnits(moduleId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/modules/${moduleId}/units?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
   }
 
-  getLessons(unitId: string, page = 1, pageSize = 100): Observable<any[]> {
+  getLessons(unitId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/units/${unitId}/lessons?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
@@ -102,7 +102,7 @@ export class AdminService {
     });
   }
 
-  getDepartmentAssignments(departmentId: string, page = 1, pageSize = 100): Observable<any[]> {
+  getDepartmentAssignments(departmentId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/departments/${departmentId}/assignments?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
@@ -164,7 +164,7 @@ export class AdminService {
     return this.http.get<any>(`${this.apiUrl}/stats`);
   }
 
-  getUsersProgress(departmentId: string, page = 1, pageSize = 100): Observable<any[]> {
+  getUsersProgress(departmentId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/departments/${departmentId}/users-progress?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)
     );
