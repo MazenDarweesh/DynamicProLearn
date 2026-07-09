@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../core/services/auth.service';
 import { AdminService } from '../../../core/services/admin.service';
 import { Router } from '@angular/router';
+import { Dialog } from '../../../core/utils/dialog';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -150,8 +151,9 @@ export class AdminDashboardComponent implements OnInit {
     this.showAddCompanyModal = true;
   }
 
-  deleteCompany(comp: any) {
-    if (confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟')) {
+  async deleteCompany(comp: any) {
+    const ok = await Dialog.confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟', 'تأكيد الحذف');
+    if (ok) {
       this.adminService.deleteCompany(comp.id).subscribe(() => this.refreshAllData());
     }
   }
@@ -177,8 +179,9 @@ export class AdminDashboardComponent implements OnInit {
     this.showAddModuleModal = true;
   }
 
-  deleteModule(mod: any) {
-    if (confirm('هل أنت متأكد من حذف الموديول؟')) {
+  async deleteModule(mod: any) {
+    const ok = await Dialog.confirm('هل أنت متأكد من حذف الموديول؟', 'تأكيد الحذف');
+    if (ok) {
       this.adminService.deleteModule(mod.id).subscribe(() => this.refreshAllData());
     }
   }
@@ -195,7 +198,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   notImplemented(feature: string) {
-    alert(`[الربط قادم قريباً] جارِ تطوير الـ Backend الخاص بـ '${feature}'. الرجاء مراجعة قائمة المهام.`);
+    Dialog.alert(`[الربط قادم قريباً] جارِ تطوير الـ Backend الخاص بـ '${feature}'. الرجاء مراجعة قائمة المهام.`, 'تنبيه', 'info');
   }
 
   // --- Modal Logic ---
@@ -227,7 +230,7 @@ export class AdminDashboardComponent implements OnInit {
   async saveCompany() {
     if (this.isSubmitting) return;
     if (!this.newCompanyName.trim()) {
-      alert('الرجاء إدخال اسم الشركة');
+      Dialog.alert('الرجاء إدخال اسم الشركة', 'تنبيه', 'info');
       return;
     }
     
@@ -277,7 +280,7 @@ export class AdminDashboardComponent implements OnInit {
     } catch (err) {
       this.isSubmitting = false;
       console.error('Error saving company', err);
-      alert('حدث خطأ أثناء حفظ الشركة.');
+      Dialog.alert('حدث خطأ أثناء حفظ الشركة.', 'خطأ', 'error');
     }
   }
 
@@ -323,7 +326,7 @@ export class AdminDashboardComponent implements OnInit {
   async saveModule() {
     if (this.isSubmitting) return;
     if (!this.newModuleName.trim()) {
-      alert('الرجاء إدخال اسم الموديول');
+      Dialog.alert('الرجاء إدخال اسم الموديول', 'تنبيه', 'info');
       return;
     }
 
@@ -457,7 +460,7 @@ export class AdminDashboardComponent implements OnInit {
   saveUser() {
     if (this.isSubmitting) return;
     if (!this.newUser.username || !this.newUser.password || !this.newUser.companyId || !this.newUser.departmentId) {
-      alert('الرجاء تعبئة جميع الحقول المطلوبة');
+      Dialog.alert('الرجاء تعبئة جميع الحقول المطلوبة', 'تنبيه', 'info');
       return;
     }
     
@@ -471,7 +474,7 @@ export class AdminDashboardComponent implements OnInit {
       error: (err) => {
         this.isSubmitting = false;
         console.error('Error creating user', err);
-        alert('حدث خطأ أثناء إضافة المستخدم.');
+        Dialog.alert('حدث خطأ أثناء إضافة المستخدم.', 'خطأ', 'error');
       }
     });
   }
@@ -519,7 +522,7 @@ export class AdminDashboardComponent implements OnInit {
         error: (err) => {
           console.error('Error assigning module', err);
           event.target.checked = false;
-          alert('حدث خطأ أثناء الإسناد.');
+          Dialog.alert('حدث خطأ أثناء الإسناد.', 'خطأ', 'error');
         }
       });
     } else {
@@ -533,7 +536,7 @@ export class AdminDashboardComponent implements OnInit {
           error: (err) => {
             console.error('Error removing assignment', err);
             event.target.checked = true;
-            alert('حدث خطأ أثناء إزالة الإسناد.');
+            Dialog.alert('حدث خطأ أثناء إزالة الإسناد.', 'خطأ', 'error');
           }
         });
       }

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AdminService, AdminModuleDto, LookupDto } from '../../../core/services/admin.service';
+import { Dialog } from '../../../core/utils/dialog';
 
 @Component({
   selector: 'app-content-builder',
@@ -135,12 +136,13 @@ export class ContentBuilderComponent implements OnInit {
         this.units.push(newUnit);
         this.newUnitName = '';
       },
-      error: (err: any) => alert('فشل إنشاء الوحدة: ' + (err.error?.detail || err.message))
+      error: (err: any) => Dialog.alert('فشل إنشاء الوحدة: ' + (err.error?.detail || err.message), 'خطأ', 'error')
     });
   }
 
-  deleteUnit(unit: any) {
-    if (!confirm(`هل أنت متأكد من حذف الوحدة: ${unit.name}؟`)) return;
+  async deleteUnit(unit: any) {
+    const ok = await Dialog.confirm(`هل أنت متأكد من حذف الوحدة: ${unit.name}؟`, 'تأكيد الحذف');
+    if (!ok) return;
     this.adminService.deleteUnit(unit.id).subscribe({
       next: () => {
         this.units = this.units.filter(u => u.id !== unit.id);
@@ -148,7 +150,7 @@ export class ContentBuilderComponent implements OnInit {
           this.selectedLesson = null;
         }
       },
-      error: (err) => alert('فشل الحذف: ' + (err.error?.detail || err.message))
+      error: (err) => Dialog.alert('فشل الحذف: ' + (err.error?.detail || err.message), 'خطأ', 'error')
     });
   }
 
@@ -188,13 +190,14 @@ export class ContentBuilderComponent implements OnInit {
         this.selectLesson(newLesson);
         this.newLessonTitle = '';
       },
-      error: (err) => alert('فشل إنشاء الدرس: ' + (err.error?.detail || err.message))
+      error: (err) => Dialog.alert('فشل إنشاء الدرس: ' + (err.error?.detail || err.message), 'خطأ', 'error')
     });
   }
 
-  deleteLesson(unit: any, lesson: any, event: Event) {
+  async deleteLesson(unit: any, lesson: any, event: Event) {
     event.stopPropagation();
-    if (!confirm(`هل أنت متأكد من حذف الدرس: ${lesson.title}؟`)) return;
+    const ok = await Dialog.confirm(`هل أنت متأكد من حذف الدرس: ${lesson.title}؟`, 'تأكيد الحذف');
+    if (!ok) return;
     
     this.adminService.deleteLesson(lesson.id).subscribe({
       next: () => {
@@ -203,7 +206,7 @@ export class ContentBuilderComponent implements OnInit {
           this.selectedLesson = null;
         }
       },
-      error: (err) => alert('فشل الحذف: ' + (err.error?.detail || err.message))
+      error: (err) => Dialog.alert('فشل الحذف: ' + (err.error?.detail || err.message), 'خطأ', 'error')
     });
   }
 
@@ -244,9 +247,9 @@ export class ContentBuilderComponent implements OnInit {
       });
       await Promise.all(lessonPromises);
 
-      alert('تم حفظ جميع التعديلات بنجاح! ✅');
+      Dialog.alert('تم حفظ جميع التعديلات بنجاح! ✅', 'نجاح', 'success');
     } catch (err: any) {
-      alert('حدث خطأ أثناء الحفظ: ' + (err.error?.detail || err.message));
+      Dialog.alert('حدث خطأ أثناء الحفظ: ' + (err.error?.detail || err.message), 'خطأ', 'error');
     } finally {
       this.isSaving = false;
     }

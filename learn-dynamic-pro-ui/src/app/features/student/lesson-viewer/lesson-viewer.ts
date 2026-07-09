@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StudentService, UnitDto, LessonDto, LessonDetailDto } from '../../../core/services/student.service';
+import { Dialog } from '../../../core/utils/dialog';
 
 export interface UnitWithLessons extends UnitDto {
   lessons: LessonDto[];
@@ -81,7 +82,7 @@ export class LessonViewer implements OnInit {
       },
       error: () => {
         this.isLoadingLesson = false;
-        alert('تعذر تحميل تفاصيل الدرس.');
+        Dialog.alert('تعذر تحميل تفاصيل الدرس.', 'خطأ', 'error');
       }
     });
   }
@@ -108,7 +109,7 @@ export class LessonViewer implements OnInit {
         this.isSubmitting = false;
       },
       error: (err: any) => {
-        alert('فشل في تحديث حالة الدرس.');
+        Dialog.alert('فشل في تحديث حالة الدرس.', 'خطأ', 'error');
         this.isSubmitting = false;
       }
     });
