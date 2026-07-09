@@ -95,15 +95,40 @@ export class ContentBuilderComponent implements OnInit {
     });
   }
 
+  isAddingUnit = false;
+  newUnitName = '';
+  addingLessonUnitId: string | null = null;
+  newLessonTitle = '';
+
   addUnit() {
-    if (!this.selectedModuleId) return;
-    const name = prompt('أدخل اسم الوحدة الجديدة:');
-    if (!name) return;
+    this.isAddingUnit = true;
+    this.newUnitName = '';
+  }
+
+  cancelAddUnit() {
+    this.isAddingUnit = false;
+    this.newUnitName = '';
+  }
+
+  saveNewUnit() {
+    if (!this.isAddingUnit) return;
+    if (!this.selectedModuleId) {
+      this.isAddingUnit = false;
+      return;
+    }
+    const name = this.newUnitName.trim();
+    if (!name) {
+      this.isAddingUnit = false;
+      return;
+    }
     
+    this.isAddingUnit = false;
+
     this.adminService.createUnit(this.selectedModuleId, name).subscribe({
       next: (newUnit: any) => {
         newUnit.lessons = [];
         this.units.push(newUnit);
+        this.newUnitName = '';
       },
       error: (err: any) => alert('فشل إنشاء الوحدة: ' + (err.error?.detail || err.message))
     });
@@ -122,10 +147,26 @@ export class ContentBuilderComponent implements OnInit {
     });
   }
 
-  addLesson(unit: any) {
-    const title = prompt('أدخل عنوان الدرس الجديد:');
-    if (!title) return;
+  startAddLesson(unit: any) {
+    this.addingLessonUnitId = unit.id;
+    this.newLessonTitle = '';
+  }
+
+  cancelAddLesson() {
+    this.addingLessonUnitId = null;
+    this.newLessonTitle = '';
+  }
+
+  saveNewLesson(unit: any) {
+    if (this.addingLessonUnitId !== unit.id) return;
+    const title = this.newLessonTitle.trim();
+    if (!title) {
+      this.addingLessonUnitId = null;
+      return;
+    }
     
+    this.addingLessonUnitId = null;
+
     const payload = {
       unitId: unit.id,
       title: title,
@@ -140,6 +181,7 @@ export class ContentBuilderComponent implements OnInit {
       next: (newLesson) => {
         unit.lessons.push(newLesson);
         this.selectLesson(newLesson);
+        this.newLessonTitle = '';
       },
       error: (err) => alert('فشل إنشاء الدرس: ' + (err.error?.detail || err.message))
     });

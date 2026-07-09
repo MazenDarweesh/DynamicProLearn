@@ -60,7 +60,7 @@
             </div>
             <div class="d-flex gap-1">
               <button class="btn-icon-danger" (click)="deleteUnit(unit)" title="حذف الوحدة"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
-              <button class="btn-icon" (click)="addLesson(unit)" title="إضافة درس"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
+              <button class="btn-icon" (click)="startAddLesson(unit)" title="إضافة درس"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></button>
             </div>
           </div>
 
@@ -73,6 +73,27 @@
                 <span class="text-sm text-truncate" style="max-width: 70%;">{{ uIndex + 1 }}.{{ lIndex + 1 }} {{ lesson.title || 'درس جديد' }}</span>
                 <button class="btn-icon-danger btn-sm" (click)="deleteLesson(unit, lesson, $event)" title="حذف الدرس"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
               </div>
+            </div>
+
+            <!-- Inline Lesson Input -->
+            <div class="lesson-item lesson-item-new" *ngIf="addingLessonUnitId === unit.id">
+              <div class="d-flex align-center w-100">
+                <input type="text" class="form-control text-sm w-100" [(ngModel)]="newLessonTitle"
+                       (keydown.enter)="saveNewLesson(unit)" (keydown.escape)="cancelAddLesson()"
+                       (blur)="saveNewLesson(unit)" autofocus placeholder="اسم الدرس الجديد واضغط Enter...">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Inline Unit Input -->
+        <div class="unit-tree" *ngIf="isAddingUnit" style="border: 1px dashed var(--color-primary);">
+          <div class="unit-header d-flex justify-between align-center">
+            <div class="d-flex align-center gap-2 flex-1">
+              <strong>+</strong>
+              <input type="text" class="form-control text-sm w-100" [(ngModel)]="newUnitName" 
+                     (keydown.enter)="saveNewUnit()" (keydown.escape)="cancelAddUnit()"
+                     (blur)="saveNewUnit()" autofocus placeholder="اسم الوحدة الجديدة واضغط Enter...">
             </div>
           </div>
         </div>
