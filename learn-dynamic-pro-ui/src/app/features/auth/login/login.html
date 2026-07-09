@@ -1,28 +1,33 @@
-<div class="login-container">
+<div class="login-container" dir="rtl">
   <div class="card login-card">
     <div class="brand">
-      <div class="logo"></div>
+      <div class="logo">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary">
+          <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+        </svg>
+      </div>
       <h2>DynamicPro Learn</h2>
-      <p>Sign in to your account</p>
+      <p>تسجيل الدخول إلى حسابك</p>
     </div>
     
     <form (ngSubmit)="onSubmit()">
       <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" [(ngModel)]="username" required>
+        <label for="username">اسم المستخدم</label>
+        <input type="text" id="username" name="username" [(ngModel)]="username" required dir="ltr" style="text-align: left;">
       </div>
       
       <div class="form-group">
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" [(ngModel)]="password" required>
+        <label for="password">كلمة المرور</label>
+        <input type="password" id="password" name="password" [(ngModel)]="password" required dir="ltr" style="text-align: left;">
       </div>
       
       <div *ngIf="errorMessage" class="error-msg">
         {{ errorMessage }}
       </div>
       
-      <button type="submit" class="btn-primary" [disabled]="isLoading">
-        {{ isLoading ? 'Signing in...' : 'Sign in' }}
+      <button type="submit" class="btn-primary w-100 mt-4 d-flex justify-center align-center gap-2" [disabled]="isLoading">
+        <span *ngIf="isLoading" class="spinner-small"></span>
+        {{ isLoading ? 'جاري تسجيل الدخول...' : 'تسجيل الدخول' }}
       </button>
     </form>
   </div>

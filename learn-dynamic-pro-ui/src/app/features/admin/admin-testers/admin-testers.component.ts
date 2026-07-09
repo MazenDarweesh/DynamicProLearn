@@ -1,6 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { AdminService } from '../../../core/services/admin.service';
 import { Router } from '@angular/router';
@@ -21,7 +22,13 @@ export class AdminTestersComponent implements OnInit {
   testersProgress: any[] = [];
   showAllTesters = false;
   showAddTesterModal = false;
+  showAddVersionModal = false;
   isSubmitting = false;
+
+  newVersionLabel = '';
+  erpVersions: any[] = [];
+
+  private http = inject(HttpClient);
 
   newTesterUsername = '';
   newTesterPassword = '';
@@ -34,6 +41,7 @@ export class AdminTestersComponent implements OnInit {
   ngOnInit() {
     this.loadTestersProgress();
     this.loadCompanies();
+    this.loadVersions();
   }
 
   goTo(path: string) {
@@ -91,6 +99,43 @@ export class AdminTestersComponent implements OnInit {
     const company = this.companies.find(c => c.id === this.testerCompanyId);
     this.testerDepartments = company ? company.departments : [];
     this.testerDepartmentId = '';
+  }
+
+  loadVersions() {
+    this.http.get<any[]>('http://localhost:5115/api/Tester/versions').subscribe({
+      next: (data) => this.erpVersions = data,
+      error: (err) => console.error(err)
+    });
+  }
+
+  openAddVersionModal() {
+    this.newVersionLabel = '';
+    this.showAddVersionModal = true;
+  }
+
+  closeAddVersionModal() {
+    this.showAddVersionModal = false;
+  }
+
+  submitVersion() {
+    if (!this.newVersionLabel.trim()) {
+      Dialog.alert('الرجاء إدخال اسم الإصدار.', 'خطأ', 'info');
+      return;
+    }
+    
+    this.isSubmitting = true;
+    this.http.post('http://localhost:5115/api/Tester/versions', { versionLabel: this.newVersionLabel.trim() }).subscribe({
+      next: () => {
+        this.isSubmitting = false;
+        Dialog.alert('تمت إضافة الإصدار بنجاح!', 'نجاح', 'success');
+        this.closeAddVersionModal();
+        this.loadVersions();
+      },
+      error: (err) => {
+        this.isSubmitting = false;
+        Dialog.alert('حدث خطأ أثناء إضافة الإصدار.', 'خطأ', 'error');
+      }
+    });
   }
 
   submitTester() {

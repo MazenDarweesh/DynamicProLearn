@@ -19,6 +19,45 @@
   </header>
 
   <div class="console-body">
+    <!-- ERP Versions Panel -->
+    <div class="panel mb-4">
+      <div class="panel-header d-flex justify-between align-center">
+        <div>
+          <h3 class="panel-title m-0 d-flex align-center gap-2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            إدارة إصدارات النظام (ERP)
+          </h3>
+          <p class="text-secondary text-sm m-0 mt-1">تحديد النسخ المتاحة للاختبار</p>
+        </div>
+        <button class="btn-accent" (click)="openAddVersionModal()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 4px; vertical-align: middle;">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          إضافة إصدار جديد
+        </button>
+      </div>
+      <div class="panel-content mt-4">
+        <table class="data-table w-100">
+          <thead>
+            <tr>
+              <th>رقم الإصدار / النسخة</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let v of erpVersions">
+              <td class="fw-500">{{ v.versionLabel }}</td>
+            </tr>
+            <tr *ngIf="erpVersions.length === 0">
+              <td style="text-align: center; color: var(--color-text-secondary); padding: 32px 0;">لا توجد إصدارات مسجلة</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-header d-flex justify-between align-center">
         <div>
@@ -138,6 +177,48 @@
       <button class="btn-primary" (click)="submitTester()" [disabled]="isSubmitting">
         <span *ngIf="isSubmitting" class="spinner"></span>
         <span *ngIf="!isSubmitting">حفظ وإضافة</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Version Modal -->
+<div class="modal-overlay" *ngIf="showAddVersionModal" dir="rtl">
+  <div class="modal-container" style="max-width: 500px;">
+    <div class="modal-header">
+      <div class="d-flex justify-between align-center">
+        <div>
+          <h3 class="m-0 text-white d-flex align-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            تسجيل إصدار ERP جديد
+          </h3>
+          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">
+            أدخل اسم النسخة الجديدة التي سيختبرها الفريق
+          </p>
+        </div>
+        <button class="icon-btn text-white" (click)="closeAddVersionModal()" style="margin-left: -10px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group mb-3">
+        <label class="form-label text-secondary text-sm mb-2 d-block">اسم الإصدار / النسخة</label>
+        <input type="text" class="form-control" [(ngModel)]="newVersionLabel" placeholder="مثال: v2.1.4-beta (أحدث نسخة تجريبية)">
+      </div>
+    </div>
+
+    <div class="modal-footer d-flex justify-end gap-3 p-4 border-top">
+      <button class="btn-secondary" (click)="closeAddVersionModal()" [disabled]="isSubmitting">إلغاء</button>
+      <button class="btn-primary" (click)="submitVersion()" [disabled]="isSubmitting">
+        <span *ngIf="isSubmitting" class="spinner"></span>
+        <span *ngIf="!isSubmitting">حفظ الإصدار</span>
       </button>
     </div>
   </div>

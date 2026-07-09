@@ -18,11 +18,10 @@
 }
 
 .logo {
-  width: 50px;
-  height: 50px;
-  background-color: var(--color-primary);
-  border-radius: 12px;
-  margin: 0 auto 15px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 15px;
 }
 
 .brand h2 {
@@ -73,3 +72,20 @@
   margin-bottom: 15px;
   text-align: center;
 }
+
+.w-100 { width: 100%; }
+.mt-4 { margin-top: 1.5rem; }
+.d-flex { display: flex; }
+.justify-center { justify-content: center; }
+.align-center { align-items: center; }
+.gap-2 { gap: 8px; }
+.spinner-small {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
+

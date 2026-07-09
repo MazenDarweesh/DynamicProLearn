@@ -25,6 +25,15 @@ public class TesterController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpPost("versions")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> CreateVersion([FromBody] CreateErpVersionRequest request)
+    {
+        var result = await _testerService.CreateErpVersionAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     [HttpPost("active-version")]
     public async Task<IActionResult> SetActiveVersion([FromBody] SetActiveVersionRequest request)
     {
