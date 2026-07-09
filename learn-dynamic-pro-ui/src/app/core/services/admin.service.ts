@@ -77,12 +77,16 @@ export class AdminService {
     return this.http.post(`${this.apiUrl}/users`, { companyId, departmentId, username, password, role: 1 });
   }
 
-  getUnits(moduleId: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/modules/${moduleId}/units`);
+  getUnits(moduleId: string, page = 1, pageSize = 100): Observable<any[]> {
+    return this.http.get<any>(`${this.apiUrl}/modules/${moduleId}/units?page=${page}&pageSize=${pageSize}`).pipe(
+      map(res => res.items ? res.items : res)
+    );
   }
 
-  getLessons(unitId: string): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/units/${unitId}/lessons`);
+  getLessons(unitId: string, page = 1, pageSize = 100): Observable<any[]> {
+    return this.http.get<any>(`${this.apiUrl}/units/${unitId}/lessons?page=${page}&pageSize=${pageSize}`).pipe(
+      map(res => res.items ? res.items : res)
+    );
   }
 
   assignModule(moduleId: string, departmentId: string): Observable<any> {

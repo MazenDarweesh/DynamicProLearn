@@ -15,12 +15,12 @@ public interface IModuleService
     Task<Result<UnitDto>> CreateUnitAsync(CreateUnitRequest request);
     Task<Result<UnitDto>> UpdateUnitAsync(Guid id, UpdateUnitRequest request);
     Task<Result> DeleteUnitAsync(Guid id);
-    Task<Result<List<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId);
+    Task<Result<PagedList<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId, int page = 1, int pageSize = 100);
 
     // Lesson CRUD
     Task<Result<LessonDto>> CreateLessonAsync(CreateLessonRequest request);
     Task<Result<LessonDto>> UpdateLessonAsync(Guid id, UpdateLessonRequest request);
     Task<Result> DeleteLessonAsync(Guid id);
-    Task<Result<List<LessonDto>>> GetLessonsByUnitAsync(Guid unitId);
+    Task<Result<PagedList<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, int page = 1, int pageSize = 100);
     Task<Result<LessonDetailDto>> GetLessonDetailAsync(Guid lessonId);
 }

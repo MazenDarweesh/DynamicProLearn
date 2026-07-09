@@ -152,9 +152,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("modules/{moduleId}/units")]
-    public async Task<IActionResult> GetUnits(Guid moduleId)
+    public async Task<IActionResult> GetUnits(Guid moduleId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _moduleService.GetUnitsByModuleAsync(moduleId);
+        var result = await _moduleService.GetUnitsByModuleAsync(moduleId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
@@ -185,9 +185,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("units/{unitId}/lessons")]
-    public async Task<IActionResult> GetLessons(Guid unitId)
+    public async Task<IActionResult> GetLessons(Guid unitId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _moduleService.GetLessonsByUnitAsync(unitId);
+        var result = await _moduleService.GetLessonsByUnitAsync(unitId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }

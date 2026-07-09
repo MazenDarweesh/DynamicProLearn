@@ -105,14 +105,19 @@ public class ModuleService : IModuleService
         return Result.Success();
     }
 
-    public async Task<Result<List<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId)
+    public async Task<Result<PagedList<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId, int page = 1, int pageSize = 100)
     {
-        var units = await _context.Units
-            .AsNoTracking()
-            .Where(u => u.ModuleId == moduleId)
+        var query = _context.Units.AsNoTracking().Where(u => u.ModuleId == moduleId);
+        var totalCount = await query.CountAsync();
+
+        var units = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(u => new UnitDto { Id = u.Id, Name = u.Name, ModuleId = u.ModuleId, OrderIndex = u.OrderIndex })
             .ToListAsync();
-        return Result<List<UnitDto>>.Success(units);
+            
+        var pagedList = new PagedList<UnitDto>(units, totalCount, page, pageSize);
+        return Result<PagedList<UnitDto>>.Success(pagedList);
     }
 
     public async Task<Result<LessonDto>> CreateLessonAsync(CreateLessonRequest request)
@@ -190,13 +195,19 @@ public class ModuleService : IModuleService
         return Result.Success();
     }
 
-    public async Task<Result<List<LessonDto>>> GetLessonsByUnitAsync(Guid unitId)
+    public async Task<Result<PagedList<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, int page = 1, int pageSize = 100)
     {
-        var lessons = await _context.Lessons
+        var query = _context.Lessons
             .AsNoTracking()
             .Where(l => l.UnitId == unitId)
             .Include(l => l.Level)
-            .Include(l => l.Type)
+            .Include(l => l.Type);
+            
+        var totalCount = await query.CountAsync();
+
+        var lessons = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(l => new LessonDto 
             { 
                 Id = l.Id, 
@@ -209,7 +220,9 @@ public class ModuleService : IModuleService
                 OrderIndex = l.OrderIndex 
             })
             .ToListAsync();
-        return Result<List<LessonDto>>.Success(lessons);
+            
+        var pagedList = new PagedList<LessonDto>(lessons, totalCount, page, pageSize);
+        return Result<PagedList<LessonDto>>.Success(pagedList);
     }
 
     public async Task<Result<LessonDetailDto>> GetLessonDetailAsync(Guid lessonId)
