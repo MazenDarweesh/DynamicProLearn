@@ -147,8 +147,24 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   editModule(mod: any) {
-    // Navigate to a dedicated page to edit module details, units, and lessons
-    this.router.navigate(['/admin/content', mod.id]);
+    this.editingModuleId = mod.id;
+    this.newModuleName = mod.name;
+    this.newModuleDescription = mod.description || '';
+    
+    // Deep clone units and lessons for editing
+    this.newUnitsList = (mod.units || []).map((u: any) => ({
+      id: u.id,
+      name: u.name,
+      lessons: (u.lessons || []).map((l: any) => ({
+        id: l.id,
+        title: l.title,
+        videoUrl: l.videoUrl || ''
+      }))
+    }));
+    
+    // Store original state for deletion comparison
+    this.originalUnits = JSON.parse(JSON.stringify(this.newUnitsList));
+    this.showAddModuleModal = true;
   }
 
   deleteModule(mod: any) {
@@ -261,11 +277,15 @@ export class AdminDashboardComponent implements OnInit {
 
   // --- Add Module Modal Logic ---
   showAddModuleModal = false;
+  editingModuleId: string | null = null;
+  originalUnits: any[] = [];
   newModuleName = '';
   newModuleDescription = '';
-  newUnitsList: { name: string, lessons: { title: string, videoUrl: string }[] }[] = [];
+  newUnitsList: { id?: string, name: string, lessons: { id?: string, title: string, videoUrl: string }[] }[] = [];
 
   openAddModuleModal() {
+    this.editingModuleId = null;
+    this.originalUnits = [];
     this.showAddModuleModal = true;
     this.newModuleName = '';
     this.newModuleDescription = '';
@@ -304,23 +324,83 @@ export class AdminDashboardComponent implements OnInit {
     this.isSubmitting = true;
     try {
       const descriptionToSave = this.newModuleDescription.trim() || 'وصف تلقائي';
-      const mod = await this.adminService.createModule(this.newModuleName, descriptionToSave).toPromise();
-      const moduleId = mod.id;
-
-      // Smart parallel saving for Units and Lessons
-      const validUnits = this.newUnitsList.filter(u => u.name.trim());
-      const unitPromises = validUnits.map(async unit => {
-        const newUnit = await this.adminService.createUnit(moduleId, unit.name.trim()).toPromise();
+      if (this.editingModuleId) {
+        // --- EDIT MODE ---
+        await this.adminService.updateModule(this.editingModuleId, this.newModuleName, descriptionToSave).toPromise();
         
-        const validLessons = unit.lessons.filter(l => l.title.trim());
-        const lessonPromises = validLessons.map(lesson => 
-          this.adminService.createLesson(newUnit.id, lesson.title.trim(), lesson.videoUrl.trim()).toPromise()
-        );
+        // Find deleted units
+        const currentUnitIds = this.newUnitsList.filter(u => u.id).map(u => u.id);
+        const originalUnitIds = this.originalUnits.map(u => u.id);
+        const unitsToDelete = originalUnitIds.filter(id => !currentUnitIds.includes(id));
         
-        return Promise.all(lessonPromises);
-      });
+        if (unitsToDelete.length > 0) {
+          await Promise.all(unitsToDelete.map(id => this.adminService.deleteUnit(id).toPromise()));
+        }
+        
+        // Find deleted lessons
+        const currentLessonIds: string[] = [];
+        this.newUnitsList.forEach(u => u.lessons.forEach(l => { if (l.id) currentLessonIds.push(l.id); }));
+        
+        const originalLessonIds: string[] = [];
+        this.originalUnits.forEach(u => u.lessons.forEach((l: any) => { if (l.id) originalLessonIds.push(l.id); }));
+        
+        const lessonsToDelete = originalLessonIds.filter(id => !currentLessonIds.includes(id));
+        if (lessonsToDelete.length > 0) {
+          // We don't need to delete lessons whose parent unit was already deleted to avoid 404s
+          const lessonsToExplicitlyDelete = lessonsToDelete.filter(lId => {
+            const parentUnit = this.originalUnits.find(ou => ou.lessons.some((ol: any) => ol.id === lId));
+            return parentUnit && !unitsToDelete.includes(parentUnit.id);
+          });
+          if (lessonsToExplicitlyDelete.length > 0) {
+            await Promise.all(lessonsToExplicitlyDelete.map(id => this.adminService.deleteLesson(id).toPromise()));
+          }
+        }
+        
+        // Save/Update valid units
+        const validUnits = this.newUnitsList.filter(u => u.name.trim());
+        const unitPromises = validUnits.map(async unit => {
+          let unitId = unit.id;
+          if (unitId) {
+            await this.adminService.updateUnit(unitId, unit.name.trim()).toPromise();
+          } else {
+            const newUnit = await this.adminService.createUnit(this.editingModuleId!, unit.name.trim()).toPromise();
+            unitId = newUnit.id;
+          }
+          
+          const validLessons = unit.lessons.filter(l => l.title.trim());
+          const lessonPromises = validLessons.map(lesson => {
+            if (lesson.id) {
+              return this.adminService.updateLesson(lesson.id, lesson.title.trim(), lesson.videoUrl.trim()).toPromise();
+            } else {
+              return this.adminService.createLesson(unitId!, lesson.title.trim(), lesson.videoUrl.trim()).toPromise();
+            }
+          });
+          
+          return Promise.all(lessonPromises);
+        });
+        
+        await Promise.all(unitPromises);
 
-      await Promise.all(unitPromises);
+      } else {
+        // --- CREATE MODE ---
+        const mod = await this.adminService.createModule(this.newModuleName, descriptionToSave).toPromise();
+        const moduleId = mod.id;
+
+        // Smart parallel saving for Units and Lessons
+        const validUnits = this.newUnitsList.filter(u => u.name.trim());
+        const unitPromises = validUnits.map(async unit => {
+          const newUnit = await this.adminService.createUnit(moduleId, unit.name.trim()).toPromise();
+          
+          const validLessons = unit.lessons.filter(l => l.title.trim());
+          const lessonPromises = validLessons.map(lesson => 
+            this.adminService.createLesson(newUnit.id, lesson.title.trim(), lesson.videoUrl.trim()).toPromise()
+          );
+          
+          return Promise.all(lessonPromises);
+        });
+
+        await Promise.all(unitPromises);
+      }
 
       this.isSubmitting = false;
       this.closeAddModuleModal();

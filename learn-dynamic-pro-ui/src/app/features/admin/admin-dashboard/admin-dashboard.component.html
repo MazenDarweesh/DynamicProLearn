@@ -426,9 +426,11 @@
         <div>
           <h3 class="m-0 text-white d-flex align-center gap-2">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-            إنشاء موديول تعليمي جديد
+            {{ editingModuleId ? 'تعديل الموديول التعليمي' : 'إنشاء موديول تعليمي جديد' }}
           </h3>
-          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">حدد اسم الموديول ثم رتّب الوحدات والدروس تحته</p>
+          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">
+            {{ editingModuleId ? 'قم بتعديل بيانات الموديول ووحداته ودروسه' : 'حدد اسم الموديول ثم رتّب الوحدات والدروس تحته' }}
+          </p>
         </div>
         <button class="icon-btn text-white" (click)="closeAddModuleModal()" style="margin-left: -10px;">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -496,7 +498,7 @@
     <div class="modal-footer d-flex gap-3">
       <button class="btn-accent flex-2 d-flex justify-center align-center gap-2" (click)="saveModule()" [disabled]="isSubmitting">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-        {{ isSubmitting ? 'جاري إنشاء الهيكل...' : 'حفظ الموديول' }}
+        {{ isSubmitting ? 'جاري الحفظ...' : (editingModuleId ? 'حفظ التعديلات' : 'حفظ الموديول') }}
       </button>
       <button class="btn-secondary flex-1" (click)="closeAddModuleModal()">إلغاء</button>
     </div>
