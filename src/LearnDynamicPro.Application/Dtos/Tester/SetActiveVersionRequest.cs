@@ -3,6 +3,7 @@ namespace LearnDynamicPro.Application.Dtos.Tester;
 public class SetActiveVersionRequest
 {
     public Guid ErpVersionId { get; set; }
+    public string? BranchName { get; set; }
 }
 
 public class CreateErpVersionRequest

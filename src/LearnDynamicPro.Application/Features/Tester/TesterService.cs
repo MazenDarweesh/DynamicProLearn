@@ -48,13 +48,15 @@ public class TesterService : ITesterService
             activeVersion = new TesterActiveVersion
             {
                 UserId = userId,
-                ErpVersionId = request.ErpVersionId
+                ErpVersionId = request.ErpVersionId,
+                BranchName = request.BranchName
             };
             _context.TesterActiveVersions.Add(activeVersion);
         }
         else
         {
             activeVersion.ErpVersionId = request.ErpVersionId;
+            activeVersion.BranchName = request.BranchName;
         }
 
         await _context.SaveChangesAsync(default);

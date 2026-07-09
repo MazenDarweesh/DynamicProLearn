@@ -18,6 +18,21 @@ export const routes: Routes = [
   },
   {
     path: 'tester',
+    redirectTo: 'tester/setup',
+    pathMatch: 'full'
+  },
+  {
+    path: 'tester/setup',
+    canActivate: [roleGuard(['Tester', 'Admin'])],
+    loadComponent: () => import('./features/tester/tester-setup/tester-setup.component').then(m => m.TesterSetupComponent)
+  },
+  {
+    path: 'tester/dashboard',
+    canActivate: [roleGuard(['Tester', 'Admin'])],
+    loadComponent: () => import('./features/tester/tester-dashboard/tester-dashboard.component').then(m => m.TesterDashboardComponent)
+  },
+  {
+    path: 'tester/feedback',
     canActivate: [roleGuard(['Tester', 'Admin'])],
     loadComponent: () => import('./features/tester/feedback-panel/feedback-panel').then(m => m.FeedbackPanel)
   },

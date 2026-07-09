@@ -380,6 +380,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("BranchName")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<Guid>("ErpVersionId")
                         .HasColumnType("uniqueidentifier");
 

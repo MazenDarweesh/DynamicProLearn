@@ -1,0 +1,157 @@
+.setup-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--color-bg-body, #0a0a0a);
+  padding: 20px;
+}
+
+.setup-card {
+  width: 100%;
+  max-width: 450px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+.card-header {
+  background-color: #3b6ef3; /* matching the image blue */
+  color: white;
+  padding: 24px 20px;
+  text-align: center;
+  position: relative;
+}
+
+.header-icon {
+  margin-bottom: 8px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.card-header h2 {
+  margin: 0 0 4px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.card-header p {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.card-body {
+  padding: 30px 24px;
+  background-color: #ffffff;
+}
+
+.instruction-text {
+  color: #666;
+  font-size: 0.9rem;
+  margin-bottom: 24px;
+  text-align: center;
+  line-height: 1.5;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #444;
+  margin-bottom: 8px;
+}
+
+/* Specific styling to match the image inputs */
+.outline-select, .outline-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 2px solid #1c2b4d; /* Dark navy border from image */
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #333;
+  background-color: white;
+  transition: all 0.2s ease;
+}
+
+.outline-input:focus, .outline-select:focus {
+  outline: none;
+  border-color: #3b6ef3;
+  box-shadow: 0 0 0 3px rgba(59, 110, 243, 0.1);
+}
+
+/* Custom select wrapper for custom arrow */
+.custom-select-wrapper {
+  position: relative;
+}
+
+.custom-select-wrapper::after {
+  content: '▼';
+  font-size: 10px;
+  color: #3b6ef3; /* Blue arrow */
+  position: absolute;
+  left: 14px; /* RTL, so it's on the left */
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.outline-select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-left: 30px; /* Space for arrow on the left */
+}
+
+.outline-input::placeholder {
+  color: #aaa;
+}
+
+.btn-start {
+  width: 100%;
+  background-color: #ff9838; /* Orange color from image */
+  color: white;
+  border: none;
+  padding: 14px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 10px;
+  transition: background-color 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-start:hover {
+  background-color: #e8862e;
+}
+
+.btn-start:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: white;
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

@@ -1,0 +1,42 @@
+<div class="setup-container" dir="rtl">
+  <div class="setup-card">
+    <div class="card-header">
+      <div class="header-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          <path d="m9 12 2 2 4-4"></path>
+        </svg>
+      </div>
+      <h2>بوابة تدقيق الجودة</h2>
+      <p>أهلاً بعودتك، يا مهندس الجودة</p>
+    </div>
+    
+    <div class="card-body">
+      <p class="instruction-text">
+        من فضلك حدد بيانات البيئة اللي هتختبرها دلوقتي على نظام الـ ERP.
+      </p>
+
+      <div class="form-group">
+        <label>1. إصدار الـ ERP المستهدف</label>
+        <div class="custom-select-wrapper">
+          <select class="form-control outline-select" [(ngModel)]="selectedVersionId">
+            <option *ngFor="let v of versions" [value]="v.id">{{ v.versionLabel }}</option>
+            <option *ngIf="versions.length === 0" value="" disabled>لا توجد إصدارات متاحة</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>2. اسم الفرع / مرجع البناء</label>
+        <input type="text" class="form-control outline-input" [(ngModel)]="branchName" placeholder="مثال: release/v2.1.4-patch2">
+      </div>
+
+      <button class="btn-start" (click)="startTestingSession()" [disabled]="isSubmitting">
+        <span *ngIf="isSubmitting" class="spinner"></span>
+        <span *ngIf="!isSubmitting">
+          بدء جلسة الاختبار 🚀
+        </span>
+      </button>
+    </div>
+  </div>
+</div>

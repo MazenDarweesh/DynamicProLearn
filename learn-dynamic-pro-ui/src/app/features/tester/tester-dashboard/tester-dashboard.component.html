@@ -1,0 +1,55 @@
+<div class="console-container" dir="rtl">
+  <!-- Header -->
+  <header class="console-header">
+    <div class="header-content">
+      <div class="brand w-100 d-flex justify-between align-center">
+        <h1>DynamicProLearn <span class="font-light">بوابة الجودة والاختبار</span></h1>
+        <div class="logout-container">
+          <button class="btn-logout" (click)="logout()">تسجيل الخروج</button>
+        </div>
+      </div>
+      <nav class="header-nav">
+        <button class="nav-btn active">الرئيسية <span class="icon">🏠</span></button>
+      </nav>
+    </div>
+  </header>
+
+  <div class="console-body">
+    <div class="panel mt-4">
+      <div class="panel-header d-flex justify-between align-center">
+        <h3 class="panel-title">🧪 الموديولات المتاحة للاختبار</h3>
+      </div>
+      <div class="panel-content">
+        
+        <div *ngIf="isLoading" class="loading">جاري تحميل الموديولات...</div>
+        
+        <div *ngIf="!isLoading && modules.length === 0" class="empty-state">
+          لا يوجد موديولات مخصصة لقسمك حالياً.
+        </div>
+        
+        <div class="grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
+          <div class="item-card module-card d-flex flex-column" *ngFor="let mod of modules">
+            <div class="d-flex justify-between align-start mb-2">
+              <div>
+                <h4 class="text-primary m-0 mb-1">{{ mod.name }}</h4>
+                <p class="text-secondary text-sm mt-1 mb-2">{{ mod.description }}</p>
+              </div>
+            </div>
+            
+            <div class="mt-auto pt-3 border-top" style="border-top: 1px solid var(--color-border); margin-top: 15px;">
+              <div class="progress-track" style="margin-bottom: 8px;">
+                <div class="progress-fill" [style.width.%]="mod.progressPercent"></div>
+              </div>
+              <span class="text-secondary text-xs font-medium d-block mb-3">{{ mod.progressPercent || 0 }}% مكتمل</span>
+              
+              <button class="btn-accent w-100 d-flex justify-center align-center gap-2" (click)="openLesson(mod.id)">
+                متابعة الاختبار 🚀
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
