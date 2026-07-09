@@ -330,3 +330,55 @@
 .m-0 { margin: 0; }
 .whitespace-nowrap { white-space: nowrap; }
 .justify-center { justify-content: center; }
+
+/* Add Module Modal Specifics */
+.dark-input {
+  background-color: #2c2c2c;
+  color: white;
+  border: 1px solid #444;
+  border-radius: 6px;
+}
+.dark-input::placeholder {
+  color: #888;
+}
+.dark-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(46, 95, 217, 0.2);
+}
+.divider {
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  margin: 20px 0;
+}
+.unit-builder-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 15px;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+}
+.lessons-list {
+  padding-right: 32px;
+}
+.lesson-item {
+  position: relative;
+}
+.btn-dashed-primary {
+  background: transparent;
+  border: 1px dashed var(--color-primary);
+  color: var(--color-primary);
+  padding: 10px 15px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  width: 100%;
+  transition: 0.2s;
+}
+.btn-dashed-primary:hover {
+  background: rgba(46, 95, 217, 0.05);
+}
+.drag-handle {
+  cursor: grab;
+}

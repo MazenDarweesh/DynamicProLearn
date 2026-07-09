@@ -239,4 +239,69 @@ export class AdminDashboardComponent implements OnInit {
       }
     });
   }
+
+  // --- Add Module Modal Logic ---
+  showAddModuleModal = false;
+  newModuleName = '';
+  newUnitsList: { name: string, lessons: { title: string }[] }[] = [];
+
+  openAddModuleModal() {
+    this.showAddModuleModal = true;
+    this.newModuleName = '';
+    this.newUnitsList = [
+      { name: 'الوحدة الأولى', lessons: [{ title: '' }, { title: '' }] }
+    ];
+  }
+
+  closeAddModuleModal() {
+    this.showAddModuleModal = false;
+  }
+
+  addUnit() {
+    this.newUnitsList.push({ name: '', lessons: [] });
+  }
+
+  removeUnit(unitIndex: number) {
+    this.newUnitsList.splice(unitIndex, 1);
+  }
+
+  addLessonToUnit(unitIndex: number) {
+    this.newUnitsList[unitIndex].lessons.push({ title: '' });
+  }
+
+  removeLessonFromUnit(unitIndex: number, lessonIndex: number) {
+    this.newUnitsList[unitIndex].lessons.splice(lessonIndex, 1);
+  }
+
+  async saveModule() {
+    if (!this.newModuleName.trim()) {
+      alert('الرجاء إدخال اسم الموديول');
+      return;
+    }
+
+    try {
+      const mod = await this.adminService.createModule(this.newModuleName, 'وصف تلقائي').toPromise();
+      const moduleId = mod.id;
+
+      for (const unit of this.newUnitsList) {
+        if (unit.name.trim()) {
+          const newUnit = await this.adminService.createUnit(moduleId, unit.name.trim()).toPromise();
+          const unitId = newUnit.id;
+
+          for (const lesson of unit.lessons) {
+            if (lesson.title.trim()) {
+              await this.adminService.createLesson(unitId, lesson.title.trim()).toPromise();
+            }
+          }
+        }
+      }
+
+      this.closeAddModuleModal();
+      this.loadModules();
+      this.loadStats();
+    } catch (err) {
+      console.error('Error creating module', err);
+      alert('حدث خطأ أثناء إنشاء الموديول.');
+    }
+  }
 }

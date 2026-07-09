@@ -100,13 +100,21 @@ public class ModuleService : IModuleService
 
     public async Task<Result<LessonDto>> CreateLessonAsync(CreateLessonRequest request)
     {
+        var levelId = request.LevelId;
+        if (!await _context.LevelOptions.AnyAsync(l => l.Id == levelId))
+            levelId = (await _context.LevelOptions.FirstOrDefaultAsync())?.Id ?? levelId;
+
+        var typeId = request.TypeId;
+        if (!await _context.TypeOptions.AnyAsync(t => t.Id == typeId))
+            typeId = (await _context.TypeOptions.FirstOrDefaultAsync())?.Id ?? typeId;
+
         var lesson = new Lesson 
         { 
             Title = request.Title, 
             VideoUrl = request.VideoUrl, 
             UnitId = request.UnitId,
-            LevelId = request.LevelId,
-            TypeId = request.TypeId,
+            LevelId = levelId,
+            TypeId = typeId,
             OrderIndex = request.OrderIndex
         };
         _context.Lessons.Add(lesson);
@@ -128,10 +136,18 @@ public class ModuleService : IModuleService
         var lesson = await _context.Lessons.FindAsync(id);
         if (lesson == null) return Result<LessonDto>.Failure(AppErrors.General.NotFound);
 
+        var levelId = request.LevelId;
+        if (!await _context.LevelOptions.AnyAsync(l => l.Id == levelId))
+            levelId = (await _context.LevelOptions.FirstOrDefaultAsync())?.Id ?? levelId;
+
+        var typeId = request.TypeId;
+        if (!await _context.TypeOptions.AnyAsync(t => t.Id == typeId))
+            typeId = (await _context.TypeOptions.FirstOrDefaultAsync())?.Id ?? typeId;
+
         lesson.Title = request.Title;
         lesson.VideoUrl = request.VideoUrl;
-        lesson.LevelId = request.LevelId;
-        lesson.TypeId = request.TypeId;
+        lesson.LevelId = levelId;
+        lesson.TypeId = typeId;
         lesson.OrderIndex = request.OrderIndex;
         await _context.SaveChangesAsync(default);
 

@@ -85,7 +85,7 @@
     <div class="panel mt-4">
       <div class="panel-header d-flex justify-between align-center">
         <h3 class="panel-title">📚 الموديولات</h3>
-        <button class="btn-accent" (click)="notImplemented('إنشاء موديول')">+ إنشاء موديول</button>
+        <button class="btn-accent" (click)="openAddModuleModal()">+ إنشاء موديول</button>
       </div>
       <div class="panel-content">
         <div class="item-card module-card mb-4" *ngFor="let mod of modules">
@@ -357,6 +357,88 @@
         حفظ وإنشاء الشركة
       </button>
       <button class="btn-secondary flex-1" (click)="closeAddCompanyModal()">إلغاء الأمر</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Module Modal -->
+<div class="modal-overlay" *ngIf="showAddModuleModal" dir="rtl">
+  <div class="modal-container">
+    <div class="modal-header">
+      <div class="d-flex justify-between align-center">
+        <div>
+          <h3 class="m-0 text-white d-flex align-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+            إنشاء موديول تعليمي جديد
+          </h3>
+          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">حدد اسم الموديول ثم رتّب الوحدات والدروس تحته</p>
+        </div>
+        <button class="icon-btn text-white" (click)="closeAddModuleModal()" style="margin-left: -10px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+    </div>
+    
+    <div class="modal-body">
+      <!-- Module Name -->
+      <div class="form-group mb-3">
+        <label class="text-secondary text-sm d-block mb-1" style="text-align: right;">اسم الموديول *</label>
+        <input type="text" class="form-control modal-input" [(ngModel)]="newModuleName" placeholder="مثال: المحاسبة المالية">
+      </div>
+      
+      <!-- Module Description -->
+      <div class="form-group mb-4">
+        <label class="text-secondary text-sm d-block mb-1" style="text-align: right;">وصف الموديول</label>
+        <textarea class="form-control modal-input" [(ngModel)]="newModuleDescription" placeholder="اكتب وصفاً مختصراً للموديول هنا..." rows="2" style="resize: vertical;"></textarea>
+      </div>
+
+      <hr class="divider mb-4">
+
+      <!-- Units & Lessons -->
+      <div class="modal-section mb-2">
+        <h4 class="section-title d-flex align-center gap-2 text-primary mb-3">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          الوحدات والدروس
+        </h4>
+
+        <!-- Unit Cards -->
+        <div class="unit-builder-card mb-3" *ngFor="let unit of newUnitsList; let uIndex = index">
+          <div class="d-flex gap-2 align-center mb-2">
+            <button class="icon-btn text-danger" (click)="removeUnit(uIndex)" style="opacity: 0.7;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            </button>
+            <input type="text" class="form-control modal-input flex-1 unit-input" [(ngModel)]="unit.name" placeholder="اسم الوحدة">
+          </div>
+
+          <!-- Lessons list -->
+          <div class="lessons-list">
+            <div class="d-flex gap-2 align-center mb-2 lesson-item" *ngFor="let lesson of unit.lessons; let lIndex = index">
+              <button class="icon-btn text-danger" (click)="removeLessonFromUnit(uIndex, lIndex)" style="opacity: 0.7;">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              </button>
+              <input type="text" class="form-control modal-input flex-1 lesson-input" [(ngModel)]="lesson.title" placeholder="اسم الدرس">
+              <svg class="drag-handle text-secondary" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.4"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>
+            </div>
+          </div>
+          
+          <div style="padding-right: 32px;">
+            <button class="btn-dashed-primary mt-2" (click)="addLessonToUnit(uIndex)">+ إضافة درس لهذه الوحدة</button>
+          </div>
+        </div>
+
+        <button class="btn-outline-primary w-100 mt-2 d-flex justify-center align-center gap-2" (click)="addUnit()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+          إضافة وحدة جديدة
+        </button>
+      </div>
+    </div>
+
+    <div class="modal-footer d-flex gap-3">
+      <button class="btn-accent flex-2 d-flex justify-center align-center gap-2" (click)="saveModule()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+        حفظ الموديول
+      </button>
+      <button class="btn-secondary flex-1" (click)="closeAddModuleModal()">إلغاء</button>
     </div>
   </div>
 </div>
