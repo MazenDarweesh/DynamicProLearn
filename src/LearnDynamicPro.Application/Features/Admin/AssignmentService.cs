@@ -49,11 +49,17 @@ public class AssignmentService : IAssignmentService
         return Result.Success();
     }
 
-    public async Task<Result<List<DepartmentModuleDto>>> GetAssignmentsByDepartmentAsync(Guid departmentId)
+    public async Task<Result<PagedList<DepartmentModuleDto>>> GetAssignmentsByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 100)
     {
-        var assignments = await _context.DepartmentModuleAssignments
+        var query = _context.DepartmentModuleAssignments
             .AsNoTracking()
-            .Where(a => a.DepartmentId == departmentId)
+            .Where(a => a.DepartmentId == departmentId);
+            
+        var totalCount = await query.CountAsync();
+
+        var assignments = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(a => new DepartmentModuleDto
             {
                 Id = a.Id,
@@ -64,7 +70,8 @@ public class AssignmentService : IAssignmentService
             })
             .ToListAsync();
             
-        return Result<List<DepartmentModuleDto>>.Success(assignments);
+        var pagedList = new PagedList<DepartmentModuleDto>(assignments, totalCount, page, pageSize);
+        return Result<PagedList<DepartmentModuleDto>>.Success(pagedList);
     }
 }
 

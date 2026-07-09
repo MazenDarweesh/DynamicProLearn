@@ -13,14 +13,14 @@ public interface ICompanyService
 
     // Department CRUD
     Task<Result<DepartmentDto>> CreateDepartmentAsync(CreateDepartmentRequest request);
-    Task<Result<List<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId);
+    Task<Result<PagedList<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId, int page = 1, int pageSize = 100);
     Task<Result<bool>> UpdateDepartmentAsync(Guid id, UpdateDepartmentRequest request);
     Task<Result<bool>> DeleteDepartmentAsync(Guid id);
 
     // User CRUD
     Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request);
-    Task<Result<List<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId);
-    Task<Result<IEnumerable<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId);
+    Task<Result<PagedList<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 100);
+    Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 100);
 
     // Dashboard Stats
     Task<Result<DashboardStatsDto>> GetDashboardStatsAsync();

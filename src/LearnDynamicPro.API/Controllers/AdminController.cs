@@ -69,9 +69,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("companies/{companyId}/departments")]
-    public async Task<IActionResult> GetDepartments(Guid companyId)
+    public async Task<IActionResult> GetDepartments(Guid companyId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _companyService.GetDepartmentsByCompanyAsync(companyId);
+        var result = await _companyService.GetDepartmentsByCompanyAsync(companyId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
@@ -102,9 +102,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("departments/{departmentId}/users")]
-    public async Task<IActionResult> GetUsers(Guid departmentId)
+    public async Task<IActionResult> GetUsers(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _companyService.GetUsersByDepartmentAsync(departmentId);
+        var result = await _companyService.GetUsersByDepartmentAsync(departmentId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
@@ -226,9 +226,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("departments/{departmentId}/assignments")]
-    public async Task<IActionResult> GetAssignments(Guid departmentId)
+    public async Task<IActionResult> GetAssignments(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _assignmentService.GetAssignmentsByDepartmentAsync(departmentId);
+        var result = await _assignmentService.GetAssignmentsByDepartmentAsync(departmentId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
@@ -251,9 +251,9 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("departments/{departmentId}/users-progress")]
-    public async Task<IActionResult> GetUsersProgress(Guid departmentId)
+    public async Task<IActionResult> GetUsersProgress(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 100)
     {
-        var result = await _companyService.GetDepartmentUsersProgressAsync(departmentId);
+        var result = await _companyService.GetDepartmentUsersProgressAsync(departmentId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
