@@ -13,6 +13,7 @@
         <button class="nav-btn" (click)="goTo('admin/users')">الشركات <span class="icon">🏢</span></button>
         <button class="nav-btn" (click)="goTo('admin/content')">الموديولات <span class="icon">📚</span></button>
         <button class="nav-btn" (click)="goTo('admin/assignments')">التحليلات <span class="icon">📊</span></button>
+        <button class="nav-btn" (click)="scrollToTesters()">المختبرين <span class="icon">🧪</span></button>
       </nav>
     </div>
   </header>
@@ -20,7 +21,7 @@
   <div class="console-body">
 
     <!-- Stats Row -->
-    <div class="stats-grid">
+    <div class="stats-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
       <div class="stat-card">
         <p>الشركات</p>
         <h3>{{ stats.companies }}</h3>
@@ -28,6 +29,10 @@
       <div class="stat-card">
         <p>متعلمون نشطون</p>
         <h3>{{ stats.users }}</h3>
+      </div>
+      <div class="stat-card">
+        <p>مختبرون</p>
+        <h3>{{ stats.testers }}</h3>
       </div>
       <div class="stat-card">
         <p>موديولات منشورة</p>
@@ -713,9 +718,10 @@
     </div>
 
     <div class="modal-footer d-flex gap-3">
-      <button class="btn-accent w-100 d-flex justify-center align-center gap-2" (click)="closeAssignModulesModal()">
-        تم الحفظ والإغلاق
+      <button class="btn-accent flex-2 d-flex justify-center align-center gap-2" (click)="saveModuleAssignments()" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'جاري الحفظ...' : 'حفظ الإسنادات والتغييرات' }}
       </button>
+      <button class="btn-secondary flex-1" (click)="closeAssignModulesModal()">إلغاء</button>
     </div>
   </div>
 </div>

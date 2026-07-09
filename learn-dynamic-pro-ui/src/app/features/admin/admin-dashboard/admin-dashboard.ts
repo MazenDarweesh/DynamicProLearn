@@ -20,7 +20,7 @@ export class AdminDashboardComponent implements OnInit {
 
   companies: any[] = [];
   modules: any[] = [];
-  stats = { companies: 0, users: 0, modules: 0, progress: '0%' };
+  stats = { companies: 0, users: 0, testers: 0, modules: 0, progress: '0%' };
   
   showAllCompanies = false;
   showAllModules = false;
@@ -32,6 +32,9 @@ export class AdminDashboardComponent implements OnInit {
   selectedDepartmentId: string = '';
   departments: any[] = [];
   progressUsers: any[] = [];
+
+  // Assign Modules state
+  pendingAssignedModuleIds = new Set<string>();
 
   // Add Company Modal State
   showAddCompanyModal = false;
@@ -69,11 +72,15 @@ export class AdminDashboardComponent implements OnInit {
   loadStats() {
     this.adminService.getDashboardStats().subscribe({
       next: (stats) => {
-        this.stats.companies = stats.totalCompanies;
-        this.stats.users = stats.activeUsers;
-        this.stats.modules = stats.publishedModules;
-        this.stats.progress = `${stats.averageProgress}%`;
-      }
+        this.stats = {
+          companies: stats.totalCompanies,
+          users: stats.activeUsers,
+          testers: stats.activeTesters,
+          modules: stats.publishedModules,
+          progress: stats.averageProgress + '%'
+        };
+      },
+      error: (err) => console.error('Error fetching stats', err)
     });
   }
 
@@ -500,11 +507,13 @@ export class AdminDashboardComponent implements OnInit {
     this.assigningCompany = company;
     this.assigningDepartment = department;
     this.assignedModules = [];
+    this.pendingAssignedModuleIds.clear();
     this.showAssignModulesModal = true;
     
     this.adminService.getDepartmentAssignments(department.id).subscribe({
       next: (assignments) => {
         this.assignedModules = assignments;
+        assignments.forEach((a: any) => this.pendingAssignedModuleIds.add(a.moduleId));
       },
       error: (err) => {
         console.error('Error fetching assignments', err);
@@ -516,41 +525,56 @@ export class AdminDashboardComponent implements OnInit {
     this.showAssignModulesModal = false;
     this.assigningCompany = null;
     this.assigningDepartment = null;
+    this.pendingAssignedModuleIds.clear();
   }
 
   isModuleAssigned(moduleId: string): boolean {
-    return this.assignedModules.some(a => a.moduleId === moduleId);
+    return this.pendingAssignedModuleIds.has(moduleId);
   }
 
   toggleModuleAssignment(moduleId: string, event: any) {
-    const isChecked = event.target.checked;
-    if (isChecked) {
-      this.adminService.assignModule(moduleId, this.assigningDepartment.id).subscribe({
-        next: (assignment) => {
-          this.assignedModules.push(assignment);
-          this.refreshAllData();
-        },
-        error: (err) => {
-          console.error('Error assigning module', err);
-          event.target.checked = false;
-          Dialog.alert('حدث خطأ أثناء الإسناد.', 'خطأ', 'error');
-        }
-      });
+    if (event.target.checked) {
+      this.pendingAssignedModuleIds.add(moduleId);
     } else {
-      const assignment = this.assignedModules.find(a => a.moduleId === moduleId);
-      if (assignment) {
-        this.adminService.removeAssignment(assignment.id).subscribe({
-          next: () => {
-            this.assignedModules = this.assignedModules.filter(a => a.id !== assignment.id);
-            this.refreshAllData();
-          },
-          error: (err) => {
-            console.error('Error removing assignment', err);
-            event.target.checked = true;
-            Dialog.alert('حدث خطأ أثناء إزالة الإسناد.', 'خطأ', 'error');
-          }
+      this.pendingAssignedModuleIds.delete(moduleId);
+    }
+  }
+
+  async saveModuleAssignments() {
+    this.isSubmitting = true;
+    const currentAssignmentIds = new Set(this.assignedModules.map(a => a.moduleId));
+    const departmentId = this.assigningDepartment.id;
+
+    const toAdd = Array.from(this.pendingAssignedModuleIds).filter(id => !currentAssignmentIds.has(id));
+    const toRemove = this.assignedModules.filter(a => !this.pendingAssignedModuleIds.has(a.moduleId));
+
+    try {
+      for (const moduleId of toAdd) {
+        await new Promise<void>((resolve, reject) => {
+          this.adminService.assignModule(moduleId, departmentId).subscribe({
+            next: () => resolve(),
+            error: (err) => reject(err)
+          });
         });
       }
+
+      for (const assignment of toRemove) {
+        await new Promise<void>((resolve, reject) => {
+          this.adminService.removeAssignment(assignment.id).subscribe({
+            next: () => resolve(),
+            error: (err) => reject(err)
+          });
+        });
+      }
+      
+      this.isSubmitting = false;
+      Dialog.alert('تم حفظ إسنادات الموديولات بنجاح!', 'نجاح', 'success');
+      this.closeAssignModulesModal();
+      this.refreshAllData();
+    } catch (err: any) {
+      this.isSubmitting = false;
+      console.error('Error saving assignments', err);
+      Dialog.alert('حدث خطأ أثناء حفظ الإسنادات.', 'خطأ', 'error');
     }
   }
 
@@ -609,5 +633,9 @@ export class AdminDashboardComponent implements OnInit {
         Dialog.alert('حدث خطأ أثناء الإضافة: ' + (err.error?.detail || err.message), 'خطأ', 'error');
       }
     });
+  }
+
+  scrollToTesters() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
   }
 }

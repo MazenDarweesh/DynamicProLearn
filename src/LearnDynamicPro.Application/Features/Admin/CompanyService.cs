@@ -304,7 +304,8 @@ public class CompanyService : ICompanyService
     public async Task<Result<DashboardStatsDto>> GetDashboardStatsAsync()
     {
         var totalCompanies = await _context.Companies.CountAsync();
-        var activeUsers = await _context.Users.CountAsync();
+        var activeUsers = await _context.Users.CountAsync(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester);
+        var activeTesters = await _context.Users.CountAsync(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
         var publishedModules = await _context.Modules.CountAsync();
 
         // Average progress = total completions / total assigned lessons across everyone
@@ -337,6 +338,7 @@ public class CompanyService : ICompanyService
         {
             TotalCompanies = totalCompanies,
             ActiveUsers = activeUsers,
+            ActiveTesters = activeTesters,
             PublishedModules = publishedModules,
             AverageProgress = averageProgress
         });
