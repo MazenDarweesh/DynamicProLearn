@@ -364,4 +364,66 @@ export class AdminDashboardComponent implements OnInit {
       }
     });
   }
+
+  // --- Assign Modules Logic ---
+  showAssignModulesModal = false;
+  assigningCompany: any = null;
+  assigningDepartment: any = null;
+  assignedModules: any[] = [];
+
+  openAssignModulesModal(company: any, department: any) {
+    this.assigningCompany = company;
+    this.assigningDepartment = department;
+    this.assignedModules = [];
+    this.showAssignModulesModal = true;
+    
+    this.adminService.getDepartmentAssignments(department.id).subscribe({
+      next: (assignments) => {
+        this.assignedModules = assignments;
+      },
+      error: (err) => {
+        console.error('Error fetching assignments', err);
+      }
+    });
+  }
+
+  closeAssignModulesModal() {
+    this.showAssignModulesModal = false;
+    this.assigningCompany = null;
+    this.assigningDepartment = null;
+  }
+
+  isModuleAssigned(moduleId: string): boolean {
+    return this.assignedModules.some(a => a.moduleId === moduleId);
+  }
+
+  toggleModuleAssignment(moduleId: string, event: any) {
+    const isChecked = event.target.checked;
+    if (isChecked) {
+      this.adminService.assignModule(moduleId, this.assigningDepartment.id).subscribe({
+        next: (assignment) => {
+          this.assignedModules.push(assignment);
+        },
+        error: (err) => {
+          console.error('Error assigning module', err);
+          event.target.checked = false;
+          alert('حدث خطأ أثناء الإسناد.');
+        }
+      });
+    } else {
+      const assignment = this.assignedModules.find(a => a.moduleId === moduleId);
+      if (assignment) {
+        this.adminService.removeAssignment(assignment.id).subscribe({
+          next: () => {
+            this.assignedModules = this.assignedModules.filter(a => a.id !== assignment.id);
+          },
+          error: (err) => {
+            console.error('Error removing assignment', err);
+            event.target.checked = true;
+            alert('حدث خطأ أثناء إزالة الإسناد.');
+          }
+        });
+      }
+    }
+  }
 }

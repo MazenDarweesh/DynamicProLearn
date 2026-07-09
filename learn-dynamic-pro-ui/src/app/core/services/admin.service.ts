@@ -84,8 +84,16 @@ export class AdminService {
       moduleId, 
       departmentId, 
       isMandatory: true,
-      dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString() // Due in 1 month
+      dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString()
     });
+  }
+
+  getDepartmentAssignments(departmentId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/departments/${departmentId}/assignments`);
+  }
+
+  removeAssignment(assignmentId: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/assignments/${assignmentId}`);
   }
 
   updateModule(id: string, name: string, description: string): Observable<any> {

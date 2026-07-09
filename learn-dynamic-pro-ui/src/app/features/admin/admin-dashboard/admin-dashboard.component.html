@@ -51,10 +51,19 @@
           <div class="d-flex justify-between align-start">
             <div>
               <h4 class="text-primary">{{ comp.name }}</h4>
-              <div class="badges-row">
-                <span class="badge badge-primary" *ngFor="let d of comp.departments">{{ d.name }}</span>
-                <span class="text-secondary text-sm" *ngIf="!comp.departments || comp.departments.length === 0">لا توجد
-                  أقسام</span>
+              <div class="badges-row d-flex flex-wrap gap-2">
+                <div class="department-badge-group d-flex align-center" *ngFor="let d of comp.departments">
+                  <span class="badge badge-primary">{{ d.name }}</span>
+                  <button class="icon-btn text-primary ms-1" style="transform: scale(0.85); margin-right: 4px;" (click)="openAssignModulesModal(comp, d)" title="إسناد موديولات">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+                      <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+                      <path d="M9 14h6"></path>
+                      <path d="M9 10h6"></path>
+                    </svg>
+                  </button>
+                </div>
+                <span class="text-secondary text-sm" *ngIf="!comp.departments || comp.departments.length === 0">لا توجد أقسام</span>
               </div>
             </div>
             <div class="actions-left d-flex align-center gap-3">
@@ -521,6 +530,57 @@
         حفظ المستخدم
       </button>
       <button class="btn-secondary flex-1" (click)="closeAddUserModal()">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Modules Modal -->
+<div class="modal-overlay" *ngIf="showAssignModulesModal" dir="rtl">
+  <div class="modal-container">
+    <div class="modal-header">
+      <div class="d-flex justify-between align-center">
+        <div>
+          <h3 class="m-0 text-white d-flex align-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              <path d="M9 14h6"></path>
+              <path d="M9 10h6"></path>
+            </svg>
+            إسناد الموديولات
+          </h3>
+          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">شركة {{ assigningCompany?.name }} - قسم {{ assigningDepartment?.name }}</p>
+        </div>
+        <button class="icon-btn text-white" (click)="closeAssignModulesModal()" style="margin-left: -10px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <div class="modal-body">
+      <p class="text-secondary text-sm mb-3">اختر الموديولات التي ترغب بإتاحتها لمستخدمي هذا القسم:</p>
+      
+      <div class="modules-list" style="max-height: 300px; overflow-y: auto;">
+        <div class="item-card mb-2 d-flex align-center gap-3" *ngFor="let mod of modules">
+          <input type="checkbox" [checked]="isModuleAssigned(mod.id)" (change)="toggleModuleAssignment(mod.id, $event)" style="width: 18px; height: 18px; cursor: pointer;">
+          <div>
+            <h4 class="text-primary m-0" style="font-size: 15px;">{{ mod.name }}</h4>
+            <span class="text-secondary text-sm">{{ mod.description || 'لا يوجد وصف' }}</span>
+          </div>
+        </div>
+        <div *ngIf="modules.length === 0" class="text-center text-secondary py-3">
+          لا توجد موديولات متاحة.
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer d-flex gap-3">
+      <button class="btn-accent w-100 d-flex justify-center align-center gap-2" (click)="closeAssignModulesModal()">
+        تم الحفظ والإغلاق
+      </button>
     </div>
   </div>
 </div>
