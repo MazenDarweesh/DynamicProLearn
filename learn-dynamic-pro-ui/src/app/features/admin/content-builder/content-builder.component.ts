@@ -20,6 +20,7 @@ export class ContentBuilderComponent implements OnInit {
   
   units: any[] = [];
   selectedLesson: any | null = null;
+  selectedModule: AdminModuleDto | null = null;
   
   lookups: { levels: LookupDto[], types: LookupDto[] } = { levels: [], types: [] };
   
@@ -52,7 +53,11 @@ export class ContentBuilderComponent implements OnInit {
   }
 
   onModuleChange() {
-    if (!this.selectedModuleId) return;
+    if (!this.selectedModuleId) {
+      this.selectedModule = null;
+      return;
+    }
+    this.selectedModule = this.modules.find(m => m.id === this.selectedModuleId) || null;
     this.loadTree(this.selectedModuleId);
   }
 
@@ -207,10 +212,15 @@ export class ContentBuilderComponent implements OnInit {
   }
 
   async saveAll() {
-    if (!this.selectedModuleId || this.units.length === 0) return;
+    if (!this.selectedModuleId) return;
     this.isSaving = true;
 
     try {
+      // Update module details
+      if (this.selectedModule) {
+        await this.adminService.updateModule(this.selectedModule.id, this.selectedModule.name, this.selectedModule.description).toPromise();
+      }
+
       // Update units
       const unitPromises = this.units.map((u, index) => 
         this.adminService.updateUnit(u.id, u.name, index + 1).toPromise()
