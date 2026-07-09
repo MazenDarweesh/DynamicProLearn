@@ -21,6 +21,10 @@ export class AdminDashboardComponent implements OnInit {
   modules: any[] = [];
   stats = { companies: 0, users: 0, modules: 0, progress: '0%' };
   
+  showAllCompanies = false;
+  showAllModules = false;
+  showAllUsers = false;
+  
   // Progress Table tracking
   selectedCompanyId: string = '';
   selectedDepartmentId: string = '';

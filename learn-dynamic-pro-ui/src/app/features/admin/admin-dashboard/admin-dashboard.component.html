@@ -47,7 +47,7 @@
       </div>
       <div class="panel-content">
         <!-- Company List -->
-        <div class="item-card mb-3" *ngFor="let comp of companies">
+        <div class="item-card mb-3" *ngFor="let comp of (showAllCompanies ? companies : (companies | slice:0:3))">
           <div class="d-flex justify-between align-start">
             <div>
               <h4 class="text-primary">{{ comp.name }}</h4>
@@ -88,6 +88,11 @@
             </div>
           </div>
         </div>
+        <div class="text-center mt-2" *ngIf="companies.length > 3">
+          <button class="btn-back" (click)="showAllCompanies = !showAllCompanies" style="margin: 0 auto; color: var(--color-primary); font-weight: 500;">
+            {{ showAllCompanies ? 'عرض أقل ⬆️' : 'عرض المزيد (' + (companies.length - 3) + ') ⬇️' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -98,7 +103,7 @@
         <button class="btn-accent" (click)="openAddModuleModal()">+ إنشاء موديول</button>
       </div>
       <div class="panel-content">
-        <div class="item-card module-card mb-4" *ngFor="let mod of modules">
+        <div class="item-card module-card mb-4" *ngFor="let mod of (showAllModules ? modules : (modules | slice:0:3))">
           <div class="d-flex justify-between align-start mb-2">
             <div>
               <h4 class="text-primary m-0 mb-1">موديول: {{ mod.name }}</h4>
@@ -171,6 +176,12 @@
           </div>
         </div>
 
+        <div class="text-center mt-2 mb-3" *ngIf="modules.length > 3">
+          <button class="btn-back" (click)="showAllModules = !showAllModules" style="margin: 0 auto; color: var(--color-primary); font-weight: 500;">
+            {{ showAllModules ? 'عرض أقل ⬆️' : 'عرض المزيد (' + (modules.length - 3) + ') ⬇️' }}
+          </button>
+        </div>
+
         <div class="info-note mt-3">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
@@ -230,7 +241,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr *ngFor="let u of progressUsers">
+            <tr *ngFor="let u of (showAllUsers ? progressUsers : (progressUsers | slice:0:3))">
               <td class="fw-500">{{ u.name }}</td>
               <td class="text-secondary">{{ u.role }}</td>
               <td class="text-secondary">{{ u.assignedModules }}</td>
@@ -247,6 +258,12 @@
             </tr>
           </tbody>
         </table>
+        
+        <div class="text-center mt-3" *ngIf="progressUsers.length > 3">
+          <button class="btn-back" (click)="showAllUsers = !showAllUsers" style="margin: 0 auto; color: var(--color-primary); font-weight: 500;">
+            {{ showAllUsers ? 'عرض أقل ⬆️' : 'عرض المزيد (' + (progressUsers.length - 3) + ') ⬇️' }}
+          </button>
+        </div>
       </div>
     </div>
 
