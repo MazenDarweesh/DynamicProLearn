@@ -4,11 +4,12 @@ import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AdminService, AdminModuleDto, LookupDto } from '../../../core/services/admin.service';
 import { Dialog } from '../../../core/utils/dialog';
+import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 
 @Component({
   selector: 'app-content-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent],
   templateUrl: './content-builder.html',
   styleUrls: ['./content-builder.css']
 })

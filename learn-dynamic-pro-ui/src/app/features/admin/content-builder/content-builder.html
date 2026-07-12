@@ -1,30 +1,18 @@
 <div class="console-container" dir="rtl">
-  <header class="console-header">
-    <div class="header-content">
-      <div class="brand w-100 d-flex justify-between align-center">
-        <h1>DynamicProLearn <span class="font-light">مُنشئ المحتوى</span></h1>
-        <div class="d-flex align-center gap-3">
-          <button class="btn-primary d-flex align-center gap-2" (click)="saveAll()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-              <polyline points="17 21 17 13 7 13 7 21"></polyline>
-              <polyline points="7 3 7 8 15 8"></polyline>
-            </svg>
-            {{ isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات' }}
-          </button>
-          <button class="btn-back" (click)="goBack()">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 14l-4-4 4-4"></path>
-              <path d="M5 10h11a4 4 0 1 1 0 8h-1"></path>
-            </svg>
-            لوحة الإدارة
-          </button>
-        </div>
-      </div>
-    </div>
-  </header>
+  <app-admin-header></app-admin-header>
 
   <div class="console-body">
+    <div class="d-flex justify-between align-center mb-4">
+      <h2 class="m-0" style="color: var(--color-navy)">مُنشئ المحتوى</h2>
+      <button class="btn-primary d-flex align-center gap-2" (click)="saveAll()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+          <polyline points="17 21 17 13 7 13 7 21"></polyline>
+          <polyline points="7 3 7 8 15 8"></polyline>
+        </svg>
+        {{ isSaving ? 'جاري الحفظ...' : 'حفظ التعديلات' }}
+      </button>
+    </div>
     <!-- Sidebar: Modules and Units Tree -->
     <div class="viewer-sidebar">
       <div class="d-flex justify-between align-center mb-3">

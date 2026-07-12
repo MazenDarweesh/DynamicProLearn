@@ -2,20 +2,19 @@ import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
+import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 
 @Component({
   selector: 'app-assignments-manager',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AdminHeaderComponent],
   template: `
-    <div class="dashboard-container">
-      <header class="header">
-        <button class="btn-back" (click)="goBack()">← Back to Dashboard</button>
-        <div class="d-flex justify-between w-100 mt-2">
-          <h2>Department Assignments</h2>
-          <button class="btn-primary" (click)="assignNewModule()">Assign New Module</button>
-        </div>
-      </header>
+    <app-admin-header></app-admin-header>
+    <div class="dashboard-container" dir="rtl">
+      <div class="d-flex justify-between w-100 mt-2 mb-4">
+        <h2>تحليلات النظام</h2>
+        <button class="btn-primary" (click)="assignNewModule()">Assign New Module</button>
+      </div>
 
       <div class="grid">
         <div class="card assignment-card">

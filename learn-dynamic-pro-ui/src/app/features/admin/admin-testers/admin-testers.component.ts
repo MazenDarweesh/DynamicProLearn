@@ -6,11 +6,12 @@ import { AuthService } from '../../../core/services/auth.service';
 import { AdminService } from '../../../core/services/admin.service';
 import { Router } from '@angular/router';
 import { Dialog } from '../../../core/utils/dialog';
+import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 
 @Component({
   selector: 'app-admin-testers',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent],
   templateUrl: './admin-testers.component.html',
   styleUrl: '../admin-dashboard/admin-dashboard.component.css'
 })
