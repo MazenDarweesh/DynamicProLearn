@@ -228,7 +228,6 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
-        // Get all users in department
         var query = _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.DepartmentId == departmentId);
@@ -238,37 +237,39 @@ public class CompanyService : ICompanyService
         var users = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(u => new 
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Role = u.Role
+            })
             .ToListAsync();
 
-        // Get assigned modules for department
         var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Include(a => a.Module)
-                .ThenInclude(m => m.Units)
-                    .ThenInclude(u => u.Lessons)
             .Where(a => a.DepartmentId == departmentId)
+            .Select(a => new 
+            {
+                ModuleName = a.Module != null ? a.Module.Name : "",
+                LessonIds = a.Module != null && a.Module.Units != null 
+                    ? a.Module.Units.Where(u => u.Lessons != null).SelectMany(u => u.Lessons).Select(l => l.Id).ToList() 
+                    : new List<Guid>()
+            })
             .ToListAsync();
 
-        var assignedModulesNames = string.Join(", ", assignments.Select(a => a.Module.Name));
-        
-        // Calculate total lessons in all assigned modules
-        var totalLessons = assignments
-            .SelectMany(a => a.Module.Units)
-            .SelectMany(u => u.Lessons)
-            .Count();
+        var assignedModulesNames = string.Join(", ", assignments.Select(a => a.ModuleName));
+        var totalLessons = assignments.Sum(a => a.LessonIds.Count);
+        var lessonIds = assignments.SelectMany(a => a.LessonIds).ToList();
 
-        var lessonIds = assignments
-            .SelectMany(a => a.Module.Units)
-            .SelectMany(u => u.Lessons)
-            .Select(l => l.Id)
-            .ToList();
-
-        // Get completed lessons for all these users
         var userIds = users.Select(u => u.Id).ToList();
-        var completions = await _unitOfWork.Repository<LessonProgress>().Query()
-            .AsNoTracking()
-            .Where(p => userIds.Contains(p.UserId) && p.IsCompleted && lessonIds.Contains(p.LessonId))
-            .ToListAsync();
+        var completions = new List<LessonProgress>();
+        if (userIds.Any() && lessonIds.Any())
+        {
+            completions = await _unitOfWork.Repository<LessonProgress>().Query()
+                .AsNoTracking()
+                .Where(p => p.IsCompleted && userIds.Contains(p.UserId) && lessonIds.Contains(p.LessonId))
+                .ToListAsync();
+        }
 
         var progressList = users.Select(u => {
             var completedCount = completions.Count(c => c.UserId == u.Id);
@@ -289,7 +290,6 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<PagedList<UserProgressDto>>> GetAllTestersProgressAsync(int page = 1, int pageSize = 10)
     {
-        // Get all testers
         var query = _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
@@ -299,41 +299,48 @@ public class CompanyService : ICompanyService
         var users = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
+            .Select(u => new 
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Role = u.Role,
+                DepartmentId = u.DepartmentId
+            })
             .ToListAsync();
 
         var departmentIds = users.Select(u => u.DepartmentId).Distinct().ToList();
 
-        // Get assigned modules for these departments
         var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Include(a => a.Module)
-                .ThenInclude(m => m.Units)
-                    .ThenInclude(u => u.Lessons)
             .Where(a => departmentIds.Contains(a.DepartmentId))
+            .Select(a => new 
+            {
+                DepartmentId = a.DepartmentId,
+                ModuleName = a.Module != null ? a.Module.Name : "",
+                LessonIds = a.Module != null && a.Module.Units != null 
+                    ? a.Module.Units.Where(u => u.Lessons != null).SelectMany(u => u.Lessons).Select(l => l.Id).ToList() 
+                    : new List<Guid>()
+            })
             .ToListAsync();
 
-        var lessonIds = assignments
-            .SelectMany(a => a.Module.Units)
-            .SelectMany(u => u.Lessons)
-            .Select(l => l.Id)
-            .ToList();
-
+        var lessonIds = assignments.SelectMany(a => a.LessonIds).Distinct().ToList();
         var userIds = users.Select(u => u.Id).ToList();
-        var completions = await _unitOfWork.Repository<LessonProgress>().Query()
-            .AsNoTracking()
-            .Where(p => userIds.Contains(p.UserId) && p.IsCompleted && lessonIds.Contains(p.LessonId))
-            .ToListAsync();
+
+        var completions = new List<LessonProgress>();
+        if (userIds.Any() && lessonIds.Any())
+        {
+            completions = await _unitOfWork.Repository<LessonProgress>().Query()
+                .AsNoTracking()
+                .Where(p => p.IsCompleted && userIds.Contains(p.UserId) && lessonIds.Contains(p.LessonId))
+                .ToListAsync();
+        }
 
         var progressList = users.Select(u => {
             var userAssignments = assignments.Where(a => a.DepartmentId == u.DepartmentId).ToList();
-            var assignedModulesNames = string.Join(", ", userAssignments.Select(a => a.Module.Name));
-            
-            var totalLessons = userAssignments
-                .SelectMany(a => a.Module.Units)
-                .SelectMany(un => un.Lessons)
-                .Count();
-
+            var assignedModulesNames = string.Join(", ", userAssignments.Select(a => a.ModuleName));
+            var totalLessons = userAssignments.Sum(a => a.LessonIds.Count);
             var completedCount = completions.Count(c => c.UserId == u.Id);
+
             return new UserProgressDto
             {
                 UserId = u.Id,
@@ -356,25 +363,11 @@ public class CompanyService : ICompanyService
         var activeTesters = await _unitOfWork.Repository<User>().Query().CountAsync(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
         var publishedModules = await _unitOfWork.Repository<Module>().Query().CountAsync();
 
-        // Average progress = total completions / total assigned lessons across everyone
-        // For simplicity, we can calculate total possible vs total completed.
-        // A more exact metric would need user-assignment mapping.
-        // Let's do a fast approximation:
-        var totalAssignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-            .Include(a => a.Department)
-                .ThenInclude(d => d.Users)
-            .Include(a => a.Module)
-                .ThenInclude(m => m.Units)
-                    .ThenInclude(u => u.Lessons)
-            .ToListAsync();
-
-        int totalPossibleLessons = 0;
-        foreach(var assignment in totalAssignments)
-        {
-            var userCount = assignment.Department.Users.Count;
-            var lessonCount = assignment.Module.Units.SelectMany(u => u.Lessons).Count();
-            totalPossibleLessons += userCount * lessonCount;
-        }
+        var totalPossibleLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+            .AsNoTracking()
+            .Where(a => a.Department != null && a.Module != null)
+            .Select(a => a.Department!.Users.Count * a.Module!.Units.SelectMany(u => u.Lessons).Count())
+            .SumAsync();
 
         int totalCompleted = await _unitOfWork.Repository<LessonProgress>().Query().CountAsync(p => p.IsCompleted);
 
