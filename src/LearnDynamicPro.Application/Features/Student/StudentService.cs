@@ -2,16 +2,18 @@ using LearnDynamicPro.Application.Dtos.Modules;
 using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Application.Common;
 using Microsoft.EntityFrameworkCore;
+using LearnDynamicPro.Application.Interfaces.Repositories;
+using LearnDynamicPro.Domain.Entities;
 
 namespace LearnDynamicPro.Application.Features.Student;
 
 public class StudentService : IStudentService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public StudentService(IApplicationDbContext context)
+    public StudentService(IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -22,7 +24,7 @@ public class StudentService : IStudentService
     // ─────────────────────────────────────────────────────────────────────────
     public async Task<Result<List<ModuleDto>>> GetAssignedModulesAsync(Guid userId)
     {
-        var departmentId = await _context.Users
+        var departmentId = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.Id == userId)
             .Select(u => u.DepartmentId)
@@ -31,7 +33,7 @@ public class StudentService : IStudentService
         if (departmentId == Guid.Empty)
             return Result<List<ModuleDto>>.Failure(AppErrors.Authentication.UserNotFound);
 
-        var modules = await _context.DepartmentModuleAssignments
+        var modules = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
             .Where(a => a.DepartmentId == departmentId)
             .Select(a => new ModuleDto
@@ -52,7 +54,7 @@ public class StudentService : IStudentService
     // ─────────────────────────────────────────────────────────────────────────
     public async Task<Result<List<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId)
     {
-        var units = await _context.Units
+        var units = await _unitOfWork.Repository<Unit>().Query()
             .AsNoTracking()
             .Where(u => u.ModuleId == moduleId)
             .OrderBy(u => u.OrderIndex)
@@ -85,7 +87,7 @@ public class StudentService : IStudentService
     // ─────────────────────────────────────────────────────────────────────────
     public async Task<Result<List<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, Guid userId)
     {
-        var userInfo = await _context.Users
+        var userInfo = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.Id == userId)
             .Select(u => new { u.DepartmentId })
@@ -94,16 +96,16 @@ public class StudentService : IStudentService
         if (userInfo == null)
             return Result<List<LessonDto>>.Failure(AppErrors.Authentication.UserNotFound);
 
-        var moduleId = await _context.Units
+        var moduleId = await _unitOfWork.Repository<Unit>().Query()
             .AsNoTracking()
             .Where(u => u.Id == unitId)
             .Select(u => u.ModuleId)
             .FirstOrDefaultAsync();
 
-        var assignments = _context.DepartmentModuleAssignments
+        var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId);
 
-        var accessibleLessonsQuery = _context.Lessons
+        var accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
             .Include(l => l.Level)
             .Include(l => l.Type)
@@ -120,7 +122,7 @@ public class StudentService : IStudentService
             return Result<List<LessonDto>>.Success(new List<LessonDto>());
 
         var lessonIds = lessons.Select(l => l.Id).ToList();
-        var completedLessonIds = await _context.LessonProgresses
+        var completedLessonIds = await _unitOfWork.Repository<LessonProgress>().Query()
             .AsNoTracking()
             .Where(lp => lp.UserId == userId && lessonIds.Contains(lp.LessonId) && lp.IsCompleted)
             .Select(lp => lp.LessonId)
@@ -148,7 +150,7 @@ public class StudentService : IStudentService
     // ─────────────────────────────────────────────────────────────────────────
     public async Task<Result<LessonDetailDto>> GetLessonDetailAsync(Guid lessonId, Guid userId)
     {
-        var lesson = await _context.Lessons
+        var lesson = await _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
             .Include(l => l.Level)
             .Include(l => l.Type)
@@ -161,7 +163,7 @@ public class StudentService : IStudentService
         if (!accessibleLessonsResult.IsSuccess || !accessibleLessonsResult.Value!.Any(l => l.Id == lessonId))
             return Result<LessonDetailDto>.Failure(AppErrors.Authorization.AccessDenied);
 
-        var isCompleted = await _context.LessonProgresses
+        var isCompleted = await _unitOfWork.Repository<LessonProgress>().Query()
             .AsNoTracking()
             .AnyAsync(lp => lp.UserId == userId && lp.LessonId == lessonId && lp.IsCompleted);
 

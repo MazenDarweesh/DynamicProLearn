@@ -3,53 +3,55 @@ using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using LearnDynamicPro.Application.Interfaces.Repositories;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
 public class ModuleService : IModuleService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public ModuleService(IApplicationDbContext context)
+    public ModuleService(IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<ModuleDto>> CreateModuleAsync(CreateModuleRequest request)
     {
         var module = new Module { Name = request.Name, Description = request.Description };
-        _context.Modules.Add(module);
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.Repository<Module>().AddAsync(module);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<ModuleDto>.Success(new ModuleDto { Id = module.Id, Name = module.Name, Description = module.Description });
     }
 
     public async Task<Result<ModuleDto>> UpdateModuleAsync(Guid id, UpdateModuleRequest request)
     {
-        var module = await _context.Modules.FindAsync(id);
+        var module = await _unitOfWork.Repository<Module>().GetByIdAsync(id);
         if (module == null) return Result<ModuleDto>.Failure(AppErrors.General.NotFound);
 
         module.Name = request.Name;
         module.Description = request.Description;
-        await _context.SaveChangesAsync(default);
+        _unitOfWork.Repository<Module>().Update(module);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<ModuleDto>.Success(new ModuleDto { Id = module.Id, Name = module.Name, Description = module.Description });
     }
 
     public async Task<Result> DeleteModuleAsync(Guid id)
     {
-        var module = await _context.Modules.FindAsync(id);
+        var module = await _unitOfWork.Repository<Module>().GetByIdAsync(id);
         if (module != null)
         {
-            _context.Modules.Remove(module);
-            await _context.SaveChangesAsync(default);
+            _unitOfWork.Repository<Module>().Remove(module);
+            await _unitOfWork.SaveChangesAsync();
         }
         return Result.Success();
     }
 
     public async Task<Result<PagedList<ModuleDto>>> GetAllModulesAsync(int page = 1, int pageSize = 10)
     {
-        var query = _context.Modules.AsNoTracking();
+        var query = _unitOfWork.Repository<Module>().Query().AsNoTracking();
         var totalCount = await query.CountAsync();
 
         var modules = await query
@@ -76,38 +78,39 @@ public class ModuleService : IModuleService
     public async Task<Result<UnitDto>> CreateUnitAsync(CreateUnitRequest request)
     {
         var unit = new Unit { Name = request.Name, ModuleId = request.ModuleId, OrderIndex = request.OrderIndex };
-        _context.Units.Add(unit);
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.Repository<Unit>().AddAsync(unit);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<UnitDto>.Success(new UnitDto { Id = unit.Id, Name = unit.Name, ModuleId = unit.ModuleId, OrderIndex = unit.OrderIndex });
     }
 
     public async Task<Result<UnitDto>> UpdateUnitAsync(Guid id, UpdateUnitRequest request)
     {
-        var unit = await _context.Units.FindAsync(id);
+        var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(id);
         if (unit == null) return Result<UnitDto>.Failure(AppErrors.General.NotFound);
 
         unit.Name = request.Name;
         unit.OrderIndex = request.OrderIndex;
-        await _context.SaveChangesAsync(default);
+        _unitOfWork.Repository<Unit>().Update(unit);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<UnitDto>.Success(new UnitDto { Id = unit.Id, Name = unit.Name, ModuleId = unit.ModuleId, OrderIndex = unit.OrderIndex });
     }
 
     public async Task<Result> DeleteUnitAsync(Guid id)
     {
-        var unit = await _context.Units.FindAsync(id);
+        var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(id);
         if (unit != null)
         {
-            _context.Units.Remove(unit);
-            await _context.SaveChangesAsync(default);
+            _unitOfWork.Repository<Unit>().Remove(unit);
+            await _unitOfWork.SaveChangesAsync();
         }
         return Result.Success();
     }
 
     public async Task<Result<PagedList<UnitDto>>> GetUnitsByModuleAsync(Guid moduleId, int page = 1, int pageSize = 10)
     {
-        var query = _context.Units.AsNoTracking().Where(u => u.ModuleId == moduleId);
+        var query = _unitOfWork.Repository<Unit>().Query().AsNoTracking().Where(u => u.ModuleId == moduleId);
         var totalCount = await query.CountAsync();
 
         var units = await query
@@ -123,12 +126,12 @@ public class ModuleService : IModuleService
     public async Task<Result<LessonDto>> CreateLessonAsync(CreateLessonRequest request)
     {
         var levelId = request.LevelId;
-        if (!await _context.LevelOptions.AnyAsync(l => l.Id == levelId))
-            levelId = (await _context.LevelOptions.FirstOrDefaultAsync())?.Id ?? levelId;
+        if (!await _unitOfWork.Repository<LevelOption>().Query().AnyAsync(l => l.Id == levelId))
+            levelId = (await _unitOfWork.Repository<LevelOption>().Query().FirstOrDefaultAsync())?.Id ?? levelId;
 
         var typeId = request.TypeId;
-        if (!await _context.TypeOptions.AnyAsync(t => t.Id == typeId))
-            typeId = (await _context.TypeOptions.FirstOrDefaultAsync())?.Id ?? typeId;
+        if (!await _unitOfWork.Repository<TypeOption>().Query().AnyAsync(t => t.Id == typeId))
+            typeId = (await _unitOfWork.Repository<TypeOption>().Query().FirstOrDefaultAsync())?.Id ?? typeId;
 
         var lesson = new Lesson 
         { 
@@ -140,8 +143,8 @@ public class ModuleService : IModuleService
             Description = request.Description,
             OrderIndex = request.OrderIndex
         };
-        _context.Lessons.Add(lesson);
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.Repository<Lesson>().AddAsync(lesson);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<LessonDto>.Success(new LessonDto 
         { 
@@ -157,16 +160,16 @@ public class ModuleService : IModuleService
 
     public async Task<Result<LessonDto>> UpdateLessonAsync(Guid id, UpdateLessonRequest request)
     {
-        var lesson = await _context.Lessons.FindAsync(id);
+        var lesson = await _unitOfWork.Repository<Lesson>().GetByIdAsync(id);
         if (lesson == null) return Result<LessonDto>.Failure(AppErrors.General.NotFound);
 
         var levelId = request.LevelId;
-        if (!await _context.LevelOptions.AnyAsync(l => l.Id == levelId))
-            levelId = (await _context.LevelOptions.FirstOrDefaultAsync())?.Id ?? levelId;
+        if (!await _unitOfWork.Repository<LevelOption>().Query().AnyAsync(l => l.Id == levelId))
+            levelId = (await _unitOfWork.Repository<LevelOption>().Query().FirstOrDefaultAsync())?.Id ?? levelId;
 
         var typeId = request.TypeId;
-        if (!await _context.TypeOptions.AnyAsync(t => t.Id == typeId))
-            typeId = (await _context.TypeOptions.FirstOrDefaultAsync())?.Id ?? typeId;
+        if (!await _unitOfWork.Repository<TypeOption>().Query().AnyAsync(t => t.Id == typeId))
+            typeId = (await _unitOfWork.Repository<TypeOption>().Query().FirstOrDefaultAsync())?.Id ?? typeId;
 
         lesson.Title = request.Title;
         lesson.VideoUrl = request.VideoUrl;
@@ -174,7 +177,9 @@ public class ModuleService : IModuleService
         lesson.TypeId = typeId;
         lesson.Description = request.Description;
         lesson.OrderIndex = request.OrderIndex;
-        await _context.SaveChangesAsync(default);
+        
+        _unitOfWork.Repository<Lesson>().Update(lesson);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<LessonDto>.Success(new LessonDto 
         { 
@@ -190,18 +195,18 @@ public class ModuleService : IModuleService
 
     public async Task<Result> DeleteLessonAsync(Guid id)
     {
-        var lesson = await _context.Lessons.FindAsync(id);
+        var lesson = await _unitOfWork.Repository<Lesson>().GetByIdAsync(id);
         if (lesson != null)
         {
-            _context.Lessons.Remove(lesson);
-            await _context.SaveChangesAsync(default);
+            _unitOfWork.Repository<Lesson>().Remove(lesson);
+            await _unitOfWork.SaveChangesAsync();
         }
         return Result.Success();
     }
 
     public async Task<Result<PagedList<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, int page = 1, int pageSize = 10)
     {
-        var query = _context.Lessons
+        var query = _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
             .Where(l => l.UnitId == unitId)
             .Include(l => l.Level)
@@ -232,7 +237,7 @@ public class ModuleService : IModuleService
 
     public async Task<Result<LessonDetailDto>> GetLessonDetailAsync(Guid lessonId)
     {
-        var lesson = await _context.Lessons
+        var lesson = await _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
             .Include(l => l.Level)
             .Include(l => l.Type)

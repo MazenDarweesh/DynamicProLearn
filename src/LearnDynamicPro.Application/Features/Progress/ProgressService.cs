@@ -4,17 +4,18 @@ using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using LearnDynamicPro.Domain.Enums;
 using Microsoft.EntityFrameworkCore;
+using LearnDynamicPro.Application.Interfaces.Repositories;
 
 namespace LearnDynamicPro.Application.Features.Progress;
 
 public class ProgressService : IProgressService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly ICurrentUserService _currentUserService;
 
-    public ProgressService(IApplicationDbContext context, ICurrentUserService currentUserService)
+    public ProgressService(IUnitOfWork unitOfWork, ICurrentUserService currentUserService)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
         _currentUserService = currentUserService;
     }
 
@@ -22,7 +23,7 @@ public class ProgressService : IProgressService
     {
         var userId = _currentUserService.UserId;
         
-        var progress = await _context.LessonProgresses
+        var progress = await _unitOfWork.Repository<LessonProgress>().Query()
             .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == request.LessonId);
 
         if (progress == null)
@@ -35,7 +36,7 @@ public class ProgressService : IProgressService
                 CompletedAt = request.IsCompleted ? DateTime.UtcNow : null,
                 CompletionSource = CompletionSource.Self
             };
-            _context.LessonProgresses.Add(progress);
+            _unitOfWork.Repository<LessonProgress>().AddAsync(progress);
         }
         else
         {
@@ -45,7 +46,7 @@ public class ProgressService : IProgressService
             progress.MarkedByUserId = null; // Clear override if student changes it themselves
         }
 
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<LessonProgressDto>.Success(new LessonProgressDto
         {
@@ -60,7 +61,7 @@ public class ProgressService : IProgressService
     {
         var adminId = _currentUserService.UserId;
         
-        var progress = await _context.LessonProgresses
+        var progress = await _unitOfWork.Repository<LessonProgress>().Query()
             .FirstOrDefaultAsync(p => p.UserId == request.UserId && p.LessonId == request.LessonId);
 
         if (progress == null)
@@ -74,7 +75,7 @@ public class ProgressService : IProgressService
                 CompletionSource = CompletionSource.AdminOverride,
                 MarkedByUserId = adminId
             };
-            _context.LessonProgresses.Add(progress);
+            _unitOfWork.Repository<LessonProgress>().AddAsync(progress);
         }
         else
         {
@@ -84,7 +85,7 @@ public class ProgressService : IProgressService
             progress.MarkedByUserId = adminId;
         }
 
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<LessonProgressDto>.Success(new LessonProgressDto
         {
@@ -97,7 +98,7 @@ public class ProgressService : IProgressService
 
     public async Task<Result<UserProgressDto>> GetUserProgressAsync(Guid userId)
     {
-        var user = await _context.Users
+        var user = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Id == userId);
             
@@ -105,11 +106,11 @@ public class ProgressService : IProgressService
             return Result<UserProgressDto>.Failure(AppErrors.Authentication.UserNotFound);
 
         // 1. IQueryable for user's department assignments
-        var deptAssignments = _context.DepartmentModuleAssignments
+        var deptAssignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .Where(a => a.DepartmentId == user.DepartmentId);
 
         // 2. IQueryable for accessible lessons applying intersection logic in SQL
-        var accessibleLessons = _context.Lessons
+        var accessibleLessons = _unitOfWork.Repository<Lesson>().Query()
             .Where(lesson => deptAssignments.Any(a =>
                 a.ModuleId == lesson.Unit!.ModuleId &&
                 (a.LevelId == null || a.LevelId == lesson.LevelId) &&
@@ -123,7 +124,7 @@ public class ProgressService : IProgressService
                 ModuleId = g.Key.ModuleId,
                 ModuleName = g.Key.ModuleName,
                 TotalLessons = g.Count(),
-                CompletedLessons = g.Count(l => _context.LessonProgresses.Any(p => p.UserId == userId && p.LessonId == l.Id && p.IsCompleted))
+                CompletedLessons = g.Count(l => _unitOfWork.Repository<LessonProgress>().Query().Any(p => p.UserId == userId && p.LessonId == l.Id && p.IsCompleted))
             })
             .OrderBy(m => m.ModuleName)
             .ToListAsync();

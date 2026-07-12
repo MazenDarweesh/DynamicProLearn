@@ -3,16 +3,17 @@ using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using LearnDynamicPro.Application.Interfaces.Repositories;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
 public class AssignmentService : IAssignmentService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
 
-    public AssignmentService(IApplicationDbContext context)
+    public AssignmentService(IUnitOfWork unitOfWork)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
     }
 
     public async Task<Result<DepartmentModuleDto>> AssignModuleToDepartmentAsync(AssignModuleRequest request)
@@ -25,8 +26,8 @@ public class AssignmentService : IAssignmentService
             TypeId = request.TypeId
         };
 
-        _context.DepartmentModuleAssignments.Add(assignment);
-        await _context.SaveChangesAsync(default);
+        _unitOfWork.Repository<DepartmentModuleAssignment>().AddAsync(assignment);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<DepartmentModuleDto>.Success(new DepartmentModuleDto
         {
@@ -40,18 +41,18 @@ public class AssignmentService : IAssignmentService
 
     public async Task<Result> RemoveAssignmentAsync(Guid assignmentId)
     {
-        var assignment = await _context.DepartmentModuleAssignments.FindAsync(assignmentId);
+        var assignment = await _unitOfWork.Repository<DepartmentModuleAssignment>().GetByIdAsync(assignmentId);
         if (assignment != null)
         {
-            _context.DepartmentModuleAssignments.Remove(assignment);
-            await _context.SaveChangesAsync(default);
+            _unitOfWork.Repository<DepartmentModuleAssignment>().Remove(assignment);
+            await _unitOfWork.SaveChangesAsync();
         }
         return Result.Success();
     }
 
     public async Task<Result<PagedList<DepartmentModuleDto>>> GetAssignmentsByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
-        var query = _context.DepartmentModuleAssignments
+        var query = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
             .Where(a => a.DepartmentId == departmentId);
             

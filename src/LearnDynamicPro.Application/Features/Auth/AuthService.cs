@@ -2,21 +2,23 @@ using LearnDynamicPro.Application.Dtos.Auth;
 using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Application.Common;
 using Microsoft.EntityFrameworkCore;
+using LearnDynamicPro.Application.Interfaces.Repositories;
+using LearnDynamicPro.Domain.Entities;
 
 namespace LearnDynamicPro.Application.Features.Auth;
 
 public class AuthService : IAuthService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenService _tokenService;
 
     public AuthService(
-        IApplicationDbContext context,
+        IUnitOfWork unitOfWork,
         IPasswordHasher passwordHasher,
         ITokenService tokenService)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _tokenService = tokenService;
     }
@@ -24,7 +26,7 @@ public class AuthService : IAuthService
     public async Task<Result<LoginResponse>> LoginAsync(LoginRequest request)
     {
         // 1. Find user by username (case-insensitive)
-        var user = await _context.Users
+        var user = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
 
