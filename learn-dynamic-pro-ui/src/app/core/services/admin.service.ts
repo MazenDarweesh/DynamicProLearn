@@ -142,6 +142,10 @@ export class AdminService {
     return this.http.post(`${this.apiUrl}/departments/${departmentId}/lessons/${lessonId}/mark-complete`, {});
   }
 
+  unmarkLessonCompleteForDepartment(departmentId: string, lessonId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/departments/${departmentId}/lessons/${lessonId}/unmark-complete`, {});
+  }
+
   // ── Users ─────────────────────────────────────────────────────────────────
   getUsers(departmentId: string, page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/departments/${departmentId}/users?page=${page}&pageSize=${pageSize}`).pipe(

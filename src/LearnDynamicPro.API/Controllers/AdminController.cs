@@ -134,6 +134,14 @@ public class AdminController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpPost("departments/{departmentId}/lessons/{lessonId}/unmark-complete")]
+    public async Task<IActionResult> UnmarkLessonCompleteForDepartment(Guid departmentId, Guid lessonId)
+    {
+        var result = await _companyService.UnmarkLessonCompleteForDepartmentAsync(departmentId, lessonId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     // ── Users ───────────────────────────────────────────────────────────────
     [HttpPost("users")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)

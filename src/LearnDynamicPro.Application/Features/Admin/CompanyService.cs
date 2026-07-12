@@ -332,6 +332,36 @@ public class CompanyService : ICompanyService
         return Result<bool>.Success(true);
     }
 
+    public async Task<Result<bool>> UnmarkLessonCompleteForDepartmentAsync(Guid departmentId, Guid lessonId)
+    {
+        var adminId = _currentUserService.UserId;
+        if (adminId == Guid.Empty)
+            return Result<bool>.Failure(AppErrors.Authorization.AccessDenied);
+
+        var userIds = await _unitOfWork.Repository<User>().Query()
+            .Where(u => u.DepartmentId == departmentId && u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        if (!userIds.Any())
+            return Result<bool>.Success(true);
+
+        var existingCompletions = await _unitOfWork.Repository<LessonProgress>().Query()
+            .Where(p => p.LessonId == lessonId && userIds.Contains(p.UserId) && p.IsCompleted)
+            .ToListAsync();
+
+        foreach (var existing in existingCompletions)
+        {
+            existing.IsCompleted = false;
+            existing.CompletedAt = null;
+            existing.MarkedByUserId = adminId;
+            _unitOfWork.Repository<LessonProgress>().Update(existing);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        return Result<bool>.Success(true);
+    }
+
     public async Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
         var query = _unitOfWork.Repository<User>().Query()

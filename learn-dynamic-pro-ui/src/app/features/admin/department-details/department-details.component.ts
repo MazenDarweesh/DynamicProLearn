@@ -77,6 +77,20 @@ export class DepartmentDetailsComponent implements OnInit {
     });
   }
 
+  unmarkLessonComplete(lessonId: string): void {
+    Dialog.confirm('هل أنت متأكد من إلغاء اكتمال هذا الدرس لجميع أفراد القسم؟', 'تأكيد').then((confirmed) => {
+      if (confirmed) {
+        this.adminService.unmarkLessonCompleteForDepartment(this.departmentId, lessonId).subscribe({
+          next: () => {
+            Dialog.alert('تم إلغاء الاكتمال بنجاح', 'نجاح', 'success');
+            this.loadDepartmentDetails(); // Refresh
+          },
+          error: () => Dialog.alert('حدث خطأ أثناء تنفيذ العملية', 'خطأ', 'error')
+        });
+      }
+    });
+  }
+
   goBack(): void {
     this.router.navigate(['/admin/users']);
   }

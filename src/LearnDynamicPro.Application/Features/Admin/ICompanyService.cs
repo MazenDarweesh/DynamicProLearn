@@ -18,6 +18,7 @@ public interface ICompanyService
     Task<Result<bool>> DeleteDepartmentAsync(Guid id);
     Task<Result<DepartmentDetailsDto>> GetDepartmentDetailsAsync(Guid departmentId);
     Task<Result<bool>> MarkLessonCompleteForDepartmentAsync(Guid departmentId, Guid lessonId);
+    Task<Result<bool>> UnmarkLessonCompleteForDepartmentAsync(Guid departmentId, Guid lessonId);
 
     // User CRUD
     Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request);
