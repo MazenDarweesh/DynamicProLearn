@@ -3,32 +3,33 @@ using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using LearnDynamicPro.Application.Interfaces.Repositories;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
 public class CompanyService : ICompanyService
 {
-    private readonly IApplicationDbContext _context;
+    private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
 
-    public CompanyService(IApplicationDbContext context, IPasswordHasher passwordHasher)
+    public CompanyService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher)
     {
-        _context = context;
+        _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
     }
 
     public async Task<Result<CompanyDto>> CreateCompanyAsync(CreateCompanyRequest request)
     {
         var company = new Company { Name = request.Name };
-        _context.Companies.Add(company);
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.Repository<Company>().AddAsync(company);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<CompanyDto>.Success(new CompanyDto { Id = company.Id, Name = company.Name });
     }
 
     public async Task<Result<PagedList<CompanyDto>>> GetAllCompaniesAsync(int page = 1, int pageSize = 10)
     {
-        var query = _context.Companies.AsNoTracking();
+        var query = _unitOfWork.Repository<Company>().Query().AsNoTracking();
         var totalCount = await query.CountAsync();
 
         var companies = await query
@@ -48,8 +49,8 @@ public class CompanyService : ICompanyService
             Name = request.Name, 
             CompanyId = request.CompanyId 
         };
-        _context.Departments.Add(department);
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.Repository<Department>().AddAsync(department);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<DepartmentDto>.Success(new DepartmentDto 
         { 
@@ -61,7 +62,7 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<PagedList<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId, int page = 1, int pageSize = 10)
     {
-        var query = _context.Departments
+        var query = _unitOfWork.Repository<Department>().Query()
             .AsNoTracking()
             .Where(d => d.CompanyId == companyId);
             
@@ -80,7 +81,7 @@ public class CompanyService : ICompanyService
     public async Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request)
     {
         // Get department to resolve CompanyId
-        var department = await _context.Departments
+        var department = await _unitOfWork.Repository<Department>().Query()
             .AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == request.DepartmentId);
             
@@ -96,8 +97,8 @@ public class CompanyService : ICompanyService
             CompanyId = department.CompanyId
         };
         
-        _context.Users.Add(user);
-        await _context.SaveChangesAsync(default);
+        await _unitOfWork.Repository<User>().AddAsync(user);
+        await _unitOfWork.SaveChangesAsync();
 
         return Result<UserDto>.Success(new UserDto 
         { 
@@ -111,7 +112,7 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<PagedList<UserDto>>> GetUsersByDepartmentAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
-        var query = _context.Users
+        var query = _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.DepartmentId == departmentId);
             
@@ -136,52 +137,54 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<bool>> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request)
     {
-        var company = await _context.Companies.FindAsync(id);
+        var company = await _unitOfWork.Repository<Company>().GetByIdAsync(id);
         if (company == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
 
         company.Name = request.Name;
-        await _context.SaveChangesAsync(default);
+        _unitOfWork.Repository<Company>().Update(company);
+        await _unitOfWork.SaveChangesAsync();
         return Result<bool>.Success(true);
     }
 
     public async Task<Result<bool>> DeleteCompanyAsync(Guid id)
     {
-        var company = await _context.Companies.FindAsync(id);
+        var company = await _unitOfWork.Repository<Company>().GetByIdAsync(id);
         if (company == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
 
-        _context.Companies.Remove(company);
-        await _context.SaveChangesAsync(default);
+        _unitOfWork.Repository<Company>().Remove(company);
+        await _unitOfWork.SaveChangesAsync();
         return Result<bool>.Success(true);
     }
 
     public async Task<Result<bool>> UpdateDepartmentAsync(Guid id, UpdateDepartmentRequest request)
     {
-        var department = await _context.Departments.FindAsync(id);
+        var department = await _unitOfWork.Repository<Department>().GetByIdAsync(id);
         if (department == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
 
         department.Name = request.Name;
-        await _context.SaveChangesAsync(default);
+        _unitOfWork.Repository<Department>().Update(department);
+        await _unitOfWork.SaveChangesAsync();
         return Result<bool>.Success(true);
     }
 
     public async Task<Result<bool>> DeleteDepartmentAsync(Guid id)
     {
-        var department = await _context.Departments.FindAsync(id);
+        var department = await _unitOfWork.Repository<Department>().GetByIdAsync(id);
         if (department == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
 
-        _context.Departments.Remove(department);
-        await _context.SaveChangesAsync(default);
+        _unitOfWork.Repository<Department>().Remove(department);
+        await _unitOfWork.SaveChangesAsync();
         return Result<bool>.Success(true);
     }
 
     public async Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 10)
     {
         // Get all users in department
-        var query = _context.Users
+        var query = _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.DepartmentId == departmentId);
             
@@ -193,7 +196,7 @@ public class CompanyService : ICompanyService
             .ToListAsync();
 
         // Get assigned modules for department
-        var assignments = await _context.DepartmentModuleAssignments
+        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
             .Include(a => a.Module)
                 .ThenInclude(m => m.Units)
@@ -217,7 +220,7 @@ public class CompanyService : ICompanyService
 
         // Get completed lessons for all these users
         var userIds = users.Select(u => u.Id).ToList();
-        var completions = await _context.LessonProgresses
+        var completions = await _unitOfWork.Repository<LessonProgress>().Query()
             .AsNoTracking()
             .Where(p => userIds.Contains(p.UserId) && p.IsCompleted && lessonIds.Contains(p.LessonId))
             .ToListAsync();
@@ -242,7 +245,7 @@ public class CompanyService : ICompanyService
     public async Task<Result<PagedList<UserProgressDto>>> GetAllTestersProgressAsync(int page = 1, int pageSize = 10)
     {
         // Get all testers
-        var query = _context.Users
+        var query = _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
             
@@ -256,7 +259,7 @@ public class CompanyService : ICompanyService
         var departmentIds = users.Select(u => u.DepartmentId).Distinct().ToList();
 
         // Get assigned modules for these departments
-        var assignments = await _context.DepartmentModuleAssignments
+        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
             .Include(a => a.Module)
                 .ThenInclude(m => m.Units)
@@ -271,7 +274,7 @@ public class CompanyService : ICompanyService
             .ToList();
 
         var userIds = users.Select(u => u.Id).ToList();
-        var completions = await _context.LessonProgresses
+        var completions = await _unitOfWork.Repository<LessonProgress>().Query()
             .AsNoTracking()
             .Where(p => userIds.Contains(p.UserId) && p.IsCompleted && lessonIds.Contains(p.LessonId))
             .ToListAsync();
@@ -303,16 +306,16 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<DashboardStatsDto>> GetDashboardStatsAsync()
     {
-        var totalCompanies = await _context.Companies.CountAsync();
-        var activeUsers = await _context.Users.CountAsync(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester);
-        var activeTesters = await _context.Users.CountAsync(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
-        var publishedModules = await _context.Modules.CountAsync();
+        var totalCompanies = await _unitOfWork.Repository<Company>().Query().CountAsync();
+        var activeUsers = await _unitOfWork.Repository<User>().Query().CountAsync(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester);
+        var activeTesters = await _unitOfWork.Repository<User>().Query().CountAsync(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
+        var publishedModules = await _unitOfWork.Repository<Module>().Query().CountAsync();
 
         // Average progress = total completions / total assigned lessons across everyone
         // For simplicity, we can calculate total possible vs total completed.
         // A more exact metric would need user-assignment mapping.
         // Let's do a fast approximation:
-        var totalAssignments = await _context.DepartmentModuleAssignments
+        var totalAssignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .Include(a => a.Department)
                 .ThenInclude(d => d.Users)
             .Include(a => a.Module)
@@ -328,7 +331,7 @@ public class CompanyService : ICompanyService
             totalPossibleLessons += userCount * lessonCount;
         }
 
-        int totalCompleted = await _context.LessonProgresses.CountAsync(p => p.IsCompleted);
+        int totalCompleted = await _unitOfWork.Repository<LessonProgress>().Query().CountAsync(p => p.IsCompleted);
 
         double averageProgress = totalPossibleLessons == 0 
             ? 0 

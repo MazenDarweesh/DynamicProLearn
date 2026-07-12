@@ -84,6 +84,10 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddSingleton<IPasswordHasher, PasswordHasher>();
 builder.Services.AddSingleton<ITokenService, TokenService>();
 
+// Register Repositories
+builder.Services.AddScoped(typeof(LearnDynamicPro.Application.Interfaces.Repositories.IGenericRepository<>), typeof(LearnDynamicPro.Infrastructure.Persistence.Repositories.GenericRepository<>));
+builder.Services.AddScoped<LearnDynamicPro.Application.Interfaces.Repositories.IUnitOfWork, LearnDynamicPro.Infrastructure.Persistence.Repositories.UnitOfWork>();
+
 // Register Feature Services
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<ICompanyService, CompanyService>();
