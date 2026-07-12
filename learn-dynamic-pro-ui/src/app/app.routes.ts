@@ -59,7 +59,16 @@ export const routes: Routes = [
   {
     path: 'admin/employees',
     canActivate: [roleGuard(['Admin'])],
-    loadComponent: () => import('./features/admin/employees-manager/employees-manager.component').then(m => m.EmployeesManagerComponent)
+    children: [
+      {
+        path: '',
+        loadComponent: () => import('./features/admin/employees-manager/employees-manager.component').then(m => m.EmployeesManagerComponent)
+      },
+      {
+        path: ':id',
+        loadComponent: () => import('./features/admin/employee-details/employee-details.component').then(m => m.EmployeeDetailsComponent)
+      }
+    ]
   },
   {
     path: 'admin/testers',

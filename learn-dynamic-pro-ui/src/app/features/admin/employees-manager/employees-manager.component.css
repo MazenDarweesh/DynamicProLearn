@@ -64,6 +64,17 @@
 }
 .icon-btn:hover { background-color: rgba(0,0,0,0.05); }
 
+.employee-link {
+  color: var(--brand-blue);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+.employee-link:hover {
+  color: var(--brand-orange);
+  text-decoration: underline;
+}
+
 .btn-blue {
   background-color: var(--color-primary);
   color: white;

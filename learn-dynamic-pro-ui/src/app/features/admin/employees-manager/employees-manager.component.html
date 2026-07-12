@@ -44,7 +44,9 @@
       <!-- ROW -->
       <ng-template #row let-emp>
         <td class="fw-500 text-primary" style="text-align: right; padding-right: 20px;">
-          {{ emp.userName }}
+          <a [routerLink]="['/admin/employees', emp.userId]" class="employee-link">
+            {{ emp.userName }}
+          </a>
         </td>
         <td style="text-align: right; padding-right: 20px;">
           <div class="d-flex align-center gap-2">

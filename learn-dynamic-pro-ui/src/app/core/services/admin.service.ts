@@ -178,6 +178,10 @@ export class AdminService {
     return this.http.delete(`${this.apiUrl}/users/${userId}`);
   }
 
+  getUserDetails(userId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/users/${userId}/details`);
+  }
+
   getTestersProgress(page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/testers-progress?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)

@@ -321,6 +321,77 @@ public class CompanyService : ICompanyService
         return Result<DepartmentDetailsDto>.Success(result);
     }
 
+    public async Task<Result<UserDetailsDto>> GetUserDetailsAsync(Guid userId)
+    {
+        var user = await _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+        
+        if (user == null)
+            return Result<UserDetailsDto>.Failure(AppErrors.General.NotFound);
+
+        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+            .AsNoTracking()
+            .Where(a => a.DepartmentId == user.DepartmentId)
+            .Select(a => new 
+            {
+                ModuleId = a.ModuleId,
+                ModuleName = a.Module!.Name,
+                Units = a.Module.Units!.Select(u => new 
+                {
+                    UnitId = u.Id,
+                    UnitName = u.Name,
+                    Lessons = u.Lessons!.Select(l => new 
+                    {
+                        LessonId = l.Id,
+                        LessonName = l.Title
+                    }).ToList()
+                }).ToList()
+            })
+            .ToListAsync();
+
+        var assignedLessonIds = assignments.SelectMany(m => m.Units.SelectMany(u => u.Lessons.Select(l => l.LessonId))).ToList();
+
+        var completions = new List<Guid>();
+        if (assignedLessonIds.Any())
+        {
+            completions = await _unitOfWork.Repository<LessonProgress>().Query()
+                .AsNoTracking()
+                .Where(p => p.IsCompleted && p.UserId == userId && assignedLessonIds.Contains(p.LessonId))
+                .Select(p => p.LessonId)
+                .ToListAsync();
+        }
+
+        var result = new UserDetailsDto
+        {
+            UserId = user.Id,
+            UserName = user.Username,
+            DepartmentId = user.DepartmentId,
+            TotalAssignedLessons = assignedLessonIds.Count,
+            TotalCompletedLessons = completions.Count,
+            Modules = assignments.Select(m => new UserModuleProgressDto
+            {
+                ModuleId = m.ModuleId,
+                Name = m.ModuleName,
+                TotalLessons = m.Units.SelectMany(u => u.Lessons).Count(),
+                CompletedLessons = m.Units.SelectMany(u => u.Lessons).Count(l => completions.Contains(l.LessonId)),
+                Units = m.Units.Select(u => new UserUnitProgressDto
+                {
+                    UnitId = u.UnitId,
+                    Name = u.UnitName,
+                    Lessons = u.Lessons.Select(l => new UserLessonProgressDto
+                    {
+                        LessonId = l.LessonId,
+                        Name = l.LessonName,
+                        IsCompleted = completions.Contains(l.LessonId)
+                    }).ToList()
+                }).ToList()
+            }).ToList()
+        };
+
+        return Result<UserDetailsDto>.Success(result);
+    }
+
     public async Task<Result<bool>> MarkLessonCompleteForDepartmentAsync(Guid departmentId, Guid lessonId)
     {
         var adminId = _currentUserService.UserId;

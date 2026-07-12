@@ -1,6 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { ExpandableTableComponent } from '../../../shared/components/expandable-table/expandable-table.component';
@@ -10,7 +11,7 @@ import { Dialog } from '../../../core/utils/dialog';
 @Component({
   selector: 'app-employees-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent],
   templateUrl: './employees-manager.component.html',
   styleUrls: ['./employees-manager.component.css']
 })
