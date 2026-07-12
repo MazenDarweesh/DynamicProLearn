@@ -1,6 +1,7 @@
 <app-admin-header 
   title="تفاصيل القسم: {{ departmentName }}" 
-  subtitle="استعراض وإدارة تقدم القسم في المناهج المخصصة">
+  subtitle="استعراض وإدارة تقدم القسم في المناهج المخصصة"
+  [showBackBtn]="true">
 </app-admin-header>
 
 <div class="card p-4 fade-in" style="margin: 20px;">
@@ -10,9 +11,6 @@
       <i class="fi fi-rr-users"></i>
       إجمالي المتدربين: {{ totalUsers }}
     </div>
-    <button class="btn btn-outline-primary" (click)="goBack()">
-      <i class="fi fi-rr-arrow-right"></i> عودة
-    </button>
   </div>
 
   <div *ngIf="isLoading" class="d-flex justify-center p-5">

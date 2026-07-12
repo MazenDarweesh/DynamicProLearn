@@ -1,13 +1,30 @@
 <header class="console-header" dir="rtl">
   <div class="header-content">
     <div class="brand w-100 d-flex justify-between align-center">
-      <div class="d-flex align-center gap-3">
-        <img src="/favicon.ico" alt="DynamicProLearn Logo" style="height: 40px; background: white; padding: 4px; border-radius: 6px;">
-        <h1 class="m-0" style="display: flex; align-items: center; gap: 8px;">DynamicProLearn <span class="font-light">لوحة تحكم الأدمن</span></h1>
+      
+      <!-- Right Side: Logo, Branding, and Page Title -->
+      <div class="d-flex align-center gap-4">
+        <div class="d-flex align-center gap-2" style="padding-left: 20px; border-left: 1px solid rgba(255,255,255,0.2);">
+          <img src="/favicon.ico" alt="DynamicProLearn Logo" style="height: 36px; background: white; padding: 3px; border-radius: 8px;">
+          <span class="fw-bold" style="font-size: 20px; color: white;">DynamicPro<span style="color: var(--color-accent, #f58220);">Learn</span></span>
+        </div>
+
+        <div>
+          <h1 class="m-0" style="display: flex; align-items: center; gap: 8px; font-size: 20px; color: white;">
+            {{ title || 'لوحة تحكم الأدمن' }} 
+          </h1>
+          <p *ngIf="subtitle" class="m-0 text-sm" style="color: rgba(255,255,255,0.8); margin-top: 4px !important;">{{ subtitle }}</p>
+        </div>
       </div>
-      <div class="logout-container">
+
+      <!-- Left Side: Back Button & Logout -->
+      <div class="d-flex align-center gap-3">
+        <button *ngIf="showBackBtn" class="btn-back-header" (click)="goBack()">
+          <i class="fi fi-rr-arrow-right"></i> عودة
+        </button>
         <button class="btn-logout" (click)="logout()">تسجيل الخروج</button>
       </div>
+
     </div>
     <nav class="header-nav">
       <button class="nav-btn" [class.active]="currentRoute === '/admin'" (click)="goTo('/admin')">الرئيسية <span class="icon">🏠</span></button>

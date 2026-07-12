@@ -1,5 +1,5 @@
-import { Component, inject } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, inject, Input } from '@angular/core';
+import { CommonModule, Location } from '@angular/common';
 import { Router, NavigationEnd } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 import { filter } from 'rxjs/operators';
@@ -14,7 +14,13 @@ import { filter } from 'rxjs/operators';
 export class AdminHeaderComponent {
   private router = inject(Router);
   private authService = inject(AuthService);
+  private location = inject(Location);
   
+  @Input() title?: string;
+  @Input() subtitle?: string;
+  @Input() showBackBtn = false;
+  @Input() backUrl?: string;
+
   currentRoute = '';
 
   constructor() {
@@ -31,6 +37,14 @@ export class AdminHeaderComponent {
 
   goTo(path: string) {
     this.router.navigate([path]);
+  }
+
+  goBack() {
+    if (this.backUrl) {
+      this.router.navigate([this.backUrl]);
+    } else {
+      this.location.back();
+    }
   }
 
   logout() {
