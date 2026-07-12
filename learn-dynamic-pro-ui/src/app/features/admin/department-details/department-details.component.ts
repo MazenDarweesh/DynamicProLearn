@@ -26,9 +26,12 @@ export class DepartmentDetailsComponent implements OnInit {
   
   isLoading = true;
 
-  // Track expanded state for nested lists
-  expandedModules: { [key: string]: boolean } = {};
-  expandedUnits: { [key: string]: boolean } = {};
+  // Track expanded state for all modules and units
+  isAllExpanded = false;
+
+  toggleExpandAll(): void {
+    this.isAllExpanded = !this.isAllExpanded;
+  }
 
   ngOnInit(): void {
     this.departmentId = this.route.snapshot.paramMap.get('id') || '';
@@ -56,13 +59,7 @@ export class DepartmentDetailsComponent implements OnInit {
     });
   }
 
-  toggleModule(moduleId: string): void {
-    this.expandedModules[moduleId] = !this.expandedModules[moduleId];
-  }
 
-  toggleUnit(unitId: string): void {
-    this.expandedUnits[unitId] = !this.expandedUnits[unitId];
-  }
 
   markLessonComplete(lessonId: string): void {
     Dialog.confirm('هل أنت متأكد من تحديد هذا الدرس كمكتمل لجميع أفراد القسم؟', 'تأكيد').then((confirmed) => {

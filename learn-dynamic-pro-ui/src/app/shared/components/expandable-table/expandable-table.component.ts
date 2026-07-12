@@ -44,7 +44,24 @@ import { CommonModule } from '@angular/common';
   encapsulation: ViewEncapsulation.None
 })
 export class ExpandableTableComponent {
-  @Input() data: any[] = [];
+  private _data: any[] = [];
+  @Input() set data(value: any[]) {
+    this._data = value || [];
+    if (this._forceExpandAll) {
+      this._data.forEach(item => this.expandedItems[item[this.keyProp]] = true);
+    }
+  }
+  get data(): any[] { return this._data; }
+
+  private _forceExpandAll = false;
+  @Input() set forceExpandAll(value: boolean) {
+    this._forceExpandAll = value;
+    if (value) {
+      this._data.forEach(item => this.expandedItems[item[this.keyProp]] = true);
+    } else {
+      this.expandedItems = {};
+    }
+  }
   @Input() keyProp: string = 'id';
   @Input() colspan: number = 5;
   @Input() emptyMessage: string = 'لا توجد بيانات';
