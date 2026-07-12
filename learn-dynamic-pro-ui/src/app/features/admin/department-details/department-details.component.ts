@@ -48,7 +48,7 @@ export class DepartmentDetailsComponent implements OnInit {
         this.isLoading = false;
       },
       error: () => {
-        Dialog.error('فشل في تحميل بيانات القسم');
+        Dialog.alert('فشل في تحميل بيانات القسم', 'خطأ', 'error');
         this.isLoading = false;
         this.router.navigate(['/admin/users']);
       }
@@ -64,14 +64,16 @@ export class DepartmentDetailsComponent implements OnInit {
   }
 
   markLessonComplete(lessonId: string): void {
-    Dialog.confirm('هل أنت متأكد من تحديد هذا الدرس كمكتمل لجميع أفراد القسم؟', () => {
-      this.adminService.markLessonCompleteForDepartment(this.departmentId, lessonId).subscribe({
-        next: () => {
-          Dialog.success('تم تحديد الدرس كمكتمل بنجاح');
-          this.loadDepartmentDetails(); // Refresh
-        },
-        error: () => Dialog.error('حدث خطأ أثناء تنفيذ العملية')
-      });
+    Dialog.confirm('هل أنت متأكد من تحديد هذا الدرس كمكتمل لجميع أفراد القسم؟', 'تأكيد').then((confirmed) => {
+      if (confirmed) {
+        this.adminService.markLessonCompleteForDepartment(this.departmentId, lessonId).subscribe({
+          next: () => {
+            Dialog.alert('تم تحديد الدرس كمكتمل بنجاح', 'نجاح', 'success');
+            this.loadDepartmentDetails(); // Refresh
+          },
+          error: () => Dialog.alert('حدث خطأ أثناء تنفيذ العملية', 'خطأ', 'error')
+        });
+      }
     });
   }
 
