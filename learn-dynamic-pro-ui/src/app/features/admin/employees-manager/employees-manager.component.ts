@@ -8,13 +8,13 @@ import { ProgressBarComponent } from '../../../shared/components/progress-bar/pr
 import { Dialog } from '../../../core/utils/dialog';
 
 @Component({
-  selector: 'app-assignments-manager',
+  selector: 'app-employees-manager',
   standalone: true,
   imports: [CommonModule, FormsModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent],
-  templateUrl: './assignments-manager.component.html',
-  styleUrls: ['./assignments-manager.component.css']
+  templateUrl: './employees-manager.component.html',
+  styleUrls: ['./employees-manager.component.css']
 })
-export class AssignmentsManagerComponent implements OnInit {
+export class EmployeesManagerComponent implements OnInit {
   private adminService = inject(AdminService);
 
   employees: any[] = [];
@@ -132,7 +132,7 @@ export class AssignmentsManagerComponent implements OnInit {
 
     this.adminService.updateUser(this.editData.userId, payload).subscribe({
       next: () => {
-        Dialog.toast('تم تعديل بيانات الموظف بنجاح', 'success');
+        Dialog.alert('تم تعديل بيانات الموظف بنجاح', 'نجاح', 'success');
         this.closeEditModal();
         this.loadEmployees();
       },
@@ -147,7 +147,7 @@ export class AssignmentsManagerComponent implements OnInit {
       if (confirmed) {
         this.adminService.deleteUser(userId).subscribe({
           next: () => {
-            Dialog.toast('تم حذف الموظف بنجاح', 'success');
+            Dialog.alert('تم حذف الموظف بنجاح', 'نجاح', 'success');
             this.loadEmployees();
           },
           error: () => {

@@ -57,9 +57,9 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/content-builder/content-builder.component').then(m => m.ContentBuilderComponent)
   },
   {
-    path: 'admin/assignments',
+    path: 'admin/employees',
     canActivate: [roleGuard(['Admin'])],
-    loadComponent: () => import('./features/admin/assignments-manager/assignments-manager.component').then(m => m.AssignmentsManagerComponent)
+    loadComponent: () => import('./features/admin/employees-manager/employees-manager.component').then(m => m.EmployeesManagerComponent)
   },
   {
     path: 'admin/testers',

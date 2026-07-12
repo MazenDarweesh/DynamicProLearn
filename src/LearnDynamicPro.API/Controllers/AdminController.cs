@@ -168,7 +168,8 @@ public class AdminController : ControllerBase
     public async Task<IActionResult> GetAllUsersProgress([FromQuery] Guid? companyId, [FromQuery] Guid? departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _companyService.GetAllUsersProgressAsync(companyId, departmentId, page, pageSize);
-        return Ok(result);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
     }
 
     [HttpGet("departments/{departmentId}/users")]
