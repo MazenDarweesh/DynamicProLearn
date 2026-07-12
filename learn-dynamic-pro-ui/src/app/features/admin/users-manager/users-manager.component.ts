@@ -61,7 +61,6 @@ export class UsersManagerComponent implements OnInit {
     this.adminService.getCompanies().subscribe({
       next: (data) => {
         this.companies = data;
-        // Fetch departments for each company
         this.companies.forEach(c => {
           this.adminService.getDepartments(c.id).subscribe(depts => {
             c.departments = depts;

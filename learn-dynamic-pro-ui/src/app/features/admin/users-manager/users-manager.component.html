@@ -61,7 +61,18 @@
                   </thead>
                   <tbody>
                     <tr *ngFor="let dept of comp.departments">
-                      <td class="fw-500">{{ dept.name }}</td>
+                      <td class="fw-500">
+                        <div class="d-flex justify-between align-center">
+                          <span>{{ dept.name }}</span>
+                          <div class="progress-container">
+                            <span class="text-sm text-secondary" style="white-space: nowrap;">{{ dept.completedLessons || 0 }} / {{ dept.totalLessons || 0 }}</span>
+                            <div class="progress-bar">
+                              <div class="progress-fill" [style.width]="(dept.progressPercentage || 0) + '%'"></div>
+                            </div>
+                            <span class="text-sm text-secondary" style="min-width: 35px; text-align: right;">{{ dept.progressPercentage || 0 }}%</span>
+                          </div>
+                        </div>
+                      </td>
                       <td style="text-align: left;">
                         <div class="d-flex gap-2" style="justify-content: flex-end; align-items: center;">
                           <button class="btn-primary" style="padding: 4px 12px; font-size: 12px;" (click)="openAssignModulesModal(comp, dept)">إسناد موديول</button>

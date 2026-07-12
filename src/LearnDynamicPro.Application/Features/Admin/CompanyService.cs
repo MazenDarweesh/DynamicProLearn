@@ -68,13 +68,58 @@ public class CompanyService : ICompanyService
             
         var totalCount = await query.CountAsync();
 
-        var departments = await query
+        var departmentData = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(d => new DepartmentDto { Id = d.Id, Name = d.Name, CompanyId = d.CompanyId })
+            .Select(d => new 
+            {
+                Id = d.Id,
+                Name = d.Name,
+                CompanyId = d.CompanyId,
+                UserIds = d.Users.Select(u => u.Id).ToList(),
+                AssignedLessonIds = d.Assignments
+                    .Where(a => a.Module != null && a.Module.Units != null)
+                    .SelectMany(a => a.Module.Units)
+                    .Where(u => u.Lessons != null)
+                    .SelectMany(u => u.Lessons)
+                    .Select(l => l.Id)
+                    .ToList()
+            })
             .ToListAsync();
+
+        var allUserIds = departmentData.SelectMany(d => d.UserIds).Distinct().ToList();
+        var allAssignedLessonIds = departmentData.SelectMany(d => d.AssignedLessonIds).Distinct().ToList();
+
+        var completions = new List<LessonProgress>();
+        if (allUserIds.Any() && allAssignedLessonIds.Any())
+        {
+            completions = await _unitOfWork.Repository<LessonProgress>().Query()
+                .AsNoTracking()
+                .Where(p => p.IsCompleted && allUserIds.Contains(p.UserId) && allAssignedLessonIds.Contains(p.LessonId))
+                .ToListAsync();
+        }
+
+        var dtoList = departmentData.Select(d => {
+            var departmentUserIds = d.UserIds.ToHashSet();
+            var departmentLessonIds = d.AssignedLessonIds.ToHashSet();
             
-        var pagedList = new PagedList<DepartmentDto>(departments, totalCount, page, pageSize);
+            var completedCount = completions.Count(c => departmentUserIds.Contains(c.UserId) && departmentLessonIds.Contains(c.LessonId));
+            
+            int totalPossibleCompletions = d.AssignedLessonIds.Count * d.UserIds.Count;
+            double progress = totalPossibleCompletions == 0 ? 0 : Math.Round((double)completedCount / totalPossibleCompletions * 100, 1);
+
+            return new DepartmentDto 
+            { 
+                Id = d.Id, 
+                Name = d.Name, 
+                CompanyId = d.CompanyId,
+                CompletedLessons = completedCount,
+                TotalLessons = totalPossibleCompletions,
+                ProgressPercentage = progress
+            };
+        }).ToList();
+            
+        var pagedList = new PagedList<DepartmentDto>(dtoList, totalCount, page, pageSize);
         return Result<PagedList<DepartmentDto>>.Success(pagedList);
     }
 
