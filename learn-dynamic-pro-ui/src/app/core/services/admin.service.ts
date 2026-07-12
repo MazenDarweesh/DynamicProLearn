@@ -163,6 +163,21 @@ export class AdminService {
     );
   }
 
+  getAllUsersProgress(companyId?: string | null, departmentId?: string | null, page = 1, pageSize = 100): Observable<any> {
+    let url = `${this.apiUrl}/users-progress?page=${page}&pageSize=${pageSize}`;
+    if (companyId) url += `&companyId=${companyId}`;
+    if (departmentId) url += `&departmentId=${departmentId}`;
+    return this.http.get<any>(url);
+  }
+
+  updateUser(userId: string, data: any): Observable<any> {
+    return this.http.put(`${this.apiUrl}/users/${userId}`, data);
+  }
+
+  deleteUser(userId: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/users/${userId}`);
+  }
+
   getTestersProgress(page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/testers-progress?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)

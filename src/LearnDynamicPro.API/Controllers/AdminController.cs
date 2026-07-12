@@ -150,6 +150,26 @@ public class AdminController : ControllerBase
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
+    [HttpPut("users/{userId}")]
+    public async Task<IActionResult> UpdateUser(Guid userId, [FromBody] UpdateUserRequest request)
+    {
+        var result = await _companyService.UpdateUserAsync(userId, request);
+        return result.IsSuccess ? Ok(result) : BadRequest(result.Error);
+    }
+
+    [HttpDelete("users/{userId}")]
+    public async Task<IActionResult> DeleteUser(Guid userId)
+    {
+        var result = await _companyService.DeleteUserAsync(userId);
+        return result.IsSuccess ? Ok(result) : BadRequest(result.Error);
+    }
+
+    [HttpGet("users-progress")]
+    public async Task<IActionResult> GetAllUsersProgress([FromQuery] Guid? companyId, [FromQuery] Guid? departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    {
+        var result = await _companyService.GetAllUsersProgressAsync(companyId, departmentId, page, pageSize);
+        return Ok(result);
+    }
 
     [HttpGet("departments/{departmentId}/users")]
     public async Task<IActionResult> GetUsers(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)

@@ -160,6 +160,42 @@ public class CompanyService : ICompanyService
         return Result<PagedList<UserDto>>.Success(pagedList);
     }
 
+    public async Task<Result<bool>> UpdateUserAsync(Guid id, UpdateUserRequest request)
+    {
+        var user = await _unitOfWork.Repository<User>().GetByIdAsync(id);
+        if (user == null)
+            return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        // Verify new department belongs to new company
+        var department = await _unitOfWork.Repository<Department>().GetByIdAsync(request.DepartmentId);
+        if (department == null || department.CompanyId != request.CompanyId)
+            return Result<bool>.Failure(AppErrors.General.ValidationFailed);
+
+        user.Username = request.Username;
+        user.CompanyId = request.CompanyId;
+        user.DepartmentId = request.DepartmentId;
+        
+        if (!string.IsNullOrWhiteSpace(request.Password))
+        {
+            user.PasswordHash = _passwordHasher.Hash(request.Password);
+        }
+
+        _unitOfWork.Repository<User>().Update(user);
+        await _unitOfWork.SaveChangesAsync();
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<bool>> DeleteUserAsync(Guid id)
+    {
+        var user = await _unitOfWork.Repository<User>().GetByIdAsync(id);
+        if (user == null)
+            return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        _unitOfWork.Repository<User>().Remove(user);
+        await _unitOfWork.SaveChangesAsync();
+        return Result<bool>.Success(true);
+    }
+
     public async Task<Result<bool>> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request)
     {
         var company = await _unitOfWork.Repository<Company>().GetByIdAsync(id);
@@ -405,6 +441,79 @@ public class CompanyService : ICompanyService
                 UserId = u.Id,
                 UserName = u.Username,
                 Role = u.Role.ToString(),
+                AssignedModules = string.IsNullOrEmpty(assignedModulesNames) ? "لا يوجد" : assignedModulesNames,
+                CompletedLessons = p.Completed,
+                TotalLessons = p.Total
+            };
+        }).ToList();
+
+        var pagedList = new PagedList<UserProgressDto>(progressList, totalCount, page, pageSize);
+        return Result<PagedList<UserProgressDto>>.Success(pagedList);
+    }
+
+    public async Task<Result<PagedList<UserProgressDto>>> GetAllUsersProgressAsync(Guid? companyId, Guid? departmentId, int page = 1, int pageSize = 10)
+    {
+        var query = _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .Include(u => u.Company)
+            .Include(u => u.Department)
+            .Where(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester);
+
+        if (companyId.HasValue && companyId.Value != Guid.Empty)
+            query = query.Where(u => u.CompanyId == companyId.Value);
+
+        if (departmentId.HasValue && departmentId.Value != Guid.Empty)
+            query = query.Where(u => u.DepartmentId == departmentId.Value);
+
+        var totalCount = await query.CountAsync();
+
+        var users = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new 
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Role = u.Role,
+                CompanyId = u.CompanyId,
+                CompanyName = u.Company!.Name,
+                DepartmentId = u.DepartmentId,
+                DepartmentName = u.Department!.Name
+            })
+            .ToListAsync();
+
+        var depIds = users.Select(u => u.DepartmentId).Distinct().ToList();
+
+        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+            .AsNoTracking()
+            .Where(a => depIds.Contains(a.DepartmentId))
+            .Select(a => new 
+            {
+                DepartmentId = a.DepartmentId,
+                ModuleName = a.Module != null ? a.Module.Name : "",
+                LessonIds = a.Module != null && a.Module.Units != null 
+                    ? a.Module.Units.Where(u => u.Lessons != null).SelectMany(u => u.Lessons).Select(l => l.Id).ToList() 
+                    : new List<Guid>()
+            })
+            .ToListAsync();
+
+        var userIds = users.Select(u => u.Id).ToList();
+        var progressMap = await _progressAnalytics.GetUsersProgressAsync(userIds);
+
+        var progressList = users.Select(u => {
+            var p = progressMap.ContainsKey(u.Id) ? progressMap[u.Id] : new ProgressResult();
+            var userAssignments = assignments.Where(a => a.DepartmentId == u.DepartmentId).ToList();
+            var assignedModulesNames = string.Join(", ", userAssignments.Select(a => a.ModuleName));
+
+            return new UserProgressDto
+            {
+                UserId = u.Id,
+                UserName = u.Username,
+                Role = u.Role.ToString(),
+                CompanyId = u.CompanyId,
+                CompanyName = u.CompanyName,
+                DepartmentId = u.DepartmentId,
+                DepartmentName = u.DepartmentName,
                 AssignedModules = string.IsNullOrEmpty(assignedModulesNames) ? "لا يوجد" : assignedModulesNames,
                 CompletedLessons = p.Completed,
                 TotalLessons = p.Total

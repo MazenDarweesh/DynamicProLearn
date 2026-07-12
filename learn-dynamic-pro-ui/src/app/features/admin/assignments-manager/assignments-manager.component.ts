@@ -1,95 +1,160 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Router } from '@angular/router';
+import { FormsModule } from '@angular/forms';
 import { AdminService } from '../../../core/services/admin.service';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { ExpandableTableComponent } from '../../../shared/components/expandable-table/expandable-table.component';
+import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
+import { Dialog } from '../../../core/utils/dialog';
 
 @Component({
   selector: 'app-assignments-manager',
   standalone: true,
-  imports: [CommonModule, AdminHeaderComponent],
-  template: `
-    <app-admin-header></app-admin-header>
-    <div class="dashboard-container" dir="rtl">
-      <div class="d-flex justify-between w-100 mt-2 mb-4">
-        <h2>تحليلات النظام</h2>
-        <button class="btn-primary" (click)="assignNewModule()">Assign New Module</button>
-      </div>
-
-      <div class="grid">
-        <div class="card assignment-card">
-          <div class="card-header">
-            <h4>Intro to DynamicPro</h4>
-            <span class="badge badge-primary">Level 1</span>
-          </div>
-          <div class="assignment-meta mt-2">
-            <p><strong>Department:</strong> HR & Payroll</p>
-            <p><strong>Required Type:</strong> Mandatory</p>
-          </div>
-          <div class="actions mt-3">
-            <button class="btn-secondary w-100" (click)="notImplemented('Edit Rule')">Edit Rule</button>
-          </div>
-        </div>
-
-        <div class="card assignment-card">
-          <div class="card-header">
-            <h4>Financial Accounting</h4>
-            <span class="badge badge-primary">Level 2</span>
-          </div>
-          <div class="assignment-meta mt-2">
-            <p><strong>Department:</strong> Accounting</p>
-            <p><strong>Required Type:</strong> Elective</p>
-          </div>
-          <div class="actions mt-3">
-            <button class="btn-secondary w-100" (click)="notImplemented('Edit Rule')">Edit Rule</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .dashboard-container { padding: 40px; max-width: 1200px; margin: 0 auto; }
-    .header { margin-bottom: 30px; }
-    .d-flex { display: flex; align-items: center; }
-    .justify-between { justify-content: space-between; }
-    .w-100 { width: 100%; }
-    .mt-2 { margin-top: 10px; }
-    .mt-3 { margin-top: 15px; }
-    
-    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 24px; }
-    
-    .assignment-card { padding: 25px; }
-    .card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-    .card-header h4 { margin: 0; font-size: 18px; }
-    
-    .assignment-meta p { margin: 5px 0; color: var(--color-text-secondary); font-size: 14px; }
-    .assignment-meta strong { color: var(--color-text-primary); }
-    
-    .badge { padding: 4px 10px; border-radius: 6px; display: inline-block; font-size: 12px; font-weight: 600; }
-    .badge-primary { background: var(--color-primary-light); color: var(--color-primary); }
-  `]
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent],
+  templateUrl: './assignments-manager.component.html',
+  styleUrls: ['./assignments-manager.component.css']
 })
-export class AssignmentsManagerComponent {
-  private router = inject(Router);
+export class AssignmentsManagerComponent implements OnInit {
   private adminService = inject(AdminService);
+
+  employees: any[] = [];
+  companies: any[] = [];
+  departments: any[] = [];
+  filteredDepartments: any[] = [];
   
-  goBack() {
-    this.router.navigate(['/admin']);
+  filterCompanyId: string | null = null;
+  filterDepartmentId: string | null = null;
+
+  totalEmployees = 0;
+  currentPage = 1;
+  pageSize = 10;
+  isLoading = false;
+
+  // Edit Modal State
+  showEditModal = false;
+  editData: any = {};
+  editFilteredDepartments: any[] = [];
+
+  ngOnInit() {
+    this.loadFilterData();
+    this.loadEmployees();
   }
 
-  assignNewModule() {
-    const moduleId = prompt('Enter Module ID to assign:');
-    if (!moduleId) return;
-    const deptId = prompt('Enter Department ID:');
-    if (!deptId) return;
-
-    this.adminService.assignModule(moduleId, deptId).subscribe({
-      next: () => alert('Module assigned to department successfully!'),
-      error: (err) => alert('Failed to assign module: ' + (err.error?.detail || err.message))
+  loadFilterData() {
+    this.adminService.getCompanies(1, 100).subscribe({
+      next: (res) => {
+        this.companies = res;
+      }
     });
   }
 
-  notImplemented(feature: string) {
-    alert(`[UI Demo] The '${feature}' feature will be connected to the backend soon!`);
+  onFilterChange() {
+    this.filterDepartmentId = null;
+    if (this.filterCompanyId) {
+      this.adminService.getDepartments(this.filterCompanyId, 1, 100).subscribe({
+        next: (res) => {
+          this.filteredDepartments = res;
+          this.loadEmployees();
+        }
+      });
+    } else {
+      this.filteredDepartments = [];
+      this.loadEmployees();
+    }
+  }
+
+  loadEmployees() {
+    this.isLoading = true;
+    this.adminService.getAllUsersProgress(this.filterCompanyId, this.filterDepartmentId, this.currentPage, this.pageSize).subscribe({
+      next: (res: any) => {
+        this.employees = res.items || [];
+        this.totalEmployees = res.totalCount || 0; 
+        this.isLoading = false;
+      },
+      error: () => {
+        this.isLoading = false;
+      }
+    });
+  }
+
+  changePage(page: number) {
+    this.currentPage = page;
+    this.loadEmployees();
+  }
+
+  getMathMin(a: number, b: number) {
+    return Math.min(a, b);
+  }
+
+  openEditModal(emp: any) {
+    this.editData = {
+      userId: emp.userId,
+      username: emp.userName,
+      password: '',
+      companyId: emp.companyId,
+      departmentId: emp.departmentId
+    };
+    
+    // Load departments for this company
+    this.adminService.getDepartments(emp.companyId, 1, 100).subscribe(res => {
+      this.editFilteredDepartments = res;
+      this.showEditModal = true;
+    });
+  }
+
+  onEditCompanyChange() {
+    this.editData.departmentId = null;
+    if (this.editData.companyId) {
+      this.adminService.getDepartments(this.editData.companyId, 1, 100).subscribe(res => {
+        this.editFilteredDepartments = res;
+      });
+    } else {
+      this.editFilteredDepartments = [];
+    }
+  }
+
+  closeEditModal() {
+    this.showEditModal = false;
+  }
+
+  saveEmployee() {
+    if (!this.editData.username || !this.editData.companyId || !this.editData.departmentId) {
+      Dialog.alert('يرجى ملء جميع الحقول المطلوبة', 'خطأ');
+      return;
+    }
+
+    const payload = {
+      username: this.editData.username,
+      password: this.editData.password,
+      companyId: this.editData.companyId,
+      departmentId: this.editData.departmentId
+    };
+
+    this.adminService.updateUser(this.editData.userId, payload).subscribe({
+      next: () => {
+        Dialog.toast('تم تعديل بيانات الموظف بنجاح', 'success');
+        this.closeEditModal();
+        this.loadEmployees();
+      },
+      error: () => {
+        Dialog.alert('حدث خطأ أثناء حفظ التعديلات', 'خطأ', 'error');
+      }
+    });
+  }
+
+  deleteEmployee(userId: string) {
+    Dialog.confirm('هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.', 'تأكيد الحذف').then(confirmed => {
+      if (confirmed) {
+        this.adminService.deleteUser(userId).subscribe({
+          next: () => {
+            Dialog.toast('تم حذف الموظف بنجاح', 'success');
+            this.loadEmployees();
+          },
+          error: () => {
+            Dialog.alert('حدث خطأ أثناء الحذف', 'خطأ', 'error');
+          }
+        });
+      }
+    });
   }
 }
