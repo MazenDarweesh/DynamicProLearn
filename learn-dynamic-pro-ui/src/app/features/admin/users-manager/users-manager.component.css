@@ -134,25 +134,7 @@
 }
 .sub-table th { background-color: #f1f5f9; }
 
-.progress-container {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 180px;
-}
-.progress-bar {
-  flex: 1;
-  height: 6px;
-  background-color: #e2e8f0;
-  border-radius: 4px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background-color: var(--color-primary);
-  border-radius: 4px;
-  transition: width 0.3s ease;
-}
+
 
 .badge { padding: 4px 10px; border-radius: 6px; display: inline-block; font-size: 12px; font-weight: 600; }
 .badge-success { background: #E6F4EA; color: #137333; }

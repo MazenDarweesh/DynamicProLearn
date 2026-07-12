@@ -95,6 +95,7 @@ builder.Services.AddScoped<IModuleService, ModuleService>();
 builder.Services.AddScoped<IAssignmentService, AssignmentService>();
 builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IProgressService, ProgressService>();
+builder.Services.AddScoped<IProgressAnalyticsService, ProgressAnalyticsService>();
 builder.Services.AddScoped<ITesterService, TesterService>();
 
 // Configure CORS for Angular

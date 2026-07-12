@@ -64,13 +64,11 @@
                       <td class="fw-500">
                         <div class="d-flex justify-between align-center">
                           <span>{{ dept.name }}</span>
-                          <div class="progress-container">
-                            <span class="text-sm text-secondary" style="white-space: nowrap;">{{ dept.completedLessons || 0 }} / {{ dept.totalLessons || 0 }}</span>
-                            <div class="progress-bar">
-                              <div class="progress-fill" [style.width]="(dept.progressPercentage || 0) + '%'"></div>
-                            </div>
-                            <span class="text-sm text-secondary" style="min-width: 35px; text-align: right;">{{ dept.progressPercentage || 0 }}%</span>
-                          </div>
+                          <app-progress-bar 
+                            [completed]="dept.completedLessons || 0" 
+                            [total]="dept.totalLessons || 0"
+                            [customPercentage]="dept.progressPercentage">
+                          </app-progress-bar>
                         </div>
                       </td>
                       <td style="text-align: left;">

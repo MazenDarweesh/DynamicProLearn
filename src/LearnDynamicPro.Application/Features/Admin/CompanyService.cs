@@ -4,6 +4,9 @@ using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
 using LearnDynamicPro.Application.Interfaces.Repositories;
+using LearnDynamicPro.Application.Features.Progress;
+using LearnDynamicPro.Application.Dtos.Progress;
+using UserProgressDto = LearnDynamicPro.Application.Dtos.Companies.UserProgressDto;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
@@ -11,11 +14,13 @@ public class CompanyService : ICompanyService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IProgressAnalyticsService _progressAnalytics;
 
-    public CompanyService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher)
+    public CompanyService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IProgressAnalyticsService progressAnalytics)
     {
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
+        _progressAnalytics = progressAnalytics;
     }
 
     public async Task<Result<CompanyDto>> CreateCompanyAsync(CreateCompanyRequest request)
@@ -71,51 +76,23 @@ public class CompanyService : ICompanyService
         var departmentData = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(d => new 
-            {
-                Id = d.Id,
-                Name = d.Name,
-                CompanyId = d.CompanyId,
-                UserIds = d.Users.Select(u => u.Id).ToList(),
-                AssignedLessonIds = d.Assignments
-                    .Where(a => a.Module != null && a.Module.Units != null)
-                    .SelectMany(a => a.Module.Units)
-                    .Where(u => u.Lessons != null)
-                    .SelectMany(u => u.Lessons)
-                    .Select(l => l.Id)
-                    .ToList()
-            })
+            .Select(d => new { d.Id, d.Name, d.CompanyId })
             .ToListAsync();
 
-        var allUserIds = departmentData.SelectMany(d => d.UserIds).Distinct().ToList();
-        var allAssignedLessonIds = departmentData.SelectMany(d => d.AssignedLessonIds).Distinct().ToList();
+        var departmentIds = departmentData.Select(d => d.Id).ToList();
+        var progressMap = await _progressAnalytics.GetDepartmentsProgressAsync(departmentIds);
 
-        var completions = new List<LessonProgress>();
-        if (allUserIds.Any() && allAssignedLessonIds.Any())
+        var dtoList = departmentData.Select(d => 
         {
-            completions = await _unitOfWork.Repository<LessonProgress>().Query()
-                .AsNoTracking()
-                .Where(p => p.IsCompleted && allUserIds.Contains(p.UserId) && allAssignedLessonIds.Contains(p.LessonId))
-                .ToListAsync();
-        }
-
-        var dtoList = departmentData.Select(d => {
-            var departmentUserIds = d.UserIds.ToHashSet();
-            var departmentLessonIds = d.AssignedLessonIds.ToHashSet();
-            
-            var completedCount = completions.Count(c => departmentUserIds.Contains(c.UserId) && departmentLessonIds.Contains(c.LessonId));
-            
-            int totalPossibleCompletions = d.AssignedLessonIds.Count * d.UserIds.Count;
-            double progress = totalPossibleCompletions == 0 ? 0 : Math.Round((double)completedCount / totalPossibleCompletions * 100, 1);
-
+            var p = progressMap.ContainsKey(d.Id) ? progressMap[d.Id] : new ProgressResult();
             return new DepartmentDto 
             { 
                 Id = d.Id, 
                 Name = d.Name, 
                 CompanyId = d.CompanyId,
-                CompletedLessons = completedCount,
-                TotalLessons = totalPossibleCompletions,
-                ProgressPercentage = progress
+                CompletedLessons = p.Completed,
+                TotalLessons = p.Total,
+                ProgressPercentage = p.Percentage
             };
         }).ToList();
             
@@ -259,28 +236,19 @@ public class CompanyService : ICompanyService
 
         var assignedModulesNames = string.Join(", ", assignments.Select(a => a.ModuleName));
         var totalLessons = assignments.Sum(a => a.LessonIds.Count);
-        var lessonIds = assignments.SelectMany(a => a.LessonIds).ToList();
-
         var userIds = users.Select(u => u.Id).ToList();
-        var completions = new List<LessonProgress>();
-        if (userIds.Any() && lessonIds.Any())
-        {
-            completions = await _unitOfWork.Repository<LessonProgress>().Query()
-                .AsNoTracking()
-                .Where(p => p.IsCompleted && userIds.Contains(p.UserId) && lessonIds.Contains(p.LessonId))
-                .ToListAsync();
-        }
+        var progressMap = await _progressAnalytics.GetUsersProgressAsync(userIds);
 
         var progressList = users.Select(u => {
-            var completedCount = completions.Count(c => c.UserId == u.Id);
+            var p = progressMap.ContainsKey(u.Id) ? progressMap[u.Id] : new ProgressResult();
             return new UserProgressDto
             {
                 UserId = u.Id,
                 UserName = u.Username,
                 Role = u.Role.ToString(),
                 AssignedModules = string.IsNullOrEmpty(assignedModulesNames) ? "لا يوجد" : assignedModulesNames,
-                CompletedLessons = completedCount,
-                TotalLessons = totalLessons
+                CompletedLessons = p.Completed,
+                TotalLessons = p.Total
             };
         }).ToList();
 
@@ -323,23 +291,13 @@ public class CompanyService : ICompanyService
             })
             .ToListAsync();
 
-        var lessonIds = assignments.SelectMany(a => a.LessonIds).Distinct().ToList();
         var userIds = users.Select(u => u.Id).ToList();
-
-        var completions = new List<LessonProgress>();
-        if (userIds.Any() && lessonIds.Any())
-        {
-            completions = await _unitOfWork.Repository<LessonProgress>().Query()
-                .AsNoTracking()
-                .Where(p => p.IsCompleted && userIds.Contains(p.UserId) && lessonIds.Contains(p.LessonId))
-                .ToListAsync();
-        }
+        var progressMap = await _progressAnalytics.GetUsersProgressAsync(userIds);
 
         var progressList = users.Select(u => {
             var userAssignments = assignments.Where(a => a.DepartmentId == u.DepartmentId).ToList();
             var assignedModulesNames = string.Join(", ", userAssignments.Select(a => a.ModuleName));
-            var totalLessons = userAssignments.Sum(a => a.LessonIds.Count);
-            var completedCount = completions.Count(c => c.UserId == u.Id);
+            var p = progressMap.ContainsKey(u.Id) ? progressMap[u.Id] : new ProgressResult();
 
             return new UserProgressDto
             {
@@ -347,8 +305,8 @@ public class CompanyService : ICompanyService
                 UserName = u.Username,
                 Role = u.Role.ToString(),
                 AssignedModules = string.IsNullOrEmpty(assignedModulesNames) ? "لا يوجد" : assignedModulesNames,
-                CompletedLessons = completedCount,
-                TotalLessons = totalLessons
+                CompletedLessons = p.Completed,
+                TotalLessons = p.Total
             };
         }).ToList();
 
@@ -363,17 +321,7 @@ public class CompanyService : ICompanyService
         var activeTesters = await _unitOfWork.Repository<User>().Query().CountAsync(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester);
         var publishedModules = await _unitOfWork.Repository<Module>().Query().CountAsync();
 
-        var totalPossibleLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-            .AsNoTracking()
-            .Where(a => a.Department != null && a.Module != null)
-            .Select(a => a.Department!.Users.Count * a.Module!.Units.SelectMany(u => u.Lessons).Count())
-            .SumAsync();
-
-        int totalCompleted = await _unitOfWork.Repository<LessonProgress>().Query().CountAsync(p => p.IsCompleted);
-
-        double averageProgress = totalPossibleLessons == 0 
-            ? 0 
-            : Math.Round((double)totalCompleted / totalPossibleLessons * 100, 1);
+        var p = await _progressAnalytics.GetOverallSystemProgressAsync();
 
         return Result<DashboardStatsDto>.Success(new DashboardStatsDto
         {
@@ -381,7 +329,7 @@ public class CompanyService : ICompanyService
             ActiveUsers = activeUsers,
             ActiveTesters = activeTesters,
             PublishedModules = publishedModules,
-            AverageProgress = averageProgress
+            AverageProgress = p.Percentage
         });
     }
 }
