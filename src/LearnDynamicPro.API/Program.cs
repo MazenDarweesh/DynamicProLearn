@@ -72,7 +72,7 @@ builder.Services.AddAuthorization(options =>
         policy.RequireRole(UserRole.Admin.ToString()));
         
     options.AddPolicy("StudentOrAbove", policy => 
-        policy.RequireRole(UserRole.Admin.ToString(), UserRole.Student.ToString()));
+        policy.RequireRole(UserRole.Admin.ToString(), UserRole.Student.ToString(), UserRole.Tester.ToString()));
         
     options.AddPolicy("TesterOnly", policy => 
         policy.RequireRole(UserRole.Tester.ToString(), UserRole.Admin.ToString()));

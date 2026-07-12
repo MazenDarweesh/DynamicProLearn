@@ -5,7 +5,7 @@
 
 # dotenv files
 .env
-
+Passwords 
 # User-specific files
 *.rsuser
 *.suo
