@@ -7,11 +7,12 @@ import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 import { RouterModule } from '@angular/router';
+import { ExpandableTableComponent } from '../../../shared/components/expandable-table/expandable-table.component';
 
 @Component({
   selector: 'app-users-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, RouterModule],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, RouterModule, ExpandableTableComponent],
   templateUrl: './users-manager.component.html',
   styleUrls: ['./users-manager.component.css']
 })
@@ -23,6 +24,7 @@ export class UsersManagerComponent implements OnInit {
   filteredCompanies: any[] = [];
   paginatedCompanies: any[] = [];
   allModules: any[] = [];
+  moduleSearchQuery: string = '';
   
   isLoading = true;
   isSubmitting = false;
@@ -108,6 +110,10 @@ export class UsersManagerComponent implements OnInit {
       this.currentPage = page;
       this.updatePagination();
     }
+  }
+
+  getMathMin(a: number, b: number): number {
+    return Math.min(a, b);
   }
 
   toggleExpand(companyId: string) {
@@ -291,6 +297,12 @@ export class UsersManagerComponent implements OnInit {
 
   isModuleAssigned(moduleId: string): boolean {
     return this.pendingAssignedModuleIds.has(moduleId);
+  }
+
+  getFilteredModules() {
+    if (!this.moduleSearchQuery.trim()) return this.allModules;
+    const query = this.moduleSearchQuery.toLowerCase();
+    return this.allModules.filter(m => m.title.toLowerCase().includes(query));
   }
 
   toggleModuleAssignment(moduleId: string, event: any) {

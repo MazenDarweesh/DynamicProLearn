@@ -5,11 +5,12 @@ import { AdminService } from '../../../core/services/admin.service';
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { ExpandableTableComponent } from '../../../shared/components/expandable-table/expandable-table.component';
 
 @Component({
   selector: 'app-department-details',
   standalone: true,
-  imports: [CommonModule, ProgressBarComponent, AdminHeaderComponent],
+  imports: [CommonModule, ProgressBarComponent, AdminHeaderComponent, ExpandableTableComponent],
   templateUrl: './department-details.component.html',
   styleUrls: ['./department-details.component.css']
 })
