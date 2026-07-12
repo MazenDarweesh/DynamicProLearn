@@ -186,23 +186,58 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<bool>> DeleteUserAsync(Guid id)
     {
-        var user = await _unitOfWork.Repository<User>().GetByIdAsync(id);
-        if (user == null)
-            return Result<bool>.Failure(AppErrors.General.NotFound);
-
-        // Remove MarkedByUserId from any LessonProgress to avoid NoAction constraint error if user is an admin
-        var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
-            .Where(lp => lp.MarkedByUserId == id)
-            .ToListAsync();
-        foreach (var p in markedProgresses)
+        try
         {
-            p.MarkedByUserId = null;
-            _unitOfWork.Repository<LessonProgress>().Update(p);
-        }
+            var user = await _unitOfWork.Repository<User>().GetByIdAsync(id);
+            if (user == null)
+                return Result<bool>.Failure(AppErrors.General.NotFound);
 
-        _unitOfWork.Repository<User>().Remove(user);
-        await _unitOfWork.SaveChangesAsync();
-        return Result<bool>.Success(true);
+            // Remove MarkedByUserId from any LessonProgress to avoid NoAction constraint error if user is an admin
+            var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                .Where(lp => lp.MarkedByUserId == id)
+                .ToListAsync();
+            foreach (var p in markedProgresses)
+            {
+                p.MarkedByUserId = null;
+                _unitOfWork.Repository<LessonProgress>().Update(p);
+            }
+
+            // Manually delete LessonProgresses
+            var userProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                .Where(lp => lp.UserId == id)
+                .ToListAsync();
+            if (userProgresses.Any())
+            {
+                _unitOfWork.Repository<LessonProgress>().RemoveRange(userProgresses);
+            }
+
+            // Manually delete Feedbacks
+            var feedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
+                .Where(tf => tf.UserId == id)
+                .ToListAsync();
+            if (feedbacks.Any())
+            {
+                _unitOfWork.Repository<TesterFeedback>().RemoveRange(feedbacks);
+            }
+
+            // Manually delete Active Version
+            var activeVersion = await _unitOfWork.Repository<TesterActiveVersion>().Query()
+                .FirstOrDefaultAsync(tav => tav.UserId == id);
+            if (activeVersion != null)
+            {
+                _unitOfWork.Repository<TesterActiveVersion>().Remove(activeVersion);
+            }
+
+            _unitOfWork.Repository<User>().Remove(user);
+            await _unitOfWork.SaveChangesAsync();
+            return Result<bool>.Success(true);
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+            System.IO.File.WriteAllText("delete_error_user.txt", inner);
+            throw;
+        }
     }
 
     public async Task<Result<bool>> UpdateCompanyAsync(Guid id, UpdateCompanyRequest request)
@@ -219,38 +254,82 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<bool>> DeleteCompanyAsync(Guid id)
     {
-        var company = await _unitOfWork.Repository<Company>().Query()
-            .Include(c => c.Users)
-            .Include(c => c.Departments)
-            .FirstOrDefaultAsync(c => c.Id == id);
-
-        if (company == null)
-            return Result<bool>.Failure(AppErrors.General.NotFound);
-
-        // Manually delete users to avoid NoAction FK error
-        if (company.Users.Any())
+        try
         {
-            var userIds = company.Users.Select(u => u.Id).ToList();
-            var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
-                .Where(lp => lp.MarkedByUserId.HasValue && userIds.Contains(lp.MarkedByUserId.Value))
-                .ToListAsync();
-            foreach (var p in markedProgresses)
+            var company = await _unitOfWork.Repository<Company>().Query()
+                .Include(c => c.Users)
+                .Include(c => c.Departments)
+                .FirstOrDefaultAsync(c => c.Id == id);
+
+            if (company == null)
+                return Result<bool>.Failure(AppErrors.General.NotFound);
+
+            if (company.Users.Any())
             {
-                p.MarkedByUserId = null;
-                _unitOfWork.Repository<LessonProgress>().Update(p);
+                var userIds = company.Users.Select(u => u.Id).ToList();
+                var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                    .Where(lp => lp.MarkedByUserId.HasValue && userIds.Contains(lp.MarkedByUserId.Value))
+                    .ToListAsync();
+                foreach (var p in markedProgresses)
+                {
+                    p.MarkedByUserId = null;
+                    _unitOfWork.Repository<LessonProgress>().Update(p);
+                }
+                
+                // ALSO delete LessonProgresses for these users manually, just in case Cascade is off in DB
+                var userProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                    .Where(lp => userIds.Contains(lp.UserId))
+                    .ToListAsync();
+                if (userProgresses.Any())
+                {
+                    _unitOfWork.Repository<LessonProgress>().RemoveRange(userProgresses);
+                }
+
+                // Delete Tester Feedbacks
+                var feedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
+                    .Where(tf => userIds.Contains(tf.UserId))
+                    .ToListAsync();
+                if (feedbacks.Any())
+                {
+                    _unitOfWork.Repository<TesterFeedback>().RemoveRange(feedbacks);
+                }
+
+                // Delete Tester Active Versions
+                var activeVersions = await _unitOfWork.Repository<TesterActiveVersion>().Query()
+                    .Where(tav => userIds.Contains(tav.UserId))
+                    .ToListAsync();
+                if (activeVersions.Any())
+                {
+                    _unitOfWork.Repository<TesterActiveVersion>().RemoveRange(activeVersions);
+                }
+
+                _unitOfWork.Repository<User>().RemoveRange(company.Users);
             }
-            _unitOfWork.Repository<User>().RemoveRange(company.Users);
-        }
 
-        // Manually delete departments
-        if (company.Departments.Any())
+            if (company.Departments.Any())
+            {
+                var deptIds = company.Departments.Select(d => d.Id).ToList();
+                var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+                    .Where(a => deptIds.Contains(a.DepartmentId))
+                    .ToListAsync();
+                if (assignments.Any())
+                {
+                    _unitOfWork.Repository<DepartmentModuleAssignment>().RemoveRange(assignments);
+                }
+
+                _unitOfWork.Repository<Department>().RemoveRange(company.Departments);
+            }
+
+            _unitOfWork.Repository<Company>().Remove(company);
+            await _unitOfWork.SaveChangesAsync();
+            return Result<bool>.Success(true);
+        }
+        catch (Exception ex)
         {
-            _unitOfWork.Repository<Department>().RemoveRange(company.Departments);
+            var inner = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+            System.IO.File.WriteAllText("delete_error.txt", inner);
+            throw;
         }
-
-        _unitOfWork.Repository<Company>().Remove(company);
-        await _unitOfWork.SaveChangesAsync();
-        return Result<bool>.Success(true);
     }
 
     public async Task<Result<bool>> UpdateDepartmentAsync(Guid id, UpdateDepartmentRequest request)
@@ -267,30 +346,73 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<bool>> DeleteDepartmentAsync(Guid id)
     {
-        var department = await _unitOfWork.Repository<Department>().Query()
-            .Include(d => d.Users)
-            .FirstOrDefaultAsync(d => d.Id == id);
-
-        if (department == null)
-            return Result<bool>.Failure(AppErrors.General.NotFound);
-
-        if (department.Users.Any())
+        try
         {
-            var userIds = department.Users.Select(u => u.Id).ToList();
-            var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
-                .Where(lp => lp.MarkedByUserId.HasValue && userIds.Contains(lp.MarkedByUserId.Value))
-                .ToListAsync();
-            foreach (var p in markedProgresses)
-            {
-                p.MarkedByUserId = null;
-                _unitOfWork.Repository<LessonProgress>().Update(p);
-            }
-            _unitOfWork.Repository<User>().RemoveRange(department.Users);
-        }
+            var department = await _unitOfWork.Repository<Department>().Query()
+                .Include(d => d.Users)
+                .FirstOrDefaultAsync(d => d.Id == id);
 
-        _unitOfWork.Repository<Department>().Remove(department);
-        await _unitOfWork.SaveChangesAsync();
-        return Result<bool>.Success(true);
+            if (department == null)
+                return Result<bool>.Failure(AppErrors.General.NotFound);
+
+            if (department.Users.Any())
+            {
+                var userIds = department.Users.Select(u => u.Id).ToList();
+                var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                    .Where(lp => lp.MarkedByUserId.HasValue && userIds.Contains(lp.MarkedByUserId.Value))
+                    .ToListAsync();
+                foreach (var p in markedProgresses)
+                {
+                    p.MarkedByUserId = null;
+                    _unitOfWork.Repository<LessonProgress>().Update(p);
+                }
+
+                var userProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                    .Where(lp => userIds.Contains(lp.UserId))
+                    .ToListAsync();
+                if (userProgresses.Any())
+                {
+                    _unitOfWork.Repository<LessonProgress>().RemoveRange(userProgresses);
+                }
+
+                var feedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
+                    .Where(tf => userIds.Contains(tf.UserId))
+                    .ToListAsync();
+                if (feedbacks.Any())
+                {
+                    _unitOfWork.Repository<TesterFeedback>().RemoveRange(feedbacks);
+                }
+
+                var activeVersions = await _unitOfWork.Repository<TesterActiveVersion>().Query()
+                    .Where(tav => userIds.Contains(tav.UserId))
+                    .ToListAsync();
+                if (activeVersions.Any())
+                {
+                    _unitOfWork.Repository<TesterActiveVersion>().RemoveRange(activeVersions);
+                }
+
+                _unitOfWork.Repository<User>().RemoveRange(department.Users);
+            }
+
+            // Also remove assignments
+            var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+                .Where(a => a.DepartmentId == id)
+                .ToListAsync();
+            if (assignments.Any())
+            {
+                _unitOfWork.Repository<DepartmentModuleAssignment>().RemoveRange(assignments);
+            }
+
+            _unitOfWork.Repository<Department>().Remove(department);
+            await _unitOfWork.SaveChangesAsync();
+            return Result<bool>.Success(true);
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
+            System.IO.File.WriteAllText("delete_error_dept.txt", inner);
+            throw;
+        }
     }
 
     public async Task<Result<DepartmentDetailsDto>> GetDepartmentDetailsAsync(Guid departmentId)
