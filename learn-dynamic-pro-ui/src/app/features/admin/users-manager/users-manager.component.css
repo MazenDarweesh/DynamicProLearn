@@ -44,7 +44,8 @@
 .gap-3 { gap: 15px; }
 .flex-1 { flex: 1; }
 
-.btn-primary {
+
+.btn-blue {
   background-color: var(--color-primary);
   color: white;
   border: none;
@@ -56,21 +57,7 @@
   cursor: pointer;
   transition: 0.2s;
 }
-.btn-primary:hover { opacity: 0.9; }
-
-.btn-accent {
-  background-color: var(--color-accent);
-  color: white;
-  border: none;
-  padding: 10px 20px;
-  border-radius: var(--radius-btn);
-  font-family: inherit;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  transition: 0.2s;
-}
-.btn-accent:hover { opacity: 0.9; }
+.btn-blue:hover { opacity: 0.9; }
 
 .icon-btn {
   background: none;

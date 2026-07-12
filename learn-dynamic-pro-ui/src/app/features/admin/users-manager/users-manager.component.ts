@@ -137,10 +137,41 @@ export class UsersManagerComponent implements OnInit {
   async deleteCompany(comp: any) {
     const ok = await Dialog.confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟', 'تأكيد الحذف');
     if (ok) {
-      this.adminService.deleteCompany(comp.id).subscribe(() => this.loadData());
+      this.adminService.deleteCompany(comp.id).subscribe(() => {
+        this.expandedCompanyId = null;
+        this.loadData();
+      });
     }
   }
 
+  // --- Department Edit/Delete ---
+  async editDepartment(comp: any, dept: any) {
+    const newName = window.prompt(`تعديل اسم القسم:`, dept.name);
+    if (newName && newName.trim() && newName.trim() !== dept.name) {
+      this.adminService.updateDepartment(dept.id, newName.trim()).subscribe({
+        next: () => {
+          this.loadData();
+          Dialog.alert('تم تعديل اسم القسم بنجاح.', 'نجاح', 'success');
+        },
+        error: () => Dialog.alert('حدث خطأ أثناء التعديل.', 'خطأ', 'error')
+      });
+    }
+  }
+
+  async deleteDepartment(comp: any, dept: any) {
+    const ok = await Dialog.confirm(`هل أنت متأكد من حذف قسم "${dept.name}"؟ جميع المستخدمين المرتبطين به سيتأثرون.`, 'تأكيد الحذف');
+    if (ok) {
+      this.adminService.deleteDepartment(dept.id).subscribe({
+        next: () => {
+          this.loadData();
+          Dialog.alert('تم حذف القسم بنجاح.', 'نجاح', 'success');
+        },
+        error: () => Dialog.alert('حدث خطأ أثناء الحذف.', 'خطأ', 'error')
+      });
+    }
+  }
+
+  // --- Add Company Modal Logic ---
   closeAddCompanyModal() {
     this.showAddCompanyModal = false;
   }
