@@ -330,7 +330,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("departments/{departmentId}/users-progress")]
-    public async Task<ActionResult<PagedList<UserProgressDto>>> GetDepartmentUsersProgress(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
+    public async Task<IActionResult> GetDepartmentUsersProgress(Guid departmentId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
     {
         var result = await _companyService.GetDepartmentUsersProgressAsync(departmentId, page, pageSize);
         if (!result.IsSuccess) return BadRequest(result.Error);
@@ -338,7 +338,7 @@ public class AdminController : ControllerBase
     }
 
     [HttpGet("users/{id}/details")]
-    public async Task<ActionResult<UserDetailsDto>> GetUserDetails(Guid id)
+    public async Task<IActionResult> GetUserDetails(Guid id)
     {
         var result = await _companyService.GetUserDetailsAsync(id);
         if (!result.IsSuccess) return BadRequest(result.Error);

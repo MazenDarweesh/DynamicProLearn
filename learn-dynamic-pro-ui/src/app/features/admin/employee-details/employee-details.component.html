@@ -15,8 +15,11 @@
         <i class="fi" [ngClass]="isAllExpanded ? 'fi-rr-compress-alt' : 'fi-rr-expand-arrows-alt'" style="margin-top: 3px;"></i>
         {{ isAllExpanded ? 'إخفاء الكل' : 'عرض الكل' }}
       </button>
-      <div class="stats-badge" style="background: rgba(67, 56, 202, 0.1); color: #4338ca; padding: 10px 15px; border-radius: 8px; font-weight: 500; font-size: 14px; display: flex; align-items: center; gap: 10px;">
-        <span style="border-left: 1px solid rgba(67, 56, 202, 0.2); padding-left: 10px;">الدروس المكتملة: <strong style="font-size: 16px;">{{ totalCompletedLessons }}</strong></span>
+
+      <div class="stats-badge" style="background: rgba(245, 130, 32, 0.1); color: var(--brand-orange); padding: 10px 15px; border-radius: 8px; font-weight: 500; font-size: 14px; display: flex; align-items: center;">
+        <span>الدروس المكتملة: <strong style="font-size: 16px;">{{ totalCompletedLessons }}</strong></span>
+      </div>
+      <div class="stats-badge" style="background: rgba(67, 56, 202, 0.1); color: var(--brand-blue); padding: 10px 15px; border-radius: 8px; font-weight: 500; font-size: 14px; display: flex; align-items: center;">
         <span>إجمالي الدروس: <strong style="font-size: 16px;">{{ totalAssignedLessons }}</strong></span>
       </div>
     </div>
