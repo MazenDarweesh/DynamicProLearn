@@ -34,6 +34,10 @@ export class UsersManagerComponent implements OnInit {
   expandedCompanyId: string | null = null;
 
   // Modals state
+  showEditDepartmentModal = false;
+  editingDepartmentId: string | null = null;
+  editingDepartmentName = '';
+
   showAddCompanyModal = false;
   editingCompanyId: string | null = null;
   newCompanyName = '';
@@ -145,17 +149,34 @@ export class UsersManagerComponent implements OnInit {
   }
 
   // --- Department Edit/Delete ---
-  async editDepartment(comp: any, dept: any) {
-    const newName = window.prompt(`تعديل اسم القسم:`, dept.name);
-    if (newName && newName.trim() && newName.trim() !== dept.name) {
-      this.adminService.updateDepartment(dept.id, newName.trim()).subscribe({
-        next: () => {
-          this.loadData();
-          Dialog.alert('تم تعديل اسم القسم بنجاح.', 'نجاح', 'success');
-        },
-        error: () => Dialog.alert('حدث خطأ أثناء التعديل.', 'خطأ', 'error')
-      });
-    }
+  editDepartment(comp: any, dept: any) {
+    this.editingDepartmentId = dept.id;
+    this.editingDepartmentName = dept.name;
+    this.showEditDepartmentModal = true;
+  }
+
+  closeEditDepartmentModal() {
+    this.showEditDepartmentModal = false;
+    this.editingDepartmentId = null;
+    this.editingDepartmentName = '';
+  }
+
+  saveDepartmentEdit() {
+    if (!this.editingDepartmentName.trim() || !this.editingDepartmentId) return;
+    
+    this.isSubmitting = true;
+    this.adminService.updateDepartment(this.editingDepartmentId, this.editingDepartmentName.trim()).subscribe({
+      next: () => {
+        this.isSubmitting = false;
+        this.closeEditDepartmentModal();
+        this.loadData();
+        Dialog.alert('تم تعديل اسم القسم بنجاح.', 'نجاح', 'success');
+      },
+      error: () => {
+        this.isSubmitting = false;
+        Dialog.alert('حدث خطأ أثناء التعديل.', 'خطأ', 'error');
+      }
+    });
   }
 
   async deleteDepartment(comp: any, dept: any) {
