@@ -38,7 +38,7 @@ export class DepartmentDetailsComponent implements OnInit {
     if (this.departmentId) {
       this.loadDepartmentDetails();
     } else {
-      this.router.navigate(['/admin/users']);
+      this.router.navigate(['/admin/companies']);
     }
   }
 
@@ -54,7 +54,7 @@ export class DepartmentDetailsComponent implements OnInit {
       error: () => {
         Dialog.alert('فشل في تحميل بيانات القسم', 'خطأ', 'error');
         this.isLoading = false;
-        this.router.navigate(['/admin/users']);
+        this.router.navigate(['/admin/companies']);
       }
     });
   }
@@ -90,6 +90,6 @@ export class DepartmentDetailsComponent implements OnInit {
   }
 
   goBack(): void {
-    this.router.navigate(['/admin/users']);
+    this.router.navigate(['/admin/companies']);
   }
 }

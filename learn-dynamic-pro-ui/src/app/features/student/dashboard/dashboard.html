@@ -20,14 +20,15 @@
         <h3 class="panel-title">📚 الموديولات المخصصة لك</h3>
       </div>
       <div class="panel-content">
-        
+
         <div *ngIf="isLoading" class="loading">جاري تحميل الموديولات...</div>
-        
+
         <div *ngIf="!isLoading && modules.length === 0" class="empty-state">
           لا يوجد موديولات مخصصة لقسمك حالياً.
         </div>
-        
-        <div class="grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
+
+        <div class="grid"
+          style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 24px;">
           <div class="item-card module-card d-flex flex-column" *ngFor="let mod of modules">
             <div class="d-flex justify-between align-start mb-2">
               <div>
@@ -35,13 +36,13 @@
                 <p class="text-secondary text-sm mt-1 mb-2">{{ mod.description }}</p>
               </div>
             </div>
-            
+
             <div class="mt-auto pt-3 border-top" style="border-top: 1px solid var(--color-border); margin-top: 15px;">
               <div class="progress-track" style="margin-bottom: 8px;">
                 <div class="progress-fill" [style.width.%]="mod.progressPercent"></div>
               </div>
               <span class="text-secondary text-xs font-medium d-block mb-3">{{ mod.progressPercent || 0 }}% مكتمل</span>
-              
+
               <button class="btn-accent w-100 d-flex justify-center align-center gap-2" (click)="openLesson(mod.id)">
                 ابدأ التعلم
               </button>

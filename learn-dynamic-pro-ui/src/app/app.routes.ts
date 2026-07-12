@@ -42,7 +42,7 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/admin-dashboard/admin-dashboard').then(m => m.AdminDashboardComponent)
   },
   {
-    path: 'admin/users',
+    path: 'admin/companies',
     canActivate: [roleGuard(['Admin'])],
     loadComponent: () => import('./features/admin/users-manager/users-manager.component').then(m => m.UsersManagerComponent)
   },
