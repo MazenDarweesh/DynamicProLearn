@@ -6,11 +6,12 @@ import { ProgressBarComponent } from '../../../shared/components/progress-bar/pr
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { ExpandableTableComponent } from '../../../shared/components/expandable-table/expandable-table.component';
+import { CurriculumViewerComponent } from '../../../shared/components/curriculum-viewer/curriculum-viewer.component';
 
 @Component({
   selector: 'app-department-details',
   standalone: true,
-  imports: [CommonModule, ProgressBarComponent, AdminHeaderComponent, ExpandableTableComponent],
+  imports: [CommonModule, ProgressBarComponent, AdminHeaderComponent, ExpandableTableComponent, CurriculumViewerComponent],
   templateUrl: './department-details.component.html',
   styleUrls: ['./department-details.component.css']
 })

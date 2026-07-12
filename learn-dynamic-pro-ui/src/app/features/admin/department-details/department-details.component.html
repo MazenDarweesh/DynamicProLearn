@@ -29,90 +29,15 @@
     </div>
 
     <!-- MODULES TABLE -->
-    <app-expandable-table *ngIf="!isLoading && modules.length > 0"
-                          [data]="modules" 
-                          keyProp="moduleId" 
-                          [colspan]="3"
-                          [forceExpandAll]="isAllExpanded">
-      <!-- HEADER -->
-      <ng-template #header>
-        <th style="color: var(--color-primary)">الموديول</th>
-        <th style="text-align: right; width: 300px; color: var(--color-primary)">التقدم</th>
-      </ng-template>
-
-      <!-- ROW -->
-      <ng-template #row let-module>
-        <td class="fw-500 text-primary" style="text-align: right; padding-right: 20px;">{{ module.name }}</td>
-        <td style="text-align: left; padding-left: 20px;">
-          <app-progress-bar [completed]="module.completedLessons" [total]="module.totalLessons"></app-progress-bar>
-        </td>
-      </ng-template>
-
-      <!-- EXPANDED -->
-      <ng-template #expanded let-module>
-        <div class="d-flex justify-between mb-2">
-          <h4 class="m-0 text-secondary" style="font-size: 14px;">الوحدات الخاصة بموديول {{module.name}}</h4>
-        </div>
-        
-        <!-- UNITS TABLE -->
-        <app-expandable-table [data]="module.units" 
-                              keyProp="unitId" 
-                              [colspan]="2"
-                              tableClass="sub-table"
-                              emptyMessage="لا توجد وحدات في هذا الموديول"
-                              [forceExpandAll]="isAllExpanded">
-          <!-- UNITS HEADER -->
-          <ng-template #header>
-            <th style="color: var(--color-accent, #f58220)">الوحدة</th>
-          </ng-template>
-
-          <!-- UNITS ROW -->
-          <ng-template #row let-unit>
-            <td class="fw-500 text-primary" style="text-align: right; padding-right: 20px;">{{ unit.name }}</td>
-          </ng-template>
-
-          <!-- UNITS EXPANDED -->
-          <ng-template #expanded let-unit>
-            <table class="sub-table" style="box-shadow: none;">
-              <tbody>
-                <tr *ngFor="let lesson of unit.lessons">
-                  <td class="fw-500 text-secondary" style="width: 40%;">
-                    {{ lesson.name }}
-                  </td>
-                  <td class="text-secondary text-right" style="width: 30%;">
-                    أتم الدرس: <strong>{{ lesson.completedUsersCount }} / {{ lesson.totalUsersCount }}</strong> طالب
-                  </td>
-                  <td style="text-align: left; width: 30%;">
-                    <div class="d-flex gap-2" style="justify-content: flex-end; align-items: center;">
-                      <span *ngIf="lesson.isFullyCompletedByAll" class="badge badge-success">مكتمل للجميع</span>
-                      
-                      <button *ngIf="!lesson.isFullyCompletedByAll" 
-                              class="btn-blue" 
-                              style="padding: 6px 12px; font-size: 13px;"
-                              (click)="markLessonComplete(lesson.lessonId)">
-                        اكتمال للكل
-                      </button>
-
-                      <button *ngIf="lesson.completedUsersCount > 0" 
-                              class="btn-blue" 
-                              style="padding: 6px 12px; font-size: 13px; background-color: var(--color-danger);"
-                              (click)="unmarkLessonComplete(lesson.lessonId)">
-                        إلغاء
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-                <tr *ngIf="unit.lessons.length === 0">
-                  <td colspan="3" class="text-center text-secondary">لا توجد دروس في هذه الوحدة</td>
-                </tr>
-              </tbody>
-            </table>
-          </ng-template>
-
-        </app-expandable-table>
-      </ng-template>
-
-    </app-expandable-table>
+    <app-curriculum-viewer 
+      [modules]="modules"
+      [isAllExpanded]="isAllExpanded"
+      [isLoading]="isLoading"
+      [isDepartmentView]="true"
+      [isStudentView]="false"
+      (onMarkLessonComplete)="markLessonComplete($event)"
+      (onUnmarkLessonComplete)="unmarkLessonComplete($event)">
+    </app-curriculum-viewer>
 
   </div>
 </div>
