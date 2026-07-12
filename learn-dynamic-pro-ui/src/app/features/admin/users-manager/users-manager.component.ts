@@ -1,94 +1,78 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
-import { AdminService, CompanyDto } from '../../../core/services/admin.service';
+import { FormsModule } from '@angular/forms';
+import { AdminService } from '../../../core/services/admin.service';
+import { Dialog } from '../../../core/utils/dialog';
 
 @Component({
   selector: 'app-users-manager',
   standalone: true,
-  imports: [CommonModule],
-  template: `
-    <div class="dashboard-container">
-      <header class="header">
-        <button class="btn-back" (click)="goBack()">← Back to Dashboard</button>
-        <div class="d-flex justify-between w-100 mt-2">
-          <h2>Companies Management</h2>
-          <button class="btn-primary" (click)="addNewCompany()">+ Add New Company</button>
-        </div>
-      </header>
-
-      <div class="card">
-        <div class="filters">
-          <input type="text" class="form-control search" placeholder="Search companies...">
-        </div>
-
-        <table class="data-table mt-4">
-          <thead>
-            <tr>
-              <th>Company Name</th>
-              <th>Industry</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngIf="isLoading"><td colspan="4" class="text-center">Loading companies...</td></tr>
-            <tr *ngFor="let comp of companies">
-              <td class="fw-500">{{ comp.name }}</td>
-              <td class="text-secondary">{{ comp.industry }}</td>
-              <td><span class="badge badge-success">Active</span></td>
-              <td class="actions">
-                <button class="btn-icon" (click)="notImplemented('Edit Company')">Edit</button>
-              </td>
-            </tr>
-            <tr *ngIf="!isLoading && companies.length === 0"><td colspan="4" class="text-center text-secondary">No companies found.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .dashboard-container { padding: 40px; max-width: 1200px; margin: 0 auto; }
-    .header { margin-bottom: 30px; }
-    .d-flex { display: flex; align-items: center; }
-    .justify-between { justify-content: space-between; }
-    .w-100 { width: 100%; }
-    .mt-2 { margin-top: 10px; }
-    .mt-4 { margin-top: 20px; }
-    
-    .filters { display: flex; gap: 15px; }
-    .form-control { padding: 10px 15px; border: 1px solid var(--color-border); border-radius: var(--radius-btn); background-color: var(--color-bg-page); color: var(--color-text-primary); font-family: inherit; }
-    .search { flex: 1; }
-    
-    .data-table { width: 100%; border-collapse: collapse; text-align: left; }
-    .data-table th, .data-table td { padding: 16px 20px; border-bottom: 1px solid var(--color-border); }
-    .data-table th { background-color: var(--color-bg-page); color: var(--color-text-secondary); font-weight: 500; font-size: 13px; text-transform: uppercase; }
-    .data-table tbody tr:hover { background-color: var(--color-bg-page); }
-    
-    .fw-500 { font-weight: 500; }
-    .text-secondary { color: var(--color-text-secondary); font-size: 14px; }
-    .text-center { text-align: center; }
-    
-    .badge { padding: 4px 10px; border-radius: 6px; display: inline-block; font-size: 12px; font-weight: 600; }
-    .badge-success { background: #E6F4EA; color: #137333; }
-    
-    .actions { display: flex; gap: 10px; }
-  `]
+  imports: [CommonModule, FormsModule],
+  templateUrl: './users-manager.component.html',
+  styleUrls: ['./users-manager.component.css']
 })
 export class UsersManagerComponent implements OnInit {
   private router = inject(Router);
   private adminService = inject(AdminService);
   
-  companies: CompanyDto[] = [];
+  companies: any[] = [];
+  filteredCompanies: any[] = [];
+  paginatedCompanies: any[] = [];
+  allModules: any[] = [];
+  
   isLoading = true;
+  isSubmitting = false;
+
+  // Search and Pagination
+  searchQuery = '';
+  currentPage = 1;
+  pageSize = 10;
+  totalPages = 1;
+
+  expandedCompanyId: string | null = null;
+
+  // Modals state
+  showAddCompanyModal = false;
+  editingCompanyId: string | null = null;
+  newCompanyName = '';
+  newDepartmentsList: { id?: string, name: string }[] = [];
+  originalDepartments: any[] = [];
+  newDepartmentName = '';
+
+  showAssignModulesModal = false;
+  assigningCompany: any = null;
+  assigningDepartment: any = null;
+  assignedModules: any[] = [];
+  pendingAssignedModuleIds = new Set<string>();
 
   ngOnInit() {
+    this.loadData();
+    this.loadModules();
+  }
+
+  loadData() {
+    this.isLoading = true;
     this.adminService.getCompanies().subscribe({
       next: (data) => {
         this.companies = data;
+        // Fetch departments for each company
+        this.companies.forEach(c => {
+          this.adminService.getDepartments(c.id).subscribe(depts => {
+            c.departments = depts;
+          });
+        });
         this.isLoading = false;
+        this.onSearch();
       },
       error: () => this.isLoading = false
+    });
+  }
+
+  loadModules() {
+    this.adminService.getModules().subscribe({
+      next: (data) => this.allModules = data,
+      error: (err) => console.error('Error fetching modules', err)
     });
   }
 
@@ -96,20 +80,207 @@ export class UsersManagerComponent implements OnInit {
     this.router.navigate(['/admin']);
   }
 
-  addNewCompany() {
-    const name = prompt('Enter New Company Name:');
-    if (!name) return;
+  onSearch() {
+    this.currentPage = 1;
+    if (this.searchQuery.trim()) {
+      const lowerQuery = this.searchQuery.toLowerCase();
+      this.filteredCompanies = this.companies.filter(c => c.name.toLowerCase().includes(lowerQuery));
+    } else {
+      this.filteredCompanies = [...this.companies];
+    }
+    this.totalPages = Math.ceil(this.filteredCompanies.length / this.pageSize);
+    this.updatePagination();
+  }
+
+  updatePagination() {
+    const startIndex = (this.currentPage - 1) * this.pageSize;
+    this.paginatedCompanies = this.filteredCompanies.slice(startIndex, startIndex + this.pageSize);
+  }
+
+  changePage(page: number) {
+    if (page >= 1 && page <= this.totalPages) {
+      this.currentPage = page;
+      this.updatePagination();
+    }
+  }
+
+  toggleExpand(companyId: string) {
+    if (this.expandedCompanyId === companyId) {
+      this.expandedCompanyId = null;
+    } else {
+      this.expandedCompanyId = companyId;
+    }
+  }
+
+  // --- Company Edit/Delete ---
+  openAddCompanyModal() {
+    this.editingCompanyId = null;
+    this.originalDepartments = [];
+    this.showAddCompanyModal = true;
+    this.newCompanyName = '';
+    this.newDepartmentName = '';
+    this.newDepartmentsList = [];
+  }
+
+  editCompany(comp: any) {
+    this.editingCompanyId = comp.id;
+    this.newCompanyName = comp.name;
+    this.newDepartmentsList = (comp.departments || []).map((d: any) => ({
+      id: d.id,
+      name: d.name
+    }));
+    this.originalDepartments = JSON.parse(JSON.stringify(this.newDepartmentsList));
+    this.showAddCompanyModal = true;
+  }
+
+  async deleteCompany(comp: any) {
+    const ok = await Dialog.confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟', 'تأكيد الحذف');
+    if (ok) {
+      this.adminService.deleteCompany(comp.id).subscribe(() => this.loadData());
+    }
+  }
+
+  closeAddCompanyModal() {
+    this.showAddCompanyModal = false;
+  }
+
+  addDepartmentToList() {
+    if (this.newDepartmentName.trim()) {
+      this.newDepartmentsList.push({ name: this.newDepartmentName.trim() });
+      this.newDepartmentName = '';
+    }
+  }
+
+  removeDepartmentFromList(index: number) {
+    this.newDepartmentsList.splice(index, 1);
+  }
+
+  async saveCompany() {
+    if (this.isSubmitting) return;
+    if (!this.newCompanyName.trim()) {
+      Dialog.alert('الرجاء إدخال اسم الشركة', 'تنبيه', 'info');
+      return;
+    }
     
-    this.adminService.createCompany(name).subscribe({
-      next: () => {
-        alert('Company added successfully!');
-        this.ngOnInit(); // reload list
+    this.isSubmitting = true;
+    try {
+      if (this.editingCompanyId) {
+        // --- EDIT MODE ---
+        await this.adminService.updateCompany(this.editingCompanyId, this.newCompanyName).toPromise();
+        
+        const currentDeptIds = this.newDepartmentsList.filter(d => d.id).map(d => d.id);
+        const originalDeptIds = this.originalDepartments.map(d => d.id);
+        
+        const deptsToDelete = originalDeptIds.filter(id => !currentDeptIds.includes(id));
+        if (deptsToDelete.length > 0) {
+          await Promise.all(deptsToDelete.map(id => this.adminService.deleteDepartment(id).toPromise()));
+        }
+        
+        const validDepts = this.newDepartmentsList.filter(d => d.name.trim());
+        const deptPromises = validDepts.map(dept => {
+          if (dept.id) {
+            return this.adminService.updateDepartment(dept.id, dept.name.trim()).toPromise();
+          } else {
+            return this.adminService.createDepartment(this.editingCompanyId!, dept.name.trim()).toPromise();
+          }
+        });
+        
+        await Promise.all(deptPromises);
+      } else {
+        // --- CREATE MODE ---
+        const comp = await this.adminService.createCompany(this.newCompanyName).toPromise();
+        const companyId = comp.id;
+        
+        const validDepts = this.newDepartmentsList.filter(d => d.name.trim());
+        const deptPromises = validDepts.map(dept => 
+          this.adminService.createDepartment(companyId, dept.name.trim()).toPromise()
+        );
+        
+        await Promise.all(deptPromises);
+      }
+      
+      this.isSubmitting = false;
+      this.closeAddCompanyModal();
+      this.loadData();
+    } catch (err) {
+      this.isSubmitting = false;
+      console.error('Error saving company', err);
+      Dialog.alert('حدث خطأ أثناء حفظ الشركة.', 'خطأ', 'error');
+    }
+  }
+
+  // --- Assign Modules Logic ---
+  openAssignModulesModal(company: any, department: any) {
+    this.assigningCompany = company;
+    this.assigningDepartment = department;
+    this.assignedModules = [];
+    this.pendingAssignedModuleIds.clear();
+    this.showAssignModulesModal = true;
+    
+    this.adminService.getDepartmentAssignments(department.id).subscribe({
+      next: (assignments) => {
+        this.assignedModules = assignments;
+        assignments.forEach((a: any) => this.pendingAssignedModuleIds.add(a.moduleId));
       },
-      error: (err) => alert('Failed to add company: ' + (err.error?.detail || err.message))
+      error: (err) => {
+        console.error('Error fetching assignments', err);
+      }
     });
   }
 
-  notImplemented(feature: string) {
-    alert(`[UI Demo] The '${feature}' feature will be connected to the backend soon!`);
+  closeAssignModulesModal() {
+    this.showAssignModulesModal = false;
+    this.assigningCompany = null;
+    this.assigningDepartment = null;
+    this.pendingAssignedModuleIds.clear();
+  }
+
+  isModuleAssigned(moduleId: string): boolean {
+    return this.pendingAssignedModuleIds.has(moduleId);
+  }
+
+  toggleModuleAssignment(moduleId: string, event: any) {
+    if (event.target.checked) {
+      this.pendingAssignedModuleIds.add(moduleId);
+    } else {
+      this.pendingAssignedModuleIds.delete(moduleId);
+    }
+  }
+
+  async saveModuleAssignments() {
+    this.isSubmitting = true;
+    const currentAssignmentIds = new Set(this.assignedModules.map(a => a.moduleId));
+    const departmentId = this.assigningDepartment.id;
+
+    const toAdd = Array.from(this.pendingAssignedModuleIds).filter(id => !currentAssignmentIds.has(id));
+    const toRemove = this.assignedModules.filter(a => !this.pendingAssignedModuleIds.has(a.moduleId));
+
+    try {
+      for (const moduleId of toAdd) {
+        await new Promise<void>((resolve, reject) => {
+          this.adminService.assignModule(moduleId, departmentId).subscribe({
+            next: () => resolve(),
+            error: (err) => reject(err)
+          });
+        });
+      }
+
+      for (const assignment of toRemove) {
+        await new Promise<void>((resolve, reject) => {
+          this.adminService.removeAssignment(assignment.id).subscribe({
+            next: () => resolve(),
+            error: (err) => reject(err)
+          });
+        });
+      }
+      
+      this.isSubmitting = false;
+      Dialog.alert('تم حفظ إسنادات الموديولات بنجاح!', 'نجاح', 'success');
+      this.closeAssignModulesModal();
+    } catch (err: any) {
+      this.isSubmitting = false;
+      console.error('Error saving assignments', err);
+      Dialog.alert('حدث خطأ أثناء حفظ الإسنادات.', 'خطأ', 'error');
+    }
   }
 }

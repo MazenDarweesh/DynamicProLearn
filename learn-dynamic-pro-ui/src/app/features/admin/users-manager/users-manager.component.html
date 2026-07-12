@@ -1,1 +1,164 @@
-<p>users-manager works!</p>
+<div class="dashboard-container">
+  <header class="header">
+    <button class="btn-back mb-3" (click)="goBack()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="9 14 4 9 9 4"></polyline>
+        <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+      </svg>
+      العودة للوحة التحكم
+    </button>
+    <div class="d-flex justify-between w-100 align-center">
+      <h2 class="m-0" style="color: var(--color-navy)">إدارة الشركات</h2>
+      <button class="btn-primary" (click)="openAddCompanyModal()">+ إضافة شركة</button>
+    </div>
+  </header>
+
+  <div class="card">
+    <div class="filters mb-4">
+      <input type="text" class="form-control" placeholder="بحث باسم الشركة..." [(ngModel)]="searchQuery" (input)="onSearch()">
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th width="50"></th>
+          <th>اسم الشركة</th>
+          <th>عدد الأقسام</th>
+          <th>الحالة</th>
+          <th class="text-left" style="text-align: left;">الإجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngIf="isLoading"><td colspan="5" class="text-center">جاري التحميل...</td></tr>
+        <ng-container *ngFor="let comp of paginatedCompanies">
+          <tr>
+            <td>
+              <button class="icon-btn" (click)="toggleExpand(comp.id)">
+                <svg *ngIf="expandedCompanyId !== comp.id" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                <svg *ngIf="expandedCompanyId === comp.id" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="18 15 12 9 6 15"></polyline></svg>
+              </button>
+            </td>
+            <td class="fw-500 text-primary">{{ comp.name }}</td>
+            <td class="text-secondary">{{ comp.departments?.length || 0 }} أقسام</td>
+            <td><span class="badge badge-success">نشط</span></td>
+            <td style="text-align: left;">
+              <div class="d-flex gap-2" style="justify-content: flex-end;">
+                <button class="icon-btn text-secondary" (click)="editCompany(comp)" title="تعديل">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                </button>
+                <button class="icon-btn text-danger" (click)="deleteCompany(comp)" title="حذف">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </div>
+            </td>
+          </tr>
+          
+          <!-- Expanded Row: Departments -->
+          <tr *ngIf="expandedCompanyId === comp.id" class="expanded-row">
+            <td colspan="5" class="p-0 border-0">
+              <div class="sub-table-container">
+                <div class="d-flex justify-between mb-2">
+                  <h4 class="m-0 text-secondary" style="font-size: 14px;">الأقسام التابعة لشركة {{comp.name}}</h4>
+                </div>
+                <table class="sub-table">
+                  <thead>
+                    <tr>
+                      <th>القسم</th>
+                      <th style="text-align: left;">إسناد موديولات</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let dept of comp.departments">
+                      <td class="fw-500">{{ dept.name }}</td>
+                      <td style="text-align: left;">
+                        <button class="btn-primary" style="padding: 4px 12px; font-size: 12px;" (click)="openAssignModulesModal(comp, dept)">إسناد موديول</button>
+                      </td>
+                    </tr>
+                    <tr *ngIf="!comp.departments || comp.departments.length === 0">
+                      <td colspan="2" class="text-center text-secondary">لا توجد أقسام لهذه الشركة</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </td>
+          </tr>
+        </ng-container>
+        <tr *ngIf="!isLoading && filteredCompanies.length === 0"><td colspan="5" class="text-center text-secondary">لا توجد شركات مطابقة للبحث.</td></tr>
+      </tbody>
+    </table>
+
+    <!-- Pagination -->
+    <div class="pagination" *ngIf="totalPages > 1">
+      <button class="page-btn" [disabled]="currentPage === 1" (click)="changePage(currentPage - 1)">السابق</button>
+      <span class="text-secondary text-sm">صفحة {{ currentPage }} من {{ totalPages }}</span>
+      <button class="page-btn" [disabled]="currentPage === totalPages" (click)="changePage(currentPage + 1)">التالي</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Add/Edit Company -->
+<div class="modal-overlay" *ngIf="showAddCompanyModal" (click)="closeAddCompanyModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">{{ editingCompanyId ? 'تعديل شركة' : 'إضافة شركة جديدة' }}</h3>
+      <button class="btn-close" (click)="closeAddCompanyModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="mb-3">
+        <label class="d-block mb-2 fw-500">اسم الشركة</label>
+        <input type="text" class="form-control" [(ngModel)]="newCompanyName" placeholder="مثال: شركة التقنية الحديثة">
+      </div>
+      
+      <div class="mb-3">
+        <label class="d-block mb-2 fw-500">الأقسام (Departments)</label>
+        <div class="d-flex gap-2 mb-2">
+          <input type="text" class="form-control" [(ngModel)]="newDepartmentName" placeholder="اسم القسم الجديد..." (keyup.enter)="addDepartmentToList()">
+          <button class="btn-primary" (click)="addDepartmentToList()">إضافة</button>
+        </div>
+        <div class="item-card" style="padding: 10px;" *ngIf="newDepartmentsList.length > 0">
+          <div class="d-flex justify-between align-center mb-2" *ngFor="let dept of newDepartmentsList; let i = index">
+            <span class="fw-500">{{ dept.name }}</span>
+            <button class="icon-btn text-danger" (click)="removeDepartmentFromList(i)" title="إزالة">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer mt-4 d-flex gap-2" style="justify-content: flex-end;">
+      <button class="btn-primary" style="background: var(--color-border); color: var(--color-navy);" (click)="closeAddCompanyModal()">إلغاء</button>
+      <button class="btn-accent" [disabled]="isSubmitting" (click)="saveCompany()">
+        {{ isSubmitting ? 'جاري الحفظ...' : 'حفظ الشركة' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Modules Modal -->
+<div class="modal-overlay" *ngIf="showAssignModulesModal" (click)="closeAssignModulesModal()">
+  <div class="modal-content" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <h3 class="modal-title">إسناد موديولات للقسم</h3>
+      <button class="btn-close" (click)="closeAssignModulesModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p class="mb-3 text-secondary">
+        اختر الموديولات التي ترغب بإسنادها لقسم <strong>{{ assigningDepartment?.name }}</strong> في شركة <strong>{{ assigningCompany?.name }}</strong>.
+      </p>
+
+      <div class="module-checkbox-list">
+        <div class="checkbox-item" *ngFor="let mod of allModules">
+          <input type="checkbox" [id]="'mod_' + mod.id" [checked]="isModuleAssigned(mod.id)" (change)="toggleModuleAssignment(mod.id, $event)">
+          <label [for]="'mod_' + mod.id" style="cursor: pointer;">{{ mod.name }}</label>
+        </div>
+        <div *ngIf="allModules.length === 0" class="text-center text-secondary p-3">لا توجد موديولات متاحة</div>
+      </div>
+    </div>
+    <div class="modal-footer mt-4 d-flex gap-2" style="justify-content: flex-end;">
+      <button class="btn-primary" style="background: var(--color-border); color: var(--color-navy);" (click)="closeAssignModulesModal()">إلغاء</button>
+      <button class="btn-accent" [disabled]="isSubmitting" (click)="saveModuleAssignments()">
+        {{ isSubmitting ? 'جاري الحفظ...' : 'حفظ الإسنادات' }}
+      </button>
+    </div>
+  </div>
+</div>
