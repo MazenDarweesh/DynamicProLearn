@@ -63,7 +63,9 @@
                     <tr *ngFor="let dept of comp.departments">
                       <td class="fw-500">
                         <div class="d-flex justify-between align-center">
-                          <span>{{ dept.name }}</span>
+                          <a [routerLink]="['/admin/departments', dept.id]" class="department-link">
+                            {{ dept.name }}
+                          </a>
                           <app-progress-bar 
                             [completed]="dept.completedLessons || 0" 
                             [total]="dept.totalLessons || 0"

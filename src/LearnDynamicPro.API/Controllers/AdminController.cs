@@ -118,6 +118,22 @@ public class AdminController : ControllerBase
         return NoContent();
     }
 
+    [HttpGet("departments/{departmentId}/details")]
+    public async Task<IActionResult> GetDepartmentDetails(Guid departmentId)
+    {
+        var result = await _companyService.GetDepartmentDetailsAsync(departmentId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpPost("departments/{departmentId}/lessons/{lessonId}/mark-complete")]
+    public async Task<IActionResult> MarkLessonCompleteForDepartment(Guid departmentId, Guid lessonId)
+    {
+        var result = await _companyService.MarkLessonCompleteForDepartmentAsync(departmentId, lessonId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     // ── Users ───────────────────────────────────────────────────────────────
     [HttpPost("users")]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserRequest request)

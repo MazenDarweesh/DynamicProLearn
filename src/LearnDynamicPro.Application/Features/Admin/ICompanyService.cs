@@ -16,6 +16,8 @@ public interface ICompanyService
     Task<Result<PagedList<DepartmentDto>>> GetDepartmentsByCompanyAsync(Guid companyId, int page = 1, int pageSize = 10);
     Task<Result<bool>> UpdateDepartmentAsync(Guid id, UpdateDepartmentRequest request);
     Task<Result<bool>> DeleteDepartmentAsync(Guid id);
+    Task<Result<DepartmentDetailsDto>> GetDepartmentDetailsAsync(Guid departmentId);
+    Task<Result<bool>> MarkLessonCompleteForDepartmentAsync(Guid departmentId, Guid lessonId);
 
     // User CRUD
     Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request);

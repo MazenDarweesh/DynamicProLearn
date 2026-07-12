@@ -139,6 +139,17 @@
 .badge { padding: 4px 10px; border-radius: 6px; display: inline-block; font-size: 12px; font-weight: 600; }
 .badge-success { background: #E6F4EA; color: #137333; }
 
+.department-link {
+  color: var(--brand-blue);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+.department-link:hover {
+  color: var(--brand-orange);
+  text-decoration: underline;
+}
+
 /* Modal Styles */
 .modal-overlay {
   position: fixed;

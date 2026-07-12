@@ -47,6 +47,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/users-manager/users-manager.component').then(m => m.UsersManagerComponent)
   },
   {
+    path: 'admin/departments/:id',
+    canActivate: [roleGuard(['Admin'])],
+    loadComponent: () => import('./features/admin/department-details/department-details.component').then(m => m.DepartmentDetailsComponent)
+  },
+  {
     path: 'admin/content',
     canActivate: [roleGuard(['Admin'])],
     loadComponent: () => import('./features/admin/content-builder/content-builder.component').then(m => m.ContentBuilderComponent)

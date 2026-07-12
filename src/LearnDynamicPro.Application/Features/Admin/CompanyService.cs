@@ -7,6 +7,7 @@ using LearnDynamicPro.Application.Interfaces.Repositories;
 using LearnDynamicPro.Application.Features.Progress;
 using LearnDynamicPro.Application.Dtos.Progress;
 using UserProgressDto = LearnDynamicPro.Application.Dtos.Companies.UserProgressDto;
+using LearnDynamicPro.Application.Interfaces;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
@@ -15,12 +16,14 @@ public class CompanyService : ICompanyService
     private readonly IUnitOfWork _unitOfWork;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IProgressAnalyticsService _progressAnalytics;
+    private readonly ICurrentUserService _currentUserService;
 
-    public CompanyService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IProgressAnalyticsService progressAnalytics)
+    public CompanyService(IUnitOfWork unitOfWork, IPasswordHasher passwordHasher, IProgressAnalyticsService progressAnalytics, ICurrentUserService currentUserService)
     {
         _unitOfWork = unitOfWork;
         _passwordHasher = passwordHasher;
         _progressAnalytics = progressAnalytics;
+        _currentUserService = currentUserService;
     }
 
     public async Task<Result<CompanyDto>> CreateCompanyAsync(CreateCompanyRequest request)
@@ -199,6 +202,132 @@ public class CompanyService : ICompanyService
             return Result<bool>.Failure(AppErrors.General.NotFound);
 
         _unitOfWork.Repository<Department>().Remove(department);
+        await _unitOfWork.SaveChangesAsync();
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<DepartmentDetailsDto>> GetDepartmentDetailsAsync(Guid departmentId)
+    {
+        var department = await _unitOfWork.Repository<Department>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(d => d.Id == departmentId);
+
+        if (department == null)
+            return Result<DepartmentDetailsDto>.Failure(AppErrors.General.NotFound);
+
+        var totalUsers = await _unitOfWork.Repository<User>().Query()
+            .CountAsync(u => u.DepartmentId == departmentId && u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester);
+
+        var userIds = await _unitOfWork.Repository<User>().Query()
+            .Where(u => u.DepartmentId == departmentId && u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+            .AsNoTracking()
+            .Where(a => a.DepartmentId == departmentId)
+            .Select(a => new 
+            {
+                ModuleId = a.ModuleId,
+                ModuleName = a.Module!.Name,
+                Units = a.Module.Units!.Select(u => new 
+                {
+                    UnitId = u.Id,
+                    UnitName = u.Name,
+                    Lessons = u.Lessons!.Select(l => new 
+                    {
+                        LessonId = l.Id,
+                        LessonName = l.Title
+                    }).ToList()
+                }).ToList()
+            })
+            .ToListAsync();
+
+        var assignedLessonIds = assignments.SelectMany(m => m.Units.SelectMany(u => u.Lessons.Select(l => l.LessonId))).ToList();
+
+        var completions = new List<LessonProgress>();
+        if (userIds.Any() && assignedLessonIds.Any())
+        {
+            completions = await _unitOfWork.Repository<LessonProgress>().Query()
+                .AsNoTracking()
+                .Where(p => p.IsCompleted && userIds.Contains(p.UserId) && assignedLessonIds.Contains(p.LessonId))
+                .ToListAsync();
+        }
+
+        var result = new DepartmentDetailsDto
+        {
+            DepartmentId = department.Id,
+            DepartmentName = department.Name,
+            TotalUsers = totalUsers,
+            Modules = assignments.Select(m => new DepartmentModuleProgressDto
+            {
+                ModuleId = m.ModuleId,
+                Name = m.ModuleName,
+                TotalLessons = m.Units.SelectMany(u => u.Lessons).Count(),
+                CompletedLessons = m.Units.SelectMany(u => u.Lessons).Count(l => 
+                    userIds.Any() && userIds.All(uid => completions.Any(c => c.UserId == uid && c.LessonId == l.LessonId))
+                ),
+                Units = m.Units.Select(u => new DepartmentUnitProgressDto
+                {
+                    UnitId = u.UnitId,
+                    Name = u.UnitName,
+                    Lessons = u.Lessons.Select(l => new DepartmentLessonProgressDto
+                    {
+                        LessonId = l.LessonId,
+                        Name = l.LessonName,
+                        TotalUsersCount = totalUsers,
+                        CompletedUsersCount = completions.Count(c => c.LessonId == l.LessonId && userIds.Contains(c.UserId))
+                    }).ToList()
+                }).ToList()
+            }).ToList()
+        };
+
+        return Result<DepartmentDetailsDto>.Success(result);
+    }
+
+    public async Task<Result<bool>> MarkLessonCompleteForDepartmentAsync(Guid departmentId, Guid lessonId)
+    {
+        var adminId = _currentUserService.UserId;
+        if (adminId == Guid.Empty)
+            return Result<bool>.Failure(AppErrors.Authorization.AccessDenied);
+
+        var userIds = await _unitOfWork.Repository<User>().Query()
+            .Where(u => u.DepartmentId == departmentId && u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+            .Select(u => u.Id)
+            .ToListAsync();
+
+        if (!userIds.Any())
+            return Result<bool>.Success(true);
+
+        var existingCompletions = await _unitOfWork.Repository<LessonProgress>().Query()
+            .Where(p => p.LessonId == lessonId && userIds.Contains(p.UserId))
+            .ToListAsync();
+
+        foreach (var userId in userIds)
+        {
+            var existing = existingCompletions.FirstOrDefault(p => p.UserId == userId);
+            if (existing == null)
+            {
+                _unitOfWork.Repository<LessonProgress>().AddAsync(new LessonProgress
+                {
+                    UserId = userId,
+                    LessonId = lessonId,
+                    IsCompleted = true,
+                    CompletedAt = DateTime.UtcNow,
+                    CompletionSource = LearnDynamicPro.Domain.Enums.CompletionSource.AdminOverride,
+                    MarkedByUserId = adminId
+                });
+            }
+            else if (!existing.IsCompleted)
+            {
+                existing.IsCompleted = true;
+                existing.CompletedAt = DateTime.UtcNow;
+                existing.CompletionSource = LearnDynamicPro.Domain.Enums.CompletionSource.AdminOverride;
+                existing.MarkedByUserId = adminId;
+                _unitOfWork.Repository<LessonProgress>().Update(existing);
+            }
+        }
+
         await _unitOfWork.SaveChangesAsync();
         return Result<bool>.Success(true);
     }
