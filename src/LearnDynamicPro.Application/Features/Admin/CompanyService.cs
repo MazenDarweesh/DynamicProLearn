@@ -190,6 +190,16 @@ public class CompanyService : ICompanyService
         if (user == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
 
+        // Remove MarkedByUserId from any LessonProgress to avoid NoAction constraint error if user is an admin
+        var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+            .Where(lp => lp.MarkedByUserId == id)
+            .ToListAsync();
+        foreach (var p in markedProgresses)
+        {
+            p.MarkedByUserId = null;
+            _unitOfWork.Repository<LessonProgress>().Update(p);
+        }
+
         _unitOfWork.Repository<User>().Remove(user);
         await _unitOfWork.SaveChangesAsync();
         return Result<bool>.Success(true);
@@ -209,9 +219,34 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<bool>> DeleteCompanyAsync(Guid id)
     {
-        var company = await _unitOfWork.Repository<Company>().GetByIdAsync(id);
+        var company = await _unitOfWork.Repository<Company>().Query()
+            .Include(c => c.Users)
+            .Include(c => c.Departments)
+            .FirstOrDefaultAsync(c => c.Id == id);
+
         if (company == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        // Manually delete users to avoid NoAction FK error
+        if (company.Users.Any())
+        {
+            var userIds = company.Users.Select(u => u.Id).ToList();
+            var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                .Where(lp => lp.MarkedByUserId.HasValue && userIds.Contains(lp.MarkedByUserId.Value))
+                .ToListAsync();
+            foreach (var p in markedProgresses)
+            {
+                p.MarkedByUserId = null;
+                _unitOfWork.Repository<LessonProgress>().Update(p);
+            }
+            _unitOfWork.Repository<User>().RemoveRange(company.Users);
+        }
+
+        // Manually delete departments
+        if (company.Departments.Any())
+        {
+            _unitOfWork.Repository<Department>().RemoveRange(company.Departments);
+        }
 
         _unitOfWork.Repository<Company>().Remove(company);
         await _unitOfWork.SaveChangesAsync();
@@ -232,9 +267,26 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<bool>> DeleteDepartmentAsync(Guid id)
     {
-        var department = await _unitOfWork.Repository<Department>().GetByIdAsync(id);
+        var department = await _unitOfWork.Repository<Department>().Query()
+            .Include(d => d.Users)
+            .FirstOrDefaultAsync(d => d.Id == id);
+
         if (department == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        if (department.Users.Any())
+        {
+            var userIds = department.Users.Select(u => u.Id).ToList();
+            var markedProgresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                .Where(lp => lp.MarkedByUserId.HasValue && userIds.Contains(lp.MarkedByUserId.Value))
+                .ToListAsync();
+            foreach (var p in markedProgresses)
+            {
+                p.MarkedByUserId = null;
+                _unitOfWork.Repository<LessonProgress>().Update(p);
+            }
+            _unitOfWork.Repository<User>().RemoveRange(department.Users);
+        }
 
         _unitOfWork.Repository<Department>().Remove(department);
         await _unitOfWork.SaveChangesAsync();
