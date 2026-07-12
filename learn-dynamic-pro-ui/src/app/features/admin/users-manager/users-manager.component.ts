@@ -302,7 +302,7 @@ export class UsersManagerComponent implements OnInit {
   getFilteredModules() {
     if (!this.moduleSearchQuery.trim()) return this.allModules;
     const query = this.moduleSearchQuery.toLowerCase();
-    return this.allModules.filter(m => m.title.toLowerCase().includes(query));
+    return this.allModules.filter(m => m.name && m.name.toLowerCase().includes(query));
   }
 
   toggleModuleAssignment(moduleId: string, event: any) {
