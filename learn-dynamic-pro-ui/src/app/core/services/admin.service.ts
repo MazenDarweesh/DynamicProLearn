@@ -182,6 +182,14 @@ export class AdminService {
     return this.http.get<any>(`${this.apiUrl}/users/${userId}/details`);
   }
 
+  markLessonCompleteForUser(userId: string, lessonId: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/users/${userId}/lessons/${lessonId}/mark-complete`, {});
+  }
+
+  unmarkLessonCompleteForUser(userId: string, lessonId: string): Observable<any> {
+    return this.http.post<any>(`${this.apiUrl}/users/${userId}/lessons/${lessonId}/unmark-complete`, {});
+  }
+
   getTestersProgress(page = 1, pageSize = 10): Observable<any[]> {
     return this.http.get<any>(`${this.apiUrl}/testers-progress?page=${page}&pageSize=${pageSize}`).pipe(
       map(res => res.items ? res.items : res)

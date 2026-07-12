@@ -26,6 +26,8 @@ public interface ICompanyService
     Task<Result<PagedList<UserProgressDto>>> GetDepartmentUsersProgressAsync(Guid departmentId, int page = 1, int pageSize = 10);
     Task<Result<PagedList<UserProgressDto>>> GetAllUsersProgressAsync(Guid? companyId, Guid? departmentId, int page = 1, int pageSize = 10);
     Task<Result<UserDetailsDto>> GetUserDetailsAsync(Guid userId);
+    Task<Result<bool>> MarkLessonCompleteForUserAsync(Guid userId, Guid lessonId);
+    Task<Result<bool>> UnmarkLessonCompleteForUserAsync(Guid userId, Guid lessonId);
     Task<Result<bool>> UpdateUserAsync(Guid id, UpdateUserRequest request);
     Task<Result<bool>> DeleteUserAsync(Guid id);
     Task<Result<PagedList<UserProgressDto>>> GetAllTestersProgressAsync(int page = 1, int pageSize = 10);

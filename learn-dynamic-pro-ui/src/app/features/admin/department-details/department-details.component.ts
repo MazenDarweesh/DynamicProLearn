@@ -11,7 +11,7 @@ import { CurriculumViewerComponent } from '../../../shared/components/curriculum
 @Component({
   selector: 'app-department-details',
   standalone: true,
-  imports: [CommonModule, ProgressBarComponent, AdminHeaderComponent, ExpandableTableComponent, CurriculumViewerComponent],
+  imports: [CommonModule, AdminHeaderComponent, CurriculumViewerComponent],
   templateUrl: './department-details.component.html',
   styleUrls: ['./department-details.component.css']
 })

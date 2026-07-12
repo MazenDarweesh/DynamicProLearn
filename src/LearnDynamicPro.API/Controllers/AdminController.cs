@@ -344,4 +344,20 @@ public class AdminController : ControllerBase
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
+
+    [HttpPost("users/{userId}/lessons/{lessonId}/mark-complete")]
+    public async Task<IActionResult> MarkLessonCompleteForUser(Guid userId, Guid lessonId)
+    {
+        var result = await _companyService.MarkLessonCompleteForUserAsync(userId, lessonId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpPost("users/{userId}/lessons/{lessonId}/unmark-complete")]
+    public async Task<IActionResult> UnmarkLessonCompleteForUser(Guid userId, Guid lessonId)
+    {
+        var result = await _companyService.UnmarkLessonCompleteForUserAsync(userId, lessonId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 }

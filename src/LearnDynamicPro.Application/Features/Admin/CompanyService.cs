@@ -7,7 +7,6 @@ using LearnDynamicPro.Application.Interfaces.Repositories;
 using LearnDynamicPro.Application.Features.Progress;
 using LearnDynamicPro.Application.Dtos.Progress;
 using UserProgressDto = LearnDynamicPro.Application.Dtos.Companies.UserProgressDto;
-using LearnDynamicPro.Application.Interfaces;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
@@ -392,6 +391,61 @@ public class CompanyService : ICompanyService
         return Result<UserDetailsDto>.Success(result);
     }
 
+    public async Task<Result<bool>> MarkLessonCompleteForUserAsync(Guid userId, Guid lessonId)
+    {
+        var adminId = _currentUserService.UserId;
+        if (adminId == Guid.Empty)
+            return Result<bool>.Failure(AppErrors.Authorization.AccessDenied);
+
+        var existing = await _unitOfWork.Repository<LessonProgress>().Query()
+            .FirstOrDefaultAsync(p => p.LessonId == lessonId && p.UserId == userId);
+
+        if (existing == null)
+        {
+            await _unitOfWork.Repository<LessonProgress>().AddAsync(new LessonProgress
+            {
+                UserId = userId,
+                LessonId = lessonId,
+                IsCompleted = true,
+                CompletedAt = DateTime.UtcNow,
+                CompletionSource = LearnDynamicPro.Domain.Enums.CompletionSource.AdminOverride,
+                MarkedByUserId = adminId
+            });
+        }
+        else if (!existing.IsCompleted)
+        {
+            existing.IsCompleted = true;
+            existing.CompletedAt = DateTime.UtcNow;
+            existing.CompletionSource = LearnDynamicPro.Domain.Enums.CompletionSource.AdminOverride;
+            existing.MarkedByUserId = adminId;
+            _unitOfWork.Repository<LessonProgress>().Update(existing);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<bool>> UnmarkLessonCompleteForUserAsync(Guid userId, Guid lessonId)
+    {
+        var adminId = _currentUserService.UserId;
+        if (adminId == Guid.Empty)
+            return Result<bool>.Failure(AppErrors.Authorization.AccessDenied);
+
+        var existing = await _unitOfWork.Repository<LessonProgress>().Query()
+            .FirstOrDefaultAsync(p => p.LessonId == lessonId && p.UserId == userId);
+
+        if (existing != null && existing.IsCompleted)
+        {
+            existing.IsCompleted = false;
+            existing.CompletedAt = null;
+            existing.MarkedByUserId = adminId;
+            _unitOfWork.Repository<LessonProgress>().Update(existing);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        return Result<bool>.Success(true);
+    }
+
     public async Task<Result<bool>> MarkLessonCompleteForDepartmentAsync(Guid departmentId, Guid lessonId)
     {
         var adminId = _currentUserService.UserId;
@@ -415,7 +469,7 @@ public class CompanyService : ICompanyService
             var existing = existingCompletions.FirstOrDefault(p => p.UserId == userId);
             if (existing == null)
             {
-                _unitOfWork.Repository<LessonProgress>().AddAsync(new LessonProgress
+                await _unitOfWork.Repository<LessonProgress>().AddAsync(new LessonProgress
                 {
                     UserId = userId,
                     LessonId = lessonId,

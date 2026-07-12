@@ -10,7 +10,7 @@ import { CurriculumViewerComponent } from '../../../shared/components/curriculum
 @Component({
   selector: 'app-employee-details',
   standalone: true,
-  imports: [CommonModule, ProgressBarComponent, AdminHeaderComponent, CurriculumViewerComponent],
+  imports: [CommonModule, AdminHeaderComponent, CurriculumViewerComponent],
   templateUrl: './employee-details.component.html',
   styleUrls: ['./employee-details.component.css']
 })
@@ -55,6 +55,30 @@ export class EmployeeDetailsComponent implements OnInit {
         Dialog.alert('فشل في تحميل بيانات الموظف', 'خطأ', 'error');
         this.isLoading = false;
         this.router.navigate(['/admin/employees']);
+      }
+    });
+  }
+
+  onMarkLessonComplete(lessonId: string): void {
+    this.adminService.markLessonCompleteForUser(this.employeeId, lessonId).subscribe({
+      next: () => {
+        Dialog.alert('تم اكتمال الدرس بنجاح', 'نجاح', 'success');
+        this.loadEmployeeDetails();
+      },
+      error: () => Dialog.alert('فشل في اكتمال الدرس', 'خطأ', 'error')
+    });
+  }
+
+  onUnmarkLessonComplete(lessonId: string): void {
+    Dialog.confirm('هل أنت متأكد من إلغاء اكتمال هذا الدرس؟', 'إلغاء الاكتمال').then(confirmed => {
+      if (confirmed) {
+        this.adminService.unmarkLessonCompleteForUser(this.employeeId, lessonId).subscribe({
+          next: () => {
+            Dialog.alert('تم إلغاء الاكتمال بنجاح', 'نجاح', 'success');
+            this.loadEmployeeDetails();
+          },
+          error: () => Dialog.alert('فشل في إلغاء الاكتمال', 'خطأ', 'error')
+        });
       }
     });
   }

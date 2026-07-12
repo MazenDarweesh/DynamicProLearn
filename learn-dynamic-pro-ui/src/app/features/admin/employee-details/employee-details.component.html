@@ -38,7 +38,9 @@
       [isAllExpanded]="isAllExpanded"
       [isLoading]="isLoading"
       [isDepartmentView]="false"
-      [isStudentView]="true">
+      [isStudentView]="true"
+      (onMarkLessonComplete)="onMarkLessonComplete($event)"
+      (onUnmarkLessonComplete)="onUnmarkLessonComplete($event)">
     </app-curriculum-viewer>
 
   </div>
