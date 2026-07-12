@@ -30,10 +30,11 @@ export class EmployeesManagerComponent implements OnInit {
   pageSize = 10;
   isLoading = false;
 
-  // Edit Modal State
-  showEditModal = false;
-  editData: any = {};
-  editFilteredDepartments: any[] = [];
+  // Modal State
+  showModal = false;
+  isEditMode = false;
+  formData: any = {};
+  filteredDepartmentsForForm: any[] = [];
 
   ngOnInit() {
     this.loadFilterData();
@@ -86,8 +87,29 @@ export class EmployeesManagerComponent implements OnInit {
     return Math.min(a, b);
   }
 
+  openAddModal() {
+    this.isEditMode = false;
+    this.formData = {
+      username: '',
+      password: '',
+      companyId: this.filterCompanyId || null,
+      departmentId: this.filterDepartmentId || null
+    };
+
+    if (this.formData.companyId) {
+      this.adminService.getDepartments(this.formData.companyId, 1, 100).subscribe(res => {
+        this.filteredDepartmentsForForm = res;
+      });
+    } else {
+      this.filteredDepartmentsForForm = [];
+    }
+
+    this.showModal = true;
+  }
+
   openEditModal(emp: any) {
-    this.editData = {
+    this.isEditMode = true;
+    this.formData = {
       userId: emp.userId,
       username: emp.userName,
       password: '',
@@ -97,49 +119,66 @@ export class EmployeesManagerComponent implements OnInit {
     
     // Load departments for this company
     this.adminService.getDepartments(emp.companyId, 1, 100).subscribe(res => {
-      this.editFilteredDepartments = res;
-      this.showEditModal = true;
+      this.filteredDepartmentsForForm = res;
+      this.showModal = true;
     });
   }
 
-  onEditCompanyChange() {
-    this.editData.departmentId = null;
-    if (this.editData.companyId) {
-      this.adminService.getDepartments(this.editData.companyId, 1, 100).subscribe(res => {
-        this.editFilteredDepartments = res;
+  onFormCompanyChange() {
+    this.formData.departmentId = null;
+    if (this.formData.companyId) {
+      this.adminService.getDepartments(this.formData.companyId, 1, 100).subscribe(res => {
+        this.filteredDepartmentsForForm = res;
       });
     } else {
-      this.editFilteredDepartments = [];
+      this.filteredDepartmentsForForm = [];
     }
   }
 
-  closeEditModal() {
-    this.showEditModal = false;
+  closeModal() {
+    this.showModal = false;
   }
 
   saveEmployee() {
-    if (!this.editData.username || !this.editData.companyId || !this.editData.departmentId) {
-      Dialog.alert('يرجى ملء جميع الحقول المطلوبة', 'خطأ');
+    if (!this.formData.username || !this.formData.companyId || !this.formData.departmentId) {
+      Dialog.alert('يرجى ملء جميع الحقول المطلوبة', 'خطأ', 'error');
       return;
     }
 
-    const payload = {
-      username: this.editData.username,
-      password: this.editData.password,
-      companyId: this.editData.companyId,
-      departmentId: this.editData.departmentId
-    };
+    if (this.isEditMode) {
+      const payload = {
+        username: this.formData.username,
+        password: this.formData.password,
+        companyId: this.formData.companyId,
+        departmentId: this.formData.departmentId
+      };
 
-    this.adminService.updateUser(this.editData.userId, payload).subscribe({
-      next: () => {
-        Dialog.alert('تم تعديل بيانات الموظف بنجاح', 'نجاح', 'success');
-        this.closeEditModal();
-        this.loadEmployees();
-      },
-      error: () => {
-        Dialog.alert('حدث خطأ أثناء حفظ التعديلات', 'خطأ', 'error');
+      this.adminService.updateUser(this.formData.userId, payload).subscribe({
+        next: () => {
+          Dialog.alert('تم تعديل بيانات الموظف بنجاح', 'نجاح', 'success');
+          this.closeModal();
+          this.loadEmployees();
+        },
+        error: () => {
+          Dialog.alert('حدث خطأ أثناء حفظ التعديلات', 'خطأ', 'error');
+        }
+      });
+    } else {
+      if (!this.formData.password) {
+        Dialog.alert('كلمة المرور مطلوبة للموظف الجديد', 'خطأ', 'error');
+        return;
       }
-    });
+      this.adminService.createUser(this.formData.companyId, this.formData.departmentId, this.formData.username, this.formData.password).subscribe({
+        next: () => {
+          Dialog.alert('تمت إضافة الموظف بنجاح', 'نجاح', 'success');
+          this.closeModal();
+          this.loadEmployees();
+        },
+        error: (err) => {
+          Dialog.alert(err?.error?.message || 'حدث خطأ أثناء إضافة الموظف', 'خطأ', 'error');
+        }
+      });
+    }
   }
 
   deleteEmployee(userId: string) {
