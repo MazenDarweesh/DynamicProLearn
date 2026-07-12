@@ -422,15 +422,11 @@ public class CompanyService : ICompanyService
             .Where(a => a.DepartmentId == departmentId)
             .Select(a => new 
             {
-                ModuleName = a.Module != null ? a.Module.Name : "",
-                LessonIds = a.Module != null && a.Module.Units != null 
-                    ? a.Module.Units.Where(u => u.Lessons != null).SelectMany(u => u.Lessons).Select(l => l.Id).ToList() 
-                    : new List<Guid>()
+                ModuleName = a.Module != null ? a.Module.Name : ""
             })
             .ToListAsync();
 
         var assignedModulesNames = string.Join(", ", assignments.Select(a => a.ModuleName));
-        var totalLessons = assignments.Sum(a => a.LessonIds.Count);
         var userIds = users.Select(u => u.Id).ToList();
         var progressMap = await _progressAnalytics.GetUsersProgressAsync(userIds);
 
@@ -455,8 +451,6 @@ public class CompanyService : ICompanyService
     {
         var query = _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
-            .Include(u => u.Company)
-            .Include(u => u.Department)
             .Where(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester);
 
         if (companyId.HasValue && companyId.Value != Guid.Empty)
@@ -490,10 +484,7 @@ public class CompanyService : ICompanyService
             .Select(a => new 
             {
                 DepartmentId = a.DepartmentId,
-                ModuleName = a.Module != null ? a.Module.Name : "",
-                LessonIds = a.Module != null && a.Module.Units != null 
-                    ? a.Module.Units.Where(u => u.Lessons != null).SelectMany(u => u.Lessons).Select(l => l.Id).ToList() 
-                    : new List<Guid>()
+                ModuleName = a.Module != null ? a.Module.Name : ""
             })
             .ToListAsync();
 
@@ -552,10 +543,7 @@ public class CompanyService : ICompanyService
             .Select(a => new 
             {
                 DepartmentId = a.DepartmentId,
-                ModuleName = a.Module != null ? a.Module.Name : "",
-                LessonIds = a.Module != null && a.Module.Units != null 
-                    ? a.Module.Units.Where(u => u.Lessons != null).SelectMany(u => u.Lessons).Select(l => l.Id).ToList() 
-                    : new List<Guid>()
+                ModuleName = a.Module != null ? a.Module.Name : ""
             })
             .ToListAsync();
 
