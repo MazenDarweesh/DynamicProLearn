@@ -1,4 +1,4 @@
-import { Component, ContentChild, Input, TemplateRef } from '@angular/core';
+import { Component, ContentChild, Input, TemplateRef, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
@@ -40,7 +40,8 @@ import { CommonModule } from '@angular/common';
       </tbody>
     </table>
   `,
-  styleUrls: ['./expandable-table.component.css']
+  styleUrls: ['./expandable-table.component.css'],
+  encapsulation: ViewEncapsulation.None
 })
 export class ExpandableTableComponent {
   @Input() data: any[] = [];
