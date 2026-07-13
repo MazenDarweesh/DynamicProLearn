@@ -16,9 +16,7 @@
           <h1 class="m-0" style="display: flex; align-items: center; gap: 8px; font-size: 20px; color: white;">
             {{ title || 'لوحة تحكم الأدمن' }}
           </h1>
-          <p *ngIf="subtitle && userRole() === 'Admin'" class="m-0 text-sm" style="color: rgba(255,255,255,0.8); margin-top: 4px !important;">{{
-            subtitle }}</p>
-          <div *ngIf="userRole() !== 'Admin'" class="d-flex align-center gap-1 m-0 text-sm" style="color: rgba(255,255,255,0.8); margin-top: 4px !important;">
+          <div class="d-flex align-center gap-1 m-0 text-sm" style="color: rgba(255,255,255,0.8); margin-top: 4px !important;">
             <span class="icon" style="font-size: 14px;">👤</span> أهلاً بك، {{ userName() || 'المستخدم' }}
           </div>
         </div>
