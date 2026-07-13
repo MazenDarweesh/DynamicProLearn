@@ -1,0 +1,95 @@
+<app-admin-header 
+  *ngIf="testerDetails"
+  title="تفاصيل المختبر: {{ testerDetails.name }}" 
+  subtitle="مراجعة التقييمات والتعليقات الخاصة بكل درس"
+  [showBackBtn]="true">
+</app-admin-header>
+
+<div class="dashboard-container" *ngIf="!isLoading && testerDetails">
+  <div class="d-flex justify-between w-100 align-center mb-4">
+    <h2 class="m-0" style="color: var(--color-navy)">بيانات المختبر وتقييماته</h2>
+    <div class="d-flex align-center gap-3">
+      
+      <button (click)="exportToExcel()" class="btn-green d-flex align-center gap-2" style="padding: 10px 15px; border-radius: 8px; font-weight: 500; border: none; cursor: pointer;">
+        <i class="fi fi-rr-file-excel"></i> تصدير إكسيل
+      </button>
+
+      <div class="stats-badge" style="background: rgba(245, 130, 32, 0.1); color: var(--brand-orange); padding: 10px 15px; border-radius: 8px; font-weight: 500; font-size: 14px; display: flex; align-items: center;">
+        <span>الدروس المكتملة: <strong style="font-size: 16px;">{{ testerDetails.completedLessons }}</strong></span>
+      </div>
+      <div class="stats-badge" style="background: rgba(67, 56, 202, 0.1); color: var(--brand-blue); padding: 10px 15px; border-radius: 8px; font-weight: 500; font-size: 14px; display: flex; align-items: center;">
+        <span>إجمالي الدروس المسندة: <strong style="font-size: 16px;">{{ testerDetails.totalAssignedLessons }}</strong></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Progress Bar Top Card -->
+  <div class="card p-4 mb-4" style="border: 1px solid rgba(0,0,0,0.05); border-radius: 12px;">
+    <div class="d-flex align-center gap-3 mb-3">
+      <div style="background: rgba(245, 130, 32, 0.1); color: var(--color-accent); padding: 12px; border-radius: 50%;">
+        <i class="fi fi-rr-test" style="font-size: 24px;"></i>
+      </div>
+      <div>
+        <h3 class="m-0 text-primary" style="font-size: 18px;">{{ testerDetails.name }}</h3>
+        <p class="m-0 text-secondary" style="font-size: 14px;">{{ testerDetails.email }}</p>
+      </div>
+    </div>
+    
+    <div class="w-100 mt-2">
+      <app-progress-bar 
+        [completed]="testerDetails.completedLessons" 
+        [total]="testerDetails.totalAssignedLessons">
+      </app-progress-bar>
+    </div>
+  </div>
+
+  <div class="card p-0">
+    <!-- Empty State -->
+    <div *ngIf="testerDetails.feedbacks.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
+      <i class="fi fi-rr-folder-open mb-3" style="font-size: 40px; color: rgba(0,0,0,0.1);"></i>
+      <h3 class="m-0">لا توجد تقييمات</h3>
+      <p class="mt-2">لم يقم هذا المختبر بتقييم أي دروس حتى الآن.</p>
+    </div>
+
+    <!-- Feedbacks Table -->
+    <table *ngIf="testerDetails.feedbacks.length > 0" class="data-table w-100">
+      <thead>
+        <tr>
+          <th>الموديول</th>
+          <th>الوحدة</th>
+          <th>الدرس</th>
+          <th>الحالة</th>
+          <th style="width: 35%;">تعليقات المختبر</th>
+          <th>تاريخ التقييم</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let f of testerDetails.feedbacks">
+          <td class="fw-500 text-primary">{{ f.moduleName }}</td>
+          <td class="text-secondary">{{ f.unitName }}</td>
+          <td class="text-secondary">{{ f.lessonName }}</td>
+          <td>
+            <span class="badge" 
+                  [ngClass]="{
+                    'badge-success': f.status === 'مكتمل' || f.status === 'سليم 100%',
+                    'badge-danger': f.status === 'بها أخطاء',
+                    'badge-secondary': f.status === 'غير مختبر'
+                  }">
+              {{ f.status }}
+            </span>
+          </td>
+          <td>
+            <p class="m-0" style="font-size: 13px; color: #475569; white-space: pre-wrap; line-height: 1.5;">{{ f.comment || '-' }}</p>
+          </td>
+          <td class="text-secondary text-sm">
+            {{ f.evaluationDate ? (f.evaluationDate | date:'yyyy-MM-dd') : '-' }}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div *ngIf="isLoading" class="d-flex justify-center align-center" style="height: 50vh;">
+  <p class="text-secondary" style="font-size: 18px;">جاري تحميل بيانات المختبر...</p>
+</div>

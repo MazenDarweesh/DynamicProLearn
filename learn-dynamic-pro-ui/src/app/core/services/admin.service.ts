@@ -163,6 +163,10 @@ export class AdminService {
     return this.http.get<any>(`${this.apiUrl}/users/${userId}/details`);
   }
 
+  getTesterDetails(testerId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/testers/${testerId}/details`);
+  }
+
   markLessonCompleteForUser(userId: string, lessonId: string): Observable<any> {
     return this.http.post<any>(`${this.apiUrl}/users/${userId}/lessons/${lessonId}/mark-complete`, {});
   }

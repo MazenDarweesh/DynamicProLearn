@@ -77,7 +77,11 @@
           </thead>
           <tbody>
             <tr *ngFor="let t of testersProgress">
-              <td class="fw-500">{{ t.name }}</td>
+              <td class="fw-500">
+                <a [routerLink]="['/admin/testers', t.userId]" class="text-primary text-decoration-none" style="cursor: pointer; transition: color 0.2s;" onmouseover="this.style.color='var(--color-accent)'" onmouseout="this.style.color='var(--color-primary)'">
+                  {{ t.name }}
+                </a>
+              </td>
               <td class="text-secondary">{{ t.assignedModules }}</td>
               <td>
                 <app-progress-bar 

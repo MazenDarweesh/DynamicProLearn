@@ -350,6 +350,14 @@ public class AdminController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpGet("testers/{id}/details")]
+    public async Task<IActionResult> GetTesterDetails(Guid id)
+    {
+        var result = await _companyService.GetTesterDetailsAsync(id);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     [HttpPost("users/{userId}/lessons/{lessonId}/mark-complete")]
     public async Task<IActionResult> MarkLessonCompleteForUser(Guid userId, Guid lessonId)
     {

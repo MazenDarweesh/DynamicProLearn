@@ -1,5 +1,8 @@
-using LearnDynamicPro.Application.Dtos.Companies;
 using LearnDynamicPro.Application.Common;
+using LearnDynamicPro.Application.Dtos.Companies;
+using LearnDynamicPro.Application.Dtos.Progress;
+using LearnDynamicPro.Application.DTOs.Tester;
+using UserProgressDto = LearnDynamicPro.Application.Dtos.Companies.UserProgressDto;
 
 namespace LearnDynamicPro.Application.Features.Admin;
 
@@ -31,6 +34,7 @@ public interface ICompanyService
     Task<Result<bool>> UpdateUserAsync(Guid id, UpdateUserRequest request);
     Task<Result<bool>> DeleteUserAsync(Guid id);
     Task<Result<PagedList<UserProgressDto>>> GetAllTestersProgressAsync(int page = 1, int pageSize = 10);
+    Task<Result<TesterDetailsDto>> GetTesterDetailsAsync(Guid testerId);
     // Dashboard Stats
     Task<Result<DashboardStatsDto>> GetDashboardStatsAsync();
 }

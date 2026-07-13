@@ -1,0 +1,44 @@
+.dashboard-container {
+    padding: 24px;
+    max-width: 1400px;
+    margin: 0 auto;
+}
+
+.btn-green {
+    background-color: #10b981;
+    color: white;
+    transition: all 0.2s;
+}
+
+.btn-green:hover {
+    background-color: #059669;
+    transform: translateY(-1px);
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table th, .data-table td {
+    padding: 16px;
+    text-align: right;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
+}
+
+.data-table th {
+    background-color: rgba(0,0,0,0.02);
+    font-weight: 600;
+    color: var(--color-navy);
+}
+
+.data-table tbody tr:hover {
+    background-color: rgba(245, 130, 32, 0.02);
+}

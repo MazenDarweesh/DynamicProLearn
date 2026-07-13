@@ -12,10 +12,12 @@ import { AdminModalComponent } from '../../../shared/components/admin-modal/admi
 import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 
+import { RouterModule } from '@angular/router';
+
 @Component({
   selector: 'app-admin-testers',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent, ProgressBarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent, ProgressBarComponent],
   templateUrl: './admin-testers.component.html',
   styleUrl: '../admin-dashboard/admin-dashboard.component.css'
 })

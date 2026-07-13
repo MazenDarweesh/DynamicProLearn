@@ -911,5 +911,105 @@ public class CompanyService : ICompanyService
             AverageProgress = p.Percentage
         });
     }
+
+    public async Task<Result<LearnDynamicPro.Application.DTOs.Tester.TesterDetailsDto>> GetTesterDetailsAsync(Guid testerId)
+    {
+        var tester = await _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .Where(u => u.Id == testerId && u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+            .Select(u => new { u.Id, u.Username })
+            .FirstOrDefaultAsync();
+
+        if (tester == null)
+            return Result<LearnDynamicPro.Application.DTOs.Tester.TesterDetailsDto>.Failure(AppErrors.General.NotFound);
+
+        // Optimize: Project only necessary hierarchy data to avoid large joins and cartesian explosion
+        var assignedHierarchy = await _unitOfWork.Repository<TestCycle>().Query()
+            .AsNoTracking()
+            .Where(tc => tc.TesterId == testerId)
+            .SelectMany(tc => tc.AssignedModules)
+            .Where(am => am.Module != null)
+            .Select(am => new
+            {
+                ModuleName = am.Module!.Name,
+                Units = am.Module.Units!.Select(u => new
+                {
+                    UnitName = u.Name,
+                    Lessons = u.Lessons!.Select(l => new
+                    {
+                        LessonId = l.Id,
+                        LessonName = l.Title
+                    }).ToList()
+                }).ToList()
+            })
+            .ToListAsync();
+
+        var allLessonsCount = assignedHierarchy.SelectMany(m => m.Units).SelectMany(u => u.Lessons).Count();
+
+        // Optimize: Fetch Progress and Feedback mapped by LessonId
+        // Dictionary lookup is O(1), preventing O(N*M) inside the loops
+        var progressesDict = await _unitOfWork.Repository<LessonProgress>().Query()
+            .AsNoTracking()
+            .Where(p => p.UserId == testerId)
+            .Select(p => new { p.LessonId, p.IsCompleted, p.CompletedAt })
+            .ToDictionaryAsync(p => p.LessonId);
+
+        var feedbacksDict = await _unitOfWork.Repository<TesterFeedback>().Query()
+            .AsNoTracking()
+            .Where(f => f.UserId == testerId)
+            .Select(f => new 
+            { 
+                f.LessonId, 
+                Label = f.ConditionOption != null ? f.ConditionOption.Label : "تم التقييم",
+                f.Notes,
+                f.CreatedAt
+            })
+            .ToDictionaryAsync(f => f.LessonId);
+
+        int completedCount = progressesDict.Values.Count(p => p.IsCompleted);
+        int totalAssigned = allLessonsCount;
+        int progressPercent = totalAssigned > 0 ? (int)Math.Round((double)completedCount / totalAssigned * 100) : 0;
+
+        var feedbacksDto = new List<LearnDynamicPro.Application.DTOs.Tester.TesterLessonFeedbackDto>();
+
+        foreach (var module in assignedHierarchy)
+        {
+            foreach (var unit in module.Units)
+            {
+                foreach (var lesson in unit.Lessons)
+                {
+                    progressesDict.TryGetValue(lesson.LessonId, out var progress);
+                    feedbacksDict.TryGetValue(lesson.LessonId, out var feedback);
+                    
+                    var status = "غير مختبر";
+                    if (progress != null && progress.IsCompleted) status = "مكتمل";
+                    if (feedback != null) status = feedback.Label;
+
+                    feedbacksDto.Add(new LearnDynamicPro.Application.DTOs.Tester.TesterLessonFeedbackDto
+                    {
+                        ModuleName = module.ModuleName,
+                        UnitName = unit.UnitName,
+                        LessonName = lesson.LessonName,
+                        Status = status,
+                        Comment = feedback?.Notes,
+                        EvaluationDate = feedback?.CreatedAt ?? progress?.CompletedAt
+                    });
+                }
+            }
+        }
+
+        var result = new LearnDynamicPro.Application.DTOs.Tester.TesterDetailsDto
+        {
+            Id = tester.Id.ToString(),
+            Name = tester.Username,
+            Email = tester.Username + "@dynamic.com", // Replace with actual email if exists
+            TotalAssignedLessons = totalAssigned,
+            CompletedLessons = completedCount,
+            ProgressPercent = progressPercent,
+            Feedbacks = feedbacksDto.OrderByDescending(f => f.EvaluationDate).ToList()
+        };
+
+        return Result<LearnDynamicPro.Application.DTOs.Tester.TesterDetailsDto>.Success(result);
+    }
 }
 
