@@ -8,6 +8,8 @@ public class TestCycleConfiguration : IEntityTypeConfiguration<TestCycle>
 {
     public void Configure(EntityTypeBuilder<TestCycle> builder)
     {
+        builder.HasQueryFilter(tc => !tc.IsDeleted);
+
         builder.HasKey(tc => tc.Id);
 
         builder.HasOne(tc => tc.Version)

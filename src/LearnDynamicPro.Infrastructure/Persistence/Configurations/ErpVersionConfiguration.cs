@@ -8,6 +8,8 @@ public class ErpVersionConfiguration : IEntityTypeConfiguration<ErpVersion>
 {
     public void Configure(EntityTypeBuilder<ErpVersion> builder)
     {
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
         builder.HasKey(e => e.Id);
 
         builder.Property(e => e.VersionLabel)

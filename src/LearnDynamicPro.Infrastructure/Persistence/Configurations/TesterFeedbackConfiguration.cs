@@ -8,6 +8,8 @@ public class TesterFeedbackConfiguration : IEntityTypeConfiguration<TesterFeedba
 {
     public void Configure(EntityTypeBuilder<TesterFeedback> builder)
     {
+        builder.HasQueryFilter(tf => !tf.IsDeleted);
+
         builder.HasKey(tf => tf.Id);
 
         builder.Property(tf => tf.Notes)

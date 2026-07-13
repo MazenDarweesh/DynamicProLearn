@@ -8,6 +8,8 @@ public class FeedbackConditionOptionConfiguration : IEntityTypeConfiguration<Fee
 {
     public void Configure(EntityTypeBuilder<FeedbackConditionOption> builder)
     {
+        builder.HasQueryFilter(f => !f.IsDeleted);
+
         builder.HasKey(f => f.Id);
 
         builder.Property(f => f.Label)
