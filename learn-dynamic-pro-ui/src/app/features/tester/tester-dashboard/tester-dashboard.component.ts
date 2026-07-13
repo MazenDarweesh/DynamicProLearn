@@ -11,11 +11,12 @@ export interface DashboardModule extends ModuleDto {
 }
 
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
+import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 
 @Component({
   selector: 'app-tester-dashboard',
   standalone: true,
-  imports: [CommonModule, ProgressBarComponent],
+  imports: [CommonModule, ProgressBarComponent, AdminHeaderComponent],
   templateUrl: './tester-dashboard.component.html',
   styleUrl: './tester-dashboard.component.css'
 })
