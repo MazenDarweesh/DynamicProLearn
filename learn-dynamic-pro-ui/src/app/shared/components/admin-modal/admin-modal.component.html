@@ -27,11 +27,11 @@
 
     <!-- ── Footer ──────────────────────────────────────────── -->
     <div class="modal-footer">
-      <button class="modal-btn modal-btn--cancel" type="button"
+      <button class="btn-secondary" type="button"
               (click)="close()" [disabled]="loading">
         {{ cancelLabel }}
       </button>
-      <button class="modal-btn modal-btn--confirm" type="button"
+      <button class="btn-primary" type="button"
               (click)="confirm()" [disabled]="loading || confirmDisabled">
         <span *ngIf="loading" class="modal-spinner"></span>
         <span *ngIf="!loading">{{ confirmLabel }}</span>

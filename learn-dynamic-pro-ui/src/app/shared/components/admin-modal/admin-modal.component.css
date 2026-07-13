@@ -94,38 +94,7 @@
   background: #f8f9fa;
 }
 
-/* ── Footer Buttons ─────────────────────────────────────────────────────── */
-.modal-btn {
-  padding: 9px 22px;
-  border-radius: var(--radius-btn, 6px);
-  font-family: 'Readex Pro', inherit;
-  font-weight: 500;
-  font-size: 14px;
-  cursor: pointer;
-  transition: opacity 0.18s, transform 0.18s;
-  border: none;
-}
-.modal-btn:disabled { opacity: 0.55; cursor: not-allowed; }
-
-.modal-btn--cancel {
-  background: #e9ecef;
-  color: var(--color-navy);
-}
-.modal-btn--cancel:hover:not(:disabled) { background: #dee2e6; }
-
-.modal-btn--confirm {
-  background: var(--color-primary);
-  color: white;
-  min-width: 90px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-}
-.modal-btn--confirm:hover:not(:disabled) {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
+/* ── Footer Buttons (Global btn-primary / btn-secondary used) ── */
 
 /* ── Loading Spinner ────────────────────────────────────────────────────── */
 .modal-spinner {
