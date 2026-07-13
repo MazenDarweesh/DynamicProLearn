@@ -1,13 +1,16 @@
 <app-admin-header [showBackBtn]="true"></app-admin-header>
 
 <div class="console-container dashboard-container" dir="rtl">
-  <div class="d-flex justify-between w-100 align-center mb-4">
-    <div>
-      <h2 class="m-0" style="color: var(--color-navy)">مُنشئ المحتوى</h2>
-      <p class="text-secondary text-sm m-0 mt-1">إدارة وتعديل المناهج، الوحدات، والدروس التفاعلية</p>
+  <!-- Page Title & Action -->
+  <div style="max-width: 1400px; width: 100%; margin: 0 auto; padding: 30px 30px 0;">
+    <div class="d-flex justify-between w-100 align-center mb-0">
+      <div>
+        <h2 class="m-0" style="color: var(--color-navy)">مُنشئ المحتوى</h2>
+        <p class="text-secondary text-sm m-0 mt-1">إدارة وتعديل المناهج، الوحدات، والدروس التفاعلية</p>
+      </div>
+      <app-admin-action-button label="إضافة موديول" (clicked)="openAddModuleModal()">
+      </app-admin-action-button>
     </div>
-    <app-admin-action-button label="إضافة موديول" (clicked)="openAddModuleModal()">
-    </app-admin-action-button>
   </div>
 
   <div class="console-body">

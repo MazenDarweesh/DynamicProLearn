@@ -19,6 +19,8 @@ public interface IApplicationDbContext
     DbSet<LessonProgress> LessonProgresses { get; }
     DbSet<ErpVersion> ErpVersions { get; }
     DbSet<TesterActiveVersion> TesterActiveVersions { get; }
+    DbSet<TestCycle> TestCycles { get; }
+    DbSet<TestCycleModule> TestCycleModules { get; }
     DbSet<TesterFeedback> TesterFeedbacks { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);

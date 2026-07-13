@@ -17,4 +17,10 @@ public interface ITesterService
     Task<Result<FeedbackDto>> SubmitFeedbackAsync(SubmitFeedbackRequest request);
     Task<Result<List<FeedbackDto>>> GetFeedbackByActiveVersionAsync();
     Task<Result<List<LookupDto>>> GetConditionOptionsAsync();
+
+    // Test Cycles
+    Task<Result<List<TestCycleDto>>> GetAllTestCyclesAsync();
+    Task<Result<TestCycleDto>> CreateTestCycleAsync(CreateTestCycleRequest request);
+    Task<Result> AssignModulesToTestCycleAsync(Guid testCycleId, AssignModulesToTestCycleRequest request);
+    Task<Result> DeleteTestCycleAsync(Guid testCycleId);
 }

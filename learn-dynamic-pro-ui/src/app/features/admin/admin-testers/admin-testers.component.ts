@@ -29,8 +29,11 @@ export class AdminTestersComponent implements OnInit {
   isSubmitting = false;
 
   newVersionLabel = '';
+  testerIdForVersion = '';
   erpVersions: any[] = [];
-
+  modules: any[] = [];
+  selectedModules: string[] = [];
+  
   private http = inject(HttpClient);
 
   newTesterUsername = '';
@@ -45,6 +48,7 @@ export class AdminTestersComponent implements OnInit {
     this.loadTestersProgress();
     this.loadCompanies();
     this.loadVersions();
+    this.loadModules();
   }
 
   goTo(path: string) {
@@ -73,6 +77,7 @@ export class AdminTestersComponent implements OnInit {
     this.adminService.getTestersProgress(1, 100).subscribe({
       next: (testers) => {
         this.testersProgress = testers.map((t: any) => ({
+          userId: t.userId,
           name: t.userName,
           role: 'مختبر نظام',
           assignedModules: t.assignedModules,
@@ -82,6 +87,14 @@ export class AdminTestersComponent implements OnInit {
         }));
       },
       error: (err) => console.error('Error fetching testers', err)
+    });
+  }
+
+  loadModules() {
+    this.adminService.getModules(1, 100).subscribe({
+      next: (data) => {
+        this.modules = data;
+      }
     });
   }
 
@@ -105,7 +118,7 @@ export class AdminTestersComponent implements OnInit {
   }
 
   loadVersions() {
-    this.http.get<any[]>('http://localhost:5115/api/Tester/versions').subscribe({
+    this.http.get<any[]>('http://localhost:5115/api/admin/test-cycles').subscribe({
       next: (data) => this.erpVersions = data,
       error: (err) => console.error(err)
     });
@@ -113,6 +126,8 @@ export class AdminTestersComponent implements OnInit {
 
   openAddVersionModal() {
     this.newVersionLabel = '';
+    this.testerIdForVersion = '';
+    this.selectedModules = [];
     this.showAddVersionModal = true;
   }
 
@@ -120,19 +135,48 @@ export class AdminTestersComponent implements OnInit {
     this.showAddVersionModal = false;
   }
 
+  toggleModuleSelection(moduleId: string) {
+    const idx = this.selectedModules.indexOf(moduleId);
+    if (idx > -1) {
+      this.selectedModules.splice(idx, 1);
+    } else {
+      this.selectedModules.push(moduleId);
+    }
+  }
+
   submitVersion() {
-    if (!this.newVersionLabel.trim()) {
-      Dialog.alert('الرجاء إدخال اسم الإصدار.', 'خطأ', 'info');
+    if (!this.newVersionLabel.trim() || !this.testerIdForVersion) {
+      Dialog.alert('الرجاء إدخال اسم الإصدار وتحديد المختبر.', 'خطأ', 'info');
       return;
     }
     
     this.isSubmitting = true;
-    this.http.post('http://localhost:5115/api/Tester/versions', { versionLabel: this.newVersionLabel.trim() }).subscribe({
-      next: () => {
-        this.isSubmitting = false;
-        Dialog.alert('تمت إضافة الإصدار بنجاح!', 'نجاح', 'success');
-        this.closeAddVersionModal();
-        this.loadVersions();
+    this.http.post<any>('http://localhost:5115/api/admin/test-cycles', { 
+      versionLabel: this.newVersionLabel.trim(),
+      testerId: this.testerIdForVersion
+    }).subscribe({
+      next: (res) => {
+        if (this.selectedModules.length > 0) {
+          this.http.post(`http://localhost:5115/api/admin/test-cycles/${res.id}/modules`, {
+            moduleIds: this.selectedModules
+          }).subscribe({
+            next: () => {
+              this.isSubmitting = false;
+              Dialog.alert('تمت إضافة الدورة وتخصيص الموديولات بنجاح!', 'نجاح', 'success');
+              this.closeAddVersionModal();
+              this.loadVersions();
+            },
+            error: () => {
+              this.isSubmitting = false;
+              Dialog.alert('تم إنشاء الدورة ولكن حدث خطأ أثناء ربط الموديولات.', 'تحذير', 'info');
+            }
+          });
+        } else {
+          this.isSubmitting = false;
+          Dialog.alert('تمت إضافة الدورة بنجاح!', 'نجاح', 'success');
+          this.closeAddVersionModal();
+          this.loadVersions();
+        }
       },
       error: (err) => {
         this.isSubmitting = false;

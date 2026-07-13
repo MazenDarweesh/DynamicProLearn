@@ -1,7 +1,9 @@
 using LearnDynamicPro.Application.Dtos.Assignments;
 using LearnDynamicPro.Application.Dtos.Companies;
 using LearnDynamicPro.Application.Dtos.Modules;
+using LearnDynamicPro.Application.Dtos.Tester;
 using LearnDynamicPro.Application.Features.Admin;
+using LearnDynamicPro.Application.Features.Tester;
 using LearnDynamicPro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -17,17 +19,20 @@ public class AdminController : ControllerBase
     private readonly ICompanyService _companyService;
     private readonly IModuleService _moduleService;
     private readonly IAssignmentService _assignmentService;
+    private readonly ITesterService _testerService;
     private readonly IApplicationDbContext _context;
 
     public AdminController(
         ICompanyService companyService,
         IModuleService moduleService,
         IAssignmentService assignmentService,
+        ITesterService testerService,
         IApplicationDbContext context)
     {
         _companyService = companyService;
         _moduleService = moduleService;
         _assignmentService = assignmentService;
+        _testerService = testerService;
         _context = context;
     }
 
@@ -359,5 +364,38 @@ public class AdminController : ControllerBase
         var result = await _companyService.UnmarkLessonCompleteForUserAsync(userId, lessonId);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
+    }
+
+    // ── Test Cycles ─────────────────────────────────────────────────────────
+    [HttpGet("test-cycles")]
+    public async Task<IActionResult> GetAllTestCycles()
+    {
+        var result = await _testerService.GetAllTestCyclesAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpPost("test-cycles")]
+    public async Task<IActionResult> CreateTestCycle([FromBody] CreateTestCycleRequest request)
+    {
+        var result = await _testerService.CreateTestCycleAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpPost("test-cycles/{testCycleId}/modules")]
+    public async Task<IActionResult> AssignModulesToTestCycle(Guid testCycleId, [FromBody] AssignModulesToTestCycleRequest request)
+    {
+        var result = await _testerService.AssignModulesToTestCycleAsync(testCycleId, request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok();
+    }
+
+    [HttpDelete("test-cycles/{testCycleId}")]
+    public async Task<IActionResult> DeleteTestCycle(Guid testCycleId)
+    {
+        var result = await _testerService.DeleteTestCycleAsync(testCycleId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return NoContent();
     }
 }

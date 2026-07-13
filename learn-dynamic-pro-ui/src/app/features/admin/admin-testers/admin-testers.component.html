@@ -22,11 +22,15 @@
           <thead>
             <tr>
               <th>رقم الإصدار / النسخة</th>
+              <th>المختبر المخصص</th>
+              <th>عدد الموديولات المربوطة</th>
             </tr>
           </thead>
           <tbody>
             <tr *ngFor="let v of erpVersions">
               <td class="fw-500">{{ v.versionLabel }}</td>
+              <td>{{ v.testerName || 'غير محدد' }}</td>
+              <td>{{ v.assignedModulesCount }}</td>
             </tr>
             <tr *ngIf="erpVersions.length === 0">
               <td style="text-align: center; color: var(--color-text-secondary); padding: 32px 0;">لا توجد إصدارات مسجلة</td>
@@ -149,6 +153,31 @@
   <div class="form-group mb-3">
     <label class="form-label text-secondary text-sm mb-2 d-block">اسم الإصدار / النسخة</label>
     <input type="text" class="form-control" [(ngModel)]="newVersionLabel" placeholder="مثال: v2.1.4-beta (أحدث نسخة تجريبية)">
+  </div>
+  
+  <div class="form-group mb-3">
+    <label class="form-label text-secondary text-sm mb-2 d-block">المختبر المسؤول عن هذه النسخة</label>
+    <div class="custom-select-wrapper">
+      <select class="form-control blue-select" [(ngModel)]="testerIdForVersion">
+        <option value="" disabled selected>اختر المختبر...</option>
+        <option *ngFor="let t of testersProgress" [value]="t.userId">{{ t.name }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group mb-3">
+    <label class="form-label text-secondary text-sm mb-2 d-block">تحديد الموديولات للاختبار (اختياري)</label>
+    <div class="modules-checkbox-list" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 8px; padding: 10px;">
+      <div class="form-check mb-2" *ngFor="let m of modules">
+        <input class="form-check-input" type="checkbox" [id]="'mod_' + m.id" 
+               [checked]="selectedModules.includes(m.id)"
+               (change)="toggleModuleSelection(m.id)">
+        <label class="form-check-label text-sm ms-2 me-2" [for]="'mod_' + m.id" style="cursor: pointer;">
+          {{ m.name }}
+        </label>
+      </div>
+      <div *ngIf="modules.length === 0" class="text-secondary text-sm text-center py-2">لا توجد موديولات</div>
+    </div>
   </div>
 
 </app-admin-modal>

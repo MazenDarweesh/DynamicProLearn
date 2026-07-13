@@ -36,6 +36,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
     // ── Tester ────────────────────────────────────────────────────────
     public DbSet<ErpVersion> ErpVersions => Set<ErpVersion>();
     public DbSet<TesterActiveVersion> TesterActiveVersions => Set<TesterActiveVersion>();
+    public DbSet<TestCycle> TestCycles => Set<TestCycle>();
+    public DbSet<TestCycleModule> TestCycleModules => Set<TestCycleModule>();
     public DbSet<TesterFeedback> TesterFeedbacks => Set<TesterFeedback>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
