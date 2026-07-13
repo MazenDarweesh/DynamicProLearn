@@ -52,17 +52,11 @@ export class UsersManagerComponent implements OnInit {
   originalDepartments: any[] = [];
   newDepartmentName = '';
   
-  showDeleteCompanyModal = false;
-  deletingCompany: any = null;
-
   showAssignModulesModal = false;
   assigningCompany: any = null;
   assigningDepartment: any = null;
   assignedModules: any[] = [];
   pendingAssignedModuleIds = new Set<string>();
-  
-  showDeleteDepartmentModal = false;
-  deletingDepartment: any = null;
 
   ngOnInit() {
     this.loadData();
@@ -154,31 +148,23 @@ export class UsersManagerComponent implements OnInit {
     this.showAddCompanyModal = true;
   }
 
-  confirmDeleteCompany(comp: any) {
-    this.deletingCompany = comp;
-    this.showDeleteCompanyModal = true;
-  }
-
-  deleteCompany() {
-    if (!this.deletingCompany) return;
-    this.isSubmitting = true;
-    console.log(`[FRONTEND] Triggering delete for company ${this.deletingCompany.id}...`);
-    this.adminService.deleteCompany(this.deletingCompany.id).subscribe({
-      next: () => {
-        this.isSubmitting = false;
-        this.showDeleteCompanyModal = false;
-        console.log(`[FRONTEND] Delete company SUCCESS`);
-        this.expandedCompanyId = null;
-        this.loadData();
-        Dialog.alert('تم حذف الشركة بنجاح.', 'نجاح', 'success');
-      },
-      error: (err) => {
-        this.isSubmitting = false;
-        this.showDeleteCompanyModal = false;
-        console.error(`[FRONTEND] Delete company FAILED`, err);
-        Dialog.alert('حدث خطأ أثناء حذف الشركة. تحقق من الـ Console.', 'خطأ', 'error');
-      }
-    });
+  async deleteCompany(comp: any) {
+    const ok = await Dialog.confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟', 'تأكيد الحذف');
+    if (ok) {
+      console.log(`[FRONTEND] Triggering delete for company ${comp.id}...`);
+      this.adminService.deleteCompany(comp.id).subscribe({
+        next: () => {
+          console.log(`[FRONTEND] Delete company SUCCESS`);
+          this.expandedCompanyId = null;
+          this.loadData();
+          Dialog.alert('تم حذف الشركة بنجاح.', 'نجاح', 'success');
+        },
+        error: (err) => {
+          console.error(`[FRONTEND] Delete company FAILED`, err);
+          Dialog.alert('حدث خطأ أثناء حذف الشركة. تحقق من الـ Console.', 'خطأ', 'error');
+        }
+      });
+    }
   }
 
   // --- Department Edit/Delete ---
@@ -212,27 +198,17 @@ export class UsersManagerComponent implements OnInit {
     });
   }
 
-  confirmDeleteDepartment(comp: any, dept: any) {
-    this.deletingDepartment = dept;
-    this.showDeleteDepartmentModal = true;
-  }
-
-  deleteDepartment() {
-    if (!this.deletingDepartment) return;
-    this.isSubmitting = true;
-    this.adminService.deleteDepartment(this.deletingDepartment.id).subscribe({
-      next: () => {
-        this.isSubmitting = false;
-        this.showDeleteDepartmentModal = false;
-        this.loadData();
-        Dialog.alert('تم حذف القسم بنجاح.', 'نجاح', 'success');
-      },
-      error: () => {
-        this.isSubmitting = false;
-        this.showDeleteDepartmentModal = false;
-        Dialog.alert('حدث خطأ أثناء الحذف.', 'خطأ', 'error');
-      }
-    });
+  async deleteDepartment(comp: any, dept: any) {
+    const ok = await Dialog.confirm(`هل أنت متأكد من حذف قسم "${dept.name}"؟ جميع المستخدمين المرتبطين به سيتأثرون.`, 'تأكيد الحذف');
+    if (ok) {
+      this.adminService.deleteDepartment(dept.id).subscribe({
+        next: () => {
+          this.loadData();
+          Dialog.alert('تم حذف القسم بنجاح.', 'نجاح', 'success');
+        },
+        error: () => Dialog.alert('حدث خطأ أثناء الحذف.', 'خطأ', 'error')
+      });
+    }
   }
 
   // --- Add Company Modal Logic ---

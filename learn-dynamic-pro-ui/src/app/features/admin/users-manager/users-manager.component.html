@@ -34,7 +34,7 @@
         <td style="text-align: left;">
           <div class="d-flex gap-2" style="justify-content: flex-end;">
             <app-admin-action-icon action="edit" (clicked)="editCompany(comp)"></app-admin-action-icon>
-            <app-admin-action-icon action="delete" (clicked)="confirmDeleteCompany(comp)"></app-admin-action-icon>
+            <app-admin-action-icon action="delete" (clicked)="deleteCompany(comp)"></app-admin-action-icon>
           </div>
         </td>
       </ng-template>
@@ -75,7 +75,7 @@
               <div class="d-flex gap-2" style="justify-content: flex-end; align-items: center;">
                 <button class="btn-primary" style="padding: 4px 12px; font-size: 12px;" (click)="openAssignModulesModal(comp, dept)">إسناد موديول</button>
                 <app-admin-action-icon action="edit" (clicked)="editDepartment(comp, dept)"></app-admin-action-icon>
-                <app-admin-action-icon action="delete" (clicked)="confirmDeleteDepartment(comp, dept)"></app-admin-action-icon>
+                <app-admin-action-icon action="delete" (clicked)="deleteDepartment(comp, dept)"></app-admin-action-icon>
               </div>
             </td>
           </ng-template>
@@ -157,38 +157,4 @@
       </div>
     </div>
   </div>
-</app-admin-modal>
-
-<!-- Delete Company Modal -->
-<app-admin-modal
-  [show]="showDeleteCompanyModal"
-  title="تأكيد الحذف"
-  subtitle="هل أنت متأكد من حذف الشركة بجميع محتوياتها؟"
-  confirmLabel="حذف"
-  confirmButtonClass="btn-danger"
-  [loading]="isSubmitting"
-  (closed)="showDeleteCompanyModal = false"
-  (confirmed)="deleteCompany()">
-  <svg modal-icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="15" y1="9" x2="9" y2="15"></line>
-    <line x1="9" y1="9" x2="15" y2="15"></line>
-  </svg>
-</app-admin-modal>
-
-<!-- Delete Department Modal -->
-<app-admin-modal
-  [show]="showDeleteDepartmentModal"
-  title="تأكيد الحذف"
-  [subtitle]="'هل أنت متأكد من حذف قسم \'' + (deletingDepartment?.name || '') + '\'؟ جميع المستخدمين المرتبطين به سيتأثرون.'"
-  confirmLabel="حذف"
-  confirmButtonClass="btn-danger"
-  [loading]="isSubmitting"
-  (closed)="showDeleteDepartmentModal = false"
-  (confirmed)="deleteDepartment()">
-  <svg modal-icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <circle cx="12" cy="12" r="10"></circle>
-    <line x1="15" y1="9" x2="9" y2="15"></line>
-    <line x1="9" y1="9" x2="15" y2="15"></line>
-  </svg>
 </app-admin-modal>
