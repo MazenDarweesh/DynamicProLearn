@@ -1,17 +1,22 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, ViewEncapsulation } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { AdminService, AdminModuleDto, LookupDto } from '../../../core/services/admin.service';
+import { AdminService } from '../../../core/services/admin.service';
+import { AdminModuleDto, LookupDto } from '../../../core/models/admin.models';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { ContentTreeComponent } from './components/content-tree/content-tree.component';
+import { ModuleEditorComponent } from './components/module-editor/module-editor.component';
+import { LessonEditorComponent } from './components/lesson-editor/lesson-editor.component';
 
 @Component({
   selector: 'app-content-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, ContentTreeComponent, ModuleEditorComponent, LessonEditorComponent],
   templateUrl: './content-builder.html',
-  styleUrls: ['./content-builder.css']
+  styleUrls: ['./content-builder.css'],
+  encapsulation: ViewEncapsulation.None
 })
 export class ContentBuilderComponent implements OnInit {
   private router = inject(Router);
@@ -54,7 +59,8 @@ export class ContentBuilderComponent implements OnInit {
     });
   }
 
-  onModuleChange() {
+  onModuleChange(moduleId: string) {
+    this.selectedModuleId = moduleId;
     if (!this.selectedModuleId) {
       this.selectedModule = null;
       return;
@@ -102,40 +108,13 @@ export class ContentBuilderComponent implements OnInit {
     });
   }
 
-  isAddingUnit = false;
-  newUnitName = '';
-  addingLessonUnitId: string | null = null;
-  newLessonTitle = '';
-
-  addUnit() {
-    this.isAddingUnit = true;
-    this.newUnitName = '';
-  }
-
-  cancelAddUnit() {
-    this.isAddingUnit = false;
-    this.newUnitName = '';
-  }
-
-  saveNewUnit() {
-    if (!this.isAddingUnit) return;
-    if (!this.selectedModuleId) {
-      this.isAddingUnit = false;
-      return;
-    }
-    const name = this.newUnitName.trim();
-    if (!name) {
-      this.isAddingUnit = false;
-      return;
-    }
+  createUnit(name: string) {
+    if (!this.selectedModuleId) return;
     
-    this.isAddingUnit = false;
-
     this.adminService.createUnit(this.selectedModuleId, name).subscribe({
       next: (newUnit: any) => {
         newUnit.lessons = [];
         this.units.push(newUnit);
-        this.newUnitName = '';
       },
       error: (err: any) => Dialog.alert('فشل إنشاء الوحدة: ' + (err.error?.detail || err.message), 'خطأ', 'error')
     });
@@ -155,26 +134,8 @@ export class ContentBuilderComponent implements OnInit {
     });
   }
 
-  startAddLesson(unit: any) {
-    this.addingLessonUnitId = unit.id;
-    this.newLessonTitle = '';
-  }
-
-  cancelAddLesson() {
-    this.addingLessonUnitId = null;
-    this.newLessonTitle = '';
-  }
-
-  saveNewLesson(unit: any) {
-    if (this.addingLessonUnitId !== unit.id) return;
-    const title = this.newLessonTitle.trim();
-    if (!title) {
-      this.addingLessonUnitId = null;
-      return;
-    }
-    
-    this.addingLessonUnitId = null;
-
+  createLesson(event: {unit: any, title: string}) {
+    const { unit, title } = event;
     const payload = {
       unitId: unit.id,
       title: title,
@@ -189,14 +150,13 @@ export class ContentBuilderComponent implements OnInit {
       next: (newLesson) => {
         unit.lessons.push(newLesson);
         this.selectLesson(newLesson);
-        this.newLessonTitle = '';
       },
       error: (err) => Dialog.alert('فشل إنشاء الدرس: ' + (err.error?.detail || err.message), 'خطأ', 'error')
     });
   }
 
-  async deleteLesson(unit: any, lesson: any, event: Event) {
-    event.stopPropagation();
+  async deleteLesson(event: {unit: any, lesson: any}) {
+    const { unit, lesson } = event;
     const ok = await Dialog.confirm(`هل أنت متأكد من حذف الدرس: ${lesson.title}؟`, 'تأكيد الحذف');
     if (!ok) return;
     

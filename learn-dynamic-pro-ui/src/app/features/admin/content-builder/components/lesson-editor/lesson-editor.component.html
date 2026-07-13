@@ -1,0 +1,41 @@
+<div class="lesson-details">
+  <h2 class="mb-4">تعديل تفاصيل الدرس</h2>
+  
+  <div class="form-group mb-3">
+    <label>عنوان الدرس</label>
+    <input type="text" class="form-control" [(ngModel)]="lesson.title" placeholder="أدخل عنوان الدرس">
+  </div>
+
+  <div class="d-flex gap-3 mb-3">
+    <div class="form-group flex-1">
+      <label>مستوى الدرس (Level)</label>
+      <select class="form-control" [(ngModel)]="lesson.levelId">
+        <option *ngFor="let level of lookups.levels" [ngValue]="level.id">{{ level.label }}</option>
+      </select>
+    </div>
+    <div class="form-group flex-1">
+      <label>نوع الدرس (Type)</label>
+      <select class="form-control" [(ngModel)]="lesson.typeId">
+        <option *ngFor="let type of lookups.types" [ngValue]="type.id">{{ type.label }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group mb-3">
+    <label>الوصف (Description)</label>
+    <textarea class="form-control" rows="4" [(ngModel)]="lesson.description" placeholder="أدخل وصفاً مفصلاً للدرس..."></textarea>
+  </div>
+
+  <div class="form-group mb-4">
+    <label>رابط الفيديو (Video URL)</label>
+    <input type="text" class="form-control" [(ngModel)]="lesson.videoUrl" placeholder="https://youtube.com/watch?v=...">
+    <small class="text-secondary mt-1 d-block">سيدعم النظام تحويل روابط يوتيوب تلقائياً إلى Embed.</small>
+  </div>
+
+  <div class="video-preview" *ngIf="lesson.videoUrl">
+    <div class="text-center text-secondary py-4">
+      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mb-2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+      <p style="margin: 0;">معاينة الفيديو ستكون متاحة للطالب هنا</p>
+    </div>
+  </div>
+</div>

@@ -2,26 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-
-export interface AdminModuleDto {
-  id: string;
-  name: string;
-  description: string;
-  isPublished: boolean;
-  totalUnits: number;
-  assignedDepartments?: string[];
-}
-
-export interface LookupDto {
-  id: string;
-  label: string;
-}
-
-export interface CompanyDto {
-  id: string;
-  name: string;
-  industry: string;
-}
+import { AdminModuleDto, LookupDto, CompanyDto } from '../models/admin.models';
 
 @Injectable({
   providedIn: 'root'
