@@ -6,11 +6,12 @@ import { AdminService } from '../../../core/services/admin.service';
 import { Router } from '@angular/router';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionIconComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrl: './admin-dashboard.component.css'
 })

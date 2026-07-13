@@ -9,11 +9,12 @@ import { ProgressBarComponent } from '../../../shared/components/progress-bar/pr
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
 import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
+import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
 
 @Component({
   selector: 'app-employees-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent, AdminActionButtonComponent, AdminModalComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent],
   templateUrl: './employees-manager.component.html',
   styleUrls: ['./employees-manager.component.css']
 })
