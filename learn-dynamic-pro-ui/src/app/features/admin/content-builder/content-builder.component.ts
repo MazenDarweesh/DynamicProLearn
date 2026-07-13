@@ -14,8 +14,8 @@ import { LessonEditorComponent } from './components/lesson-editor/lesson-editor.
   selector: 'app-content-builder',
   standalone: true,
   imports: [CommonModule, FormsModule, AdminHeaderComponent, ContentTreeComponent, ModuleEditorComponent, LessonEditorComponent],
-  templateUrl: './content-builder.html',
-  styleUrls: ['./content-builder.css'],
+  templateUrl: './content-builder.component.html',
+  styleUrls: ['./content-builder.component.css'],
   encapsulation: ViewEncapsulation.None
 })
 export class ContentBuilderComponent implements OnInit {
