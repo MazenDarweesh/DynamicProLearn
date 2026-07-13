@@ -9,11 +9,12 @@ import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
 import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
+import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
 
 @Component({
   selector: 'app-admin-testers',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent],
   templateUrl: './admin-testers.component.html',
   styleUrl: '../admin-dashboard/admin-dashboard.component.css'
 })
@@ -30,6 +31,7 @@ export class AdminTestersComponent implements OnInit {
 
   newVersionLabel = '';
   testerIdForVersion = '';
+  editingVersionId: string | null = null;
   erpVersions: any[] = [];
   modules: any[] = [];
   selectedModules: string[] = [];
@@ -125,10 +127,34 @@ export class AdminTestersComponent implements OnInit {
   }
 
   openAddVersionModal() {
+    this.editingVersionId = null;
     this.newVersionLabel = '';
     this.testerIdForVersion = '';
     this.selectedModules = [];
     this.showAddVersionModal = true;
+  }
+
+  editVersion(version: any) {
+    this.editingVersionId = version.id;
+    this.newVersionLabel = version.versionLabel;
+    this.testerIdForVersion = version.testerId;
+    this.selectedModules = version.moduleIds ? [...version.moduleIds] : [];
+    this.showAddVersionModal = true;
+  }
+
+  async deleteVersion(version: any) {
+    const ok = await Dialog.confirm('هل أنت متأكد من حذف هذا الإصدار؟', 'تأكيد الحذف');
+    if (ok) {
+      this.http.delete(`http://localhost:5115/api/admin/test-cycles/${version.id}`).subscribe({
+        next: () => {
+          Dialog.alert('تم حذف الإصدار بنجاح.', 'نجاح', 'success');
+          this.loadVersions();
+        },
+        error: () => {
+          Dialog.alert('حدث خطأ أثناء الحذف.', 'خطأ', 'error');
+        }
+      });
+    }
   }
 
   closeAddVersionModal() {
@@ -151,38 +177,59 @@ export class AdminTestersComponent implements OnInit {
     }
     
     this.isSubmitting = true;
-    this.http.post<any>('http://localhost:5115/api/admin/test-cycles', { 
+    const payload = {
       versionLabel: this.newVersionLabel.trim(),
-      testerId: this.testerIdForVersion
-    }).subscribe({
-      next: (res) => {
-        if (this.selectedModules.length > 0) {
-          this.http.post(`http://localhost:5115/api/admin/test-cycles/${res.id}/modules`, {
-            moduleIds: this.selectedModules
-          }).subscribe({
-            next: () => {
-              this.isSubmitting = false;
-              Dialog.alert('تمت إضافة الدورة وتخصيص الموديولات بنجاح!', 'نجاح', 'success');
-              this.closeAddVersionModal();
-              this.loadVersions();
-            },
-            error: () => {
-              this.isSubmitting = false;
-              Dialog.alert('تم إنشاء الدورة ولكن حدث خطأ أثناء ربط الموديولات.', 'تحذير', 'info');
-            }
-          });
-        } else {
+      testerId: this.testerIdForVersion,
+      moduleIds: this.selectedModules
+    };
+
+    if (this.editingVersionId) {
+      this.http.put(`http://localhost:5115/api/admin/test-cycles/${this.editingVersionId}`, payload).subscribe({
+        next: () => {
           this.isSubmitting = false;
-          Dialog.alert('تمت إضافة الدورة بنجاح!', 'نجاح', 'success');
+          Dialog.alert('تم تعديل الإصدار بنجاح!', 'نجاح', 'success');
           this.closeAddVersionModal();
           this.loadVersions();
+        },
+        error: () => {
+          this.isSubmitting = false;
+          Dialog.alert('حدث خطأ أثناء التعديل.', 'خطأ', 'error');
         }
-      },
-      error: (err) => {
-        this.isSubmitting = false;
-        Dialog.alert('حدث خطأ أثناء إضافة الإصدار.', 'خطأ', 'error');
-      }
-    });
+      });
+    } else {
+      this.http.post<any>('http://localhost:5115/api/admin/test-cycles', { 
+        versionLabel: this.newVersionLabel.trim(),
+        testerId: this.testerIdForVersion
+      }).subscribe({
+        next: (res) => {
+          if (this.selectedModules.length > 0) {
+            this.http.post(`http://localhost:5115/api/admin/test-cycles/${res.id}/modules`, {
+              moduleIds: this.selectedModules
+            }).subscribe({
+              next: () => {
+                this.isSubmitting = false;
+                Dialog.alert('تمت إضافة الدورة وتخصيص الموديولات بنجاح!', 'نجاح', 'success');
+                this.closeAddVersionModal();
+                this.loadVersions();
+              },
+              error: () => {
+                this.isSubmitting = false;
+                Dialog.alert('تم إنشاء الدورة ولكن حدث خطأ أثناء ربط الموديولات.', 'تحذير', 'info');
+              }
+            });
+          } else {
+            this.isSubmitting = false;
+            Dialog.alert('تمت إضافة الدورة بنجاح!', 'نجاح', 'success');
+            this.closeAddVersionModal();
+            this.loadVersions();
+          }
+        },
+        error: (err) => {
+          this.isSubmitting = false;
+          Dialog.alert('حدث خطأ أثناء إضافة الإصدار.', 'خطأ', 'error');
+        }
+      });
+    }
   }
 
   submitTester() {

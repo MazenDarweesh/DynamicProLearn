@@ -391,6 +391,14 @@ public class AdminController : ControllerBase
         return Ok();
     }
 
+    [HttpPut("test-cycles/{testCycleId}")]
+    public async Task<IActionResult> UpdateTestCycle(Guid testCycleId, [FromBody] UpdateTestCycleRequest request)
+    {
+        var result = await _testerService.UpdateTestCycleAsync(testCycleId, request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok();
+    }
+
     [HttpDelete("test-cycles/{testCycleId}")]
     public async Task<IActionResult> DeleteTestCycle(Guid testCycleId)
     {

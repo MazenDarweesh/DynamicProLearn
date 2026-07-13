@@ -24,6 +24,7 @@
               <th>رقم الإصدار / النسخة</th>
               <th>المختبر المخصص</th>
               <th>عدد الموديولات المربوطة</th>
+              <th width="100" class="text-left">إجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -31,9 +32,15 @@
               <td class="fw-500">{{ v.versionLabel }}</td>
               <td>{{ v.testerName || 'غير محدد' }}</td>
               <td>{{ v.assignedModulesCount }}</td>
+              <td class="text-left">
+                <div class="d-flex gap-2 justify-end">
+                  <app-admin-action-icon action="edit" (clicked)="editVersion(v)"></app-admin-action-icon>
+                  <app-admin-action-icon action="delete" (clicked)="deleteVersion(v)"></app-admin-action-icon>
+                </div>
+              </td>
             </tr>
             <tr *ngIf="erpVersions.length === 0">
-              <td style="text-align: center; color: var(--color-text-secondary); padding: 32px 0;">لا توجد إصدارات مسجلة</td>
+              <td colspan="4" style="text-align: center; color: var(--color-text-secondary); padding: 32px 0;">لا توجد إصدارات مسجلة</td>
             </tr>
           </tbody>
         </table>
@@ -139,9 +146,9 @@
 <!-- Add Version Modal -->
 <app-admin-modal
   [show]="showAddVersionModal"
-  title="تسجيل إصدار ERP جديد"
-  subtitle="أدخل اسم النسخة الجديدة التي سيختبرها الفريق"
-  confirmLabel="حفظ الإصدار"
+  [title]="editingVersionId ? 'تعديل إصدار ERP' : 'تسجيل إصدار ERP جديد'"
+  [subtitle]="editingVersionId ? 'قم بتعديل بيانات الإصدار أو الموديولات المخصصة' : 'أدخل اسم النسخة الجديدة التي سيختبرها الفريق'"
+  [confirmLabel]="editingVersionId ? 'حفظ التعديلات' : 'حفظ الإصدار'"
   [loading]="isSubmitting"
   (closed)="closeAddVersionModal()"
   (confirmed)="submitVersion()">

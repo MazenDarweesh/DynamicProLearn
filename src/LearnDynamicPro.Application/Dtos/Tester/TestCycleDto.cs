@@ -24,3 +24,10 @@ public class AssignModulesToTestCycleRequest
 {
     public List<Guid> ModuleIds { get; set; } = new();
 }
+
+public class UpdateTestCycleRequest
+{
+    public string VersionLabel { get; set; } = string.Empty;
+    public Guid TesterId { get; set; }
+    public List<Guid> ModuleIds { get; set; } = new();
+}

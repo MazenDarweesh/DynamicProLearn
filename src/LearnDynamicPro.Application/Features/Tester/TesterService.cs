@@ -206,6 +206,38 @@ public class TesterService : ITesterService
         return Result.Success();
     }
 
+    public async Task<Result> UpdateTestCycleAsync(Guid testCycleId, UpdateTestCycleRequest request)
+    {
+        var testCycle = await _unitOfWork.Repository<TestCycle>().Query()
+            .Include(tc => tc.AssignedModules)
+            .Include(tc => tc.Version)
+            .FirstOrDefaultAsync(tc => tc.Id == testCycleId);
+
+        if (testCycle == null) return Result.Failure("Test cycle not found");
+
+        if (testCycle.Version != null)
+        {
+            testCycle.Version.VersionLabel = request.VersionLabel;
+            _unitOfWork.Repository<ErpVersion>().Update(testCycle.Version);
+        }
+
+        testCycle.TesterId = request.TesterId;
+        _unitOfWork.Repository<TestCycle>().Update(testCycle);
+
+        _unitOfWork.Repository<TestCycleModule>().RemoveRange(testCycle.AssignedModules);
+        foreach (var modId in request.ModuleIds)
+        {
+            await _unitOfWork.Repository<TestCycleModule>().AddAsync(new TestCycleModule
+            {
+                TestCycleId = testCycleId,
+                ModuleId = modId
+            });
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+        return Result.Success();
+    }
+
     public async Task<Result> DeleteTestCycleAsync(Guid testCycleId)
     {
         var testCycle = await _unitOfWork.Repository<TestCycle>().GetByIdAsync(testCycleId);
