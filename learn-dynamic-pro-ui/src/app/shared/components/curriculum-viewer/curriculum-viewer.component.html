@@ -42,57 +42,46 @@
 
       <!-- UNITS EXPANDED -->
       <ng-template #expanded let-unit>
-        <table class="sub-table" style="box-shadow: none;">
-          <tbody>
-            <tr *ngFor="let lesson of unit.lessons">
-              <td class="fw-500 text-secondary" style="width: 40%;">
-                {{ lesson.name }}
-              </td>
-              
-              <!-- STUDENT VIEW: SHOW STATUS -->
-              <ng-container *ngIf="isStudentView">
-                <td class="text-secondary text-right" style="width: 30%;">
-                  الحالة: <strong [class.text-success]="lesson.isCompleted" [class.text-secondary]="!lesson.isCompleted">{{ lesson.isCompleted ? 'مكتمل' : 'غير مكتمل' }}</strong>
-                </td>
-                <td style="text-align: left; width: 30%;">
-                  <div class="d-flex gap-2" style="justify-content: flex-end; align-items: center;">
-                    <button *ngIf="!lesson.isCompleted" class="btn-blue" style="padding: 6px 12px; font-size: 13px;" (click)="markLessonComplete(lesson.lessonId)">اكتمال</button>
-                    <button *ngIf="lesson.isCompleted" class="btn-blue" style="padding: 6px 12px; font-size: 13px; background-color: var(--color-danger);" (click)="unmarkLessonComplete(lesson.lessonId)">إلغاء</button>
-                  </div>
-                </td>
-              </ng-container>
+        <div style="background: rgba(0,0,0,0.02); padding: 15px; border-radius: 8px; border: 1px dashed rgba(0,0,0,0.1); margin: 5px;">
+          <div *ngFor="let lesson of unit.lessons; let last = last" 
+               class="d-flex justify-between align-center" 
+               [style.border-bottom]="last ? 'none' : '1px solid rgba(0,0,0,0.05)'"
+               [style.padding-bottom]="last ? '0' : '12px'"
+               [style.margin-bottom]="last ? '0' : '12px'">
+               
+            <div class="fw-500 text-secondary d-flex align-center gap-2" style="flex: 1;">
+              <span class="icon" style="font-size: 14px; color: var(--color-primary); opacity: 0.8;">📄</span>
+              {{ lesson.name }}
+            </div>
+            
+            <!-- STUDENT VIEW: SHOW STATUS -->
+            <ng-container *ngIf="isStudentView">
+              <div class="text-secondary text-right" style="width: 150px; font-size: 13px;">
+                الحالة: <strong [class.text-success]="lesson.isCompleted" [class.text-secondary]="!lesson.isCompleted">{{ lesson.isCompleted ? 'مكتمل' : 'غير مكتمل' }}</strong>
+              </div>
+              <div class="d-flex gap-2" style="justify-content: flex-end; align-items: center; width: 140px;">
+                <button *ngIf="!lesson.isCompleted" class="btn-blue" style="padding: 6px 14px; font-size: 12px; border-radius: 6px;" (click)="markLessonComplete(lesson.lessonId)">اكتمال</button>
+                <button *ngIf="lesson.isCompleted" class="btn-blue" style="padding: 6px 14px; font-size: 12px; background-color: var(--color-danger); border-radius: 6px;" (click)="unmarkLessonComplete(lesson.lessonId)">إلغاء</button>
+              </div>
+            </ng-container>
 
-              <!-- DEPARTMENT VIEW: SHOW BUTTONS AND COUNTS -->
-              <ng-container *ngIf="isDepartmentView">
-                <td class="text-secondary text-right" style="width: 30%;">
-                  أتم الدرس: <strong>{{ lesson.completedUsersCount }} / {{ lesson.totalUsersCount }}</strong> طالب
-                </td>
-                <td style="text-align: left; width: 30%;">
-                  <div class="d-flex gap-2" style="justify-content: flex-end; align-items: center;">
-                    <span *ngIf="lesson.isFullyCompletedByAll" class="badge badge-success">مكتمل للجميع</span>
-                    
-                    <button *ngIf="!lesson.isFullyCompletedByAll" 
-                            class="btn-blue" 
-                            style="padding: 6px 12px; font-size: 13px;"
-                            (click)="markLessonComplete(lesson.lessonId)">
-                      اكتمال للكل
-                    </button>
-
-                    <button *ngIf="lesson.completedUsersCount > 0" 
-                            class="btn-blue" 
-                            style="padding: 6px 12px; font-size: 13px; background-color: var(--color-danger);"
-                            (click)="unmarkLessonComplete(lesson.lessonId)">
-                      إلغاء
-                    </button>
-                  </div>
-                </td>
-              </ng-container>
-            </tr>
-            <tr *ngIf="unit.lessons.length === 0">
-              <td colspan="3" class="text-center text-secondary">لا توجد دروس في هذه الوحدة</td>
-            </tr>
-          </tbody>
-        </table>
+            <!-- DEPARTMENT VIEW: SHOW BUTTONS AND COUNTS -->
+            <ng-container *ngIf="isDepartmentView">
+              <div class="text-secondary text-right" style="width: 180px; font-size: 13px;">
+                أتم الدرس: <strong>{{ lesson.completedUsersCount }} / {{ lesson.totalUsersCount }}</strong> طالب
+              </div>
+              <div class="d-flex gap-2" style="justify-content: flex-end; align-items: center; width: 220px;">
+                <span *ngIf="lesson.isFullyCompletedByAll" class="badge badge-success" style="font-size: 11px;">مكتمل للجميع</span>
+                <button *ngIf="!lesson.isFullyCompletedByAll" class="btn-blue" style="padding: 6px 14px; font-size: 12px; border-radius: 6px;" (click)="markLessonComplete(lesson.lessonId)">اكتمال للكل</button>
+                <button *ngIf="lesson.completedUsersCount > 0" class="btn-blue" style="padding: 6px 14px; font-size: 12px; background-color: var(--color-danger); border-radius: 6px;" (click)="unmarkLessonComplete(lesson.lessonId)">إلغاء</button>
+              </div>
+            </ng-container>
+            
+          </div>
+          <div *ngIf="unit.lessons.length === 0" class="text-center text-secondary" style="padding: 10px; font-size: 13px;">
+            لا توجد دروس في هذه الوحدة
+          </div>
+        </div>
       </ng-template>
 
     </app-expandable-table>
