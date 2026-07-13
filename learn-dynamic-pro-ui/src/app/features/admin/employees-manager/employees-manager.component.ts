@@ -7,11 +7,13 @@ import { AdminHeaderComponent } from '../../../shared/components/admin-header/ad
 import { ExpandableTableComponent } from '../../../shared/components/expandable-table/expandable-table.component';
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 import { Dialog } from '../../../core/utils/dialog';
+import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
+import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 
 @Component({
   selector: 'app-employees-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent],
+  imports: [CommonModule, FormsModule, RouterModule, AdminHeaderComponent, ExpandableTableComponent, ProgressBarComponent, AdminActionButtonComponent, AdminModalComponent],
   templateUrl: './employees-manager.component.html',
   styleUrls: ['./employees-manager.component.css']
 })

@@ -8,11 +8,13 @@ import { AdminHeaderComponent } from '../../../shared/components/admin-header/ad
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 import { RouterModule } from '@angular/router';
 import { ExpandableTableComponent } from '../../../shared/components/expandable-table/expandable-table.component';
+import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
+import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 
 @Component({
   selector: 'app-users-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, RouterModule, ExpandableTableComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, RouterModule, ExpandableTableComponent, AdminActionButtonComponent, AdminModalComponent],
   templateUrl: './users-manager.component.html',
   styleUrls: ['./users-manager.component.css']
 })

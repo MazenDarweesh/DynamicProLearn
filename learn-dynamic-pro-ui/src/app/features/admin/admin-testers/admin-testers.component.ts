@@ -7,11 +7,13 @@ import { AdminService } from '../../../core/services/admin.service';
 import { Router } from '@angular/router';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
+import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 
 @Component({
   selector: 'app-admin-testers',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent],
   templateUrl: './admin-testers.component.html',
   styleUrl: '../admin-dashboard/admin-dashboard.component.css'
 })
