@@ -26,6 +26,7 @@ export class ContentTreeComponent {
   @Output() deleteLesson = new EventEmitter<{unit: any, lesson: any}>();
   @Output() selectLesson = new EventEmitter<any>();
   @Output() deleteModule = new EventEmitter<string>();
+  @Output() createModule = new EventEmitter<void>();
 
   isAddingUnit = false;
   newUnitName = '';
@@ -40,6 +41,10 @@ export class ContentTreeComponent {
     if (this.selectedModuleId) {
       this.deleteModule.emit(this.selectedModuleId);
     }
+  }
+
+  onAddModule() {
+    this.createModule.emit();
   }
 
   onSaveAll() {

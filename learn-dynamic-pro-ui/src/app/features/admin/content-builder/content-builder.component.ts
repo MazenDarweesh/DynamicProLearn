@@ -127,6 +127,43 @@ export class ContentBuilderComponent implements OnInit {
     });
   }
 
+  showAddModuleModal = false;
+  newModuleName = '';
+  isSubmittingModal = false;
+
+  openAddModuleModal() {
+    this.showAddModuleModal = true;
+    this.newModuleName = '';
+    this.isSubmittingModal = false;
+  }
+
+  closeAddModuleModal() {
+    this.showAddModuleModal = false;
+    this.newModuleName = '';
+  }
+
+  submitNewModule() {
+    if (!this.newModuleName.trim()) return;
+    this.isSubmittingModal = true;
+    
+    const payload = {
+      name: this.newModuleName.trim(),
+      description: ''
+    };
+
+    this.adminService.createModule(payload.name, payload.description).subscribe({
+      next: (newMod) => {
+        this.modules.push(newMod);
+        this.closeAddModuleModal();
+        this.onModuleChange(newMod.id);
+      },
+      error: (err) => {
+        this.isSubmittingModal = false;
+        Dialog.alert('فشل إنشاء الموديول: ' + (err.error?.detail || err.message), 'خطأ', 'error');
+      }
+    });
+  }
+
   createUnit(name: string) {
     if (!this.selectedModuleId) return;
     
