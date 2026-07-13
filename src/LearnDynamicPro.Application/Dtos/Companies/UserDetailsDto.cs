@@ -4,7 +4,7 @@ public class UserDetailsDto
 {
     public Guid UserId { get; set; }
     public string UserName { get; set; } = string.Empty;
-    public Guid DepartmentId { get; set; }
+    public Guid? DepartmentId { get; set; }
     public int TotalAssignedLessons { get; set; }
     public int TotalCompletedLessons { get; set; }
     public List<UserModuleProgressDto> Modules { get; set; } = new();

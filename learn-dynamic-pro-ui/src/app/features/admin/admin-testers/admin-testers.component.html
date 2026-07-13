@@ -73,6 +73,7 @@
               <th>الموديولات المتاحة</th>
               <th>دروس مكتملة</th>
               <th class="text-right">التقدم</th>
+              <th width="100" class="text-left">إجراءات</th>
             </tr>
           </thead>
           <tbody>
@@ -83,6 +84,12 @@
               <td class="progress-cell">
                 <div class="progress-track">
                   <div class="progress-fill" [style.width]="t.progressValue + '%'"></div>
+                </div>
+              </td>
+              <td class="text-left">
+                <div class="d-flex gap-2 justify-end">
+                  <app-admin-action-icon action="edit" (clicked)="editTester(t)"></app-admin-action-icon>
+                  <app-admin-action-icon action="delete" (clicked)="deleteTester(t)"></app-admin-action-icon>
                 </div>
               </td>
             </tr>
@@ -99,8 +106,8 @@
 <!-- Add Tester Modal -->
 <app-admin-modal
   [show]="showAddTesterModal"
-  title="تسجيل مختبر جديد"
-  subtitle="أدخل بيانات المختبر، واختر القسم لتحديد الموديولات المتاحة له"
+  [title]="editingTesterId ? 'تعديل حساب المختبر' : 'تسجيل مختبر جديد'"
+  [subtitle]="editingTesterId ? 'تعديل بيانات حساب المختبر' : 'أدخل بيانات المختبر'"
   confirmLabel="حفظ وإضافة"
   [loading]="isSubmitting"
   (closed)="closeAddTesterModal()"
@@ -118,27 +125,8 @@
     <input type="text" class="form-control" [(ngModel)]="newTesterUsername" placeholder="مثال: tester1">
   </div>
   <div class="form-group mb-3">
-    <label class="form-label text-secondary text-sm mb-2 d-block">كلمة المرور</label>
+    <label class="form-label text-secondary text-sm mb-2 d-block">كلمة المرور {{ editingTesterId ? '(اتركها فارغة لعدم التغيير)' : '' }}</label>
     <input type="password" class="form-control" [(ngModel)]="newTesterPassword" placeholder="كلمة مرور قوية">
-  </div>
-  <div class="form-group mb-3">
-    <label class="form-label text-secondary text-sm mb-2 d-block">الشركة</label>
-    <div class="custom-select-wrapper">
-      <select class="form-control blue-select" [(ngModel)]="testerCompanyId" (change)="onTesterCompanyChange()">
-        <option value="" disabled selected>اختر الشركة...</option>
-        <option *ngFor="let c of companies" [value]="c.id">{{ c.name }}</option>
-      </select>
-    </div>
-  </div>
-  <div class="form-group mb-3">
-    <label class="form-label text-secondary text-sm mb-2 d-block">القسم (يحدد الموديولات المتاحة له)</label>
-    <div class="custom-select-wrapper">
-      <select class="form-control blue-select" [(ngModel)]="testerDepartmentId">
-        <option value="" disabled selected>اختر القسم...</option>
-        <option *ngFor="let d of testerDepartments" [value]="d.id">{{ d.name }}</option>
-        <option *ngIf="testerDepartments.length === 0" value="" disabled>لا توجد أقسام</option>
-      </select>
-    </div>
   </div>
 
 </app-admin-modal>

@@ -104,21 +104,26 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request)
     {
-        // Get department to resolve CompanyId
-        var department = await _unitOfWork.Repository<Department>().Query()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(d => d.Id == request.DepartmentId);
-            
-        if (department == null)
-            return Result<UserDto>.Failure(AppErrors.General.NotFound);
+        Department? department = null;
+
+        if (request.DepartmentId.HasValue)
+        {
+            // Get department to resolve CompanyId if not provided, or to validate it
+            department = await _unitOfWork.Repository<Department>().Query()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(d => d.Id == request.DepartmentId.Value);
+                
+            if (department == null)
+                return Result<UserDto>.Failure(AppErrors.General.NotFound);
+        }
 
         var user = new User
         {
             Username = request.Username,
             PasswordHash = _passwordHasher.Hash(request.Password),
             Role = request.Role,
-            DepartmentId = department.Id,
-            CompanyId = department.CompanyId
+            DepartmentId = department?.Id,
+            CompanyId = department?.CompanyId ?? request.CompanyId
         };
         
         await _unitOfWork.Repository<User>().AddAsync(user);
@@ -165,12 +170,20 @@ public class CompanyService : ICompanyService
         if (user == null)
             return Result<bool>.Failure(AppErrors.General.NotFound);
 
-        // Verify new department belongs to new company
-        var department = await _unitOfWork.Repository<Department>().GetByIdAsync(request.DepartmentId);
-        if (department == null || department.CompanyId != request.CompanyId)
-            return Result<bool>.Failure(AppErrors.General.ValidationFailed);
+        // Verify new department belongs to new company only if provided
+        if (request.DepartmentId.HasValue || request.CompanyId.HasValue)
+        {
+            if (!request.DepartmentId.HasValue || !request.CompanyId.HasValue)
+                return Result<bool>.Failure(AppErrors.General.ValidationFailed);
 
-        user.Username = request.Username;
+            var department = await _unitOfWork.Repository<Department>().GetByIdAsync(request.DepartmentId.Value);
+            if (department == null || department.CompanyId != request.CompanyId.Value)
+                return Result<bool>.Failure(AppErrors.General.ValidationFailed);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Username))
+            user.Username = request.Username;
+            
         user.CompanyId = request.CompanyId;
         user.DepartmentId = request.DepartmentId;
         

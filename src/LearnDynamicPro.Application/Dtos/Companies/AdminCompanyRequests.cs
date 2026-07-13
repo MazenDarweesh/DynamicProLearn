@@ -15,8 +15,8 @@ public class CreateDepartmentRequest
 
 public class CreateUserRequest
 {
-    public Guid CompanyId { get; set; }
-    public Guid DepartmentId { get; set; }
+    public Guid? CompanyId { get; set; }
+    public Guid? DepartmentId { get; set; }
     public string Username { get; set; } = string.Empty;
     public string Password { get; set; } = string.Empty;
     public UserRole Role { get; set; }

@@ -134,7 +134,7 @@ export class AdminService {
     );
   }
 
-  createUser(companyId: string, departmentId: string, username: string, password: string, role: number = 1): Observable<any> {
+  createUser(companyId: string | null, departmentId: string | null, username: string, password: string, role: number = 1): Observable<any> {
     return this.http.post(`${this.apiUrl}/users`, { companyId, departmentId, username, password, role });
   }
 

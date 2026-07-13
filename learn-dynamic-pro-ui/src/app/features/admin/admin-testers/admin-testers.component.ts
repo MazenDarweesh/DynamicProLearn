@@ -40,11 +40,9 @@ export class AdminTestersComponent implements OnInit {
 
   newTesterUsername = '';
   newTesterPassword = '';
-  testerCompanyId = '';
-  testerDepartmentId = '';
+  editingTesterId: string | null = null;
   
   companies: any[] = [];
-  testerDepartments: any[] = [];
 
   ngOnInit() {
     this.loadTestersProgress();
@@ -101,22 +99,34 @@ export class AdminTestersComponent implements OnInit {
   }
 
   openAddTesterModal() {
+    this.editingTesterId = null;
     this.newTesterUsername = '';
     this.newTesterPassword = '';
-    this.testerCompanyId = '';
-    this.testerDepartmentId = '';
-    this.testerDepartments = [];
     this.showAddTesterModal = true;
+  }
+
+  editTester(t: any) {
+    this.editingTesterId = t.userId;
+    this.newTesterUsername = t.name;
+    this.newTesterPassword = '';
+    this.showAddTesterModal = true;
+  }
+
+  async deleteTester(t: any) {
+    const ok = await Dialog.confirm('هل أنت متأكد من حذف حساب المختبر بكافة بياناته؟', 'تأكيد الحذف');
+    if (ok) {
+      this.adminService.deleteUser(t.userId).subscribe({
+        next: () => {
+          Dialog.alert('تم حذف حساب المختبر بنجاح.', 'نجاح', 'success');
+          this.loadTestersProgress();
+        },
+        error: () => Dialog.alert('حدث خطأ أثناء الحذف.', 'خطأ', 'error')
+      });
+    }
   }
 
   closeAddTesterModal() {
     this.showAddTesterModal = false;
-  }
-
-  onTesterCompanyChange() {
-    const company = this.companies.find(c => c.id === this.testerCompanyId);
-    this.testerDepartments = company ? company.departments : [];
-    this.testerDepartmentId = '';
   }
 
   loadVersions() {
@@ -233,23 +243,43 @@ export class AdminTestersComponent implements OnInit {
   }
 
   submitTester() {
-    if (!this.newTesterUsername || !this.newTesterPassword || !this.testerCompanyId || !this.testerDepartmentId) {
-      Dialog.alert('الرجاء إكمال جميع الحقول المطلوبة للمختبر.', 'حقول مفقودة', 'info');
+    if (!this.newTesterUsername || (!this.editingTesterId && !this.newTesterPassword)) {
+      Dialog.alert('الرجاء إدخال اسم المستخدم وكلمة المرور.', 'حقول مفقودة', 'info');
       return;
     }
 
     this.isSubmitting = true;
-    this.adminService.createUser(this.testerCompanyId, this.testerDepartmentId, this.newTesterUsername, this.newTesterPassword, 2).subscribe({
-      next: () => {
-        this.isSubmitting = false;
-        Dialog.alert('تمت إضافة المختبر بنجاح!', 'نجاح', 'success');
-        this.closeAddTesterModal();
-        this.loadTestersProgress();
-      },
-      error: (err) => {
-        this.isSubmitting = false;
-        Dialog.alert('حدث خطأ أثناء الإضافة: ' + (err.error?.detail || err.message), 'خطأ', 'error');
+
+    if (this.editingTesterId) {
+      const payload: any = { username: this.newTesterUsername, role: 2 };
+      if (this.newTesterPassword) {
+         payload.password = this.newTesterPassword;
       }
-    });
+      this.adminService.updateUser(this.editingTesterId, payload).subscribe({
+        next: () => {
+          this.isSubmitting = false;
+          Dialog.alert('تم تعديل حساب المختبر بنجاح!', 'نجاح', 'success');
+          this.closeAddTesterModal();
+          this.loadTestersProgress();
+        },
+        error: (err) => {
+          this.isSubmitting = false;
+          Dialog.alert('حدث خطأ أثناء التعديل: ' + (err.error?.detail || err.message), 'خطأ', 'error');
+        }
+      });
+    } else {
+      this.adminService.createUser(null, null, this.newTesterUsername, this.newTesterPassword, 2).subscribe({
+        next: () => {
+          this.isSubmitting = false;
+          Dialog.alert('تمت إضافة المختبر بنجاح!', 'نجاح', 'success');
+          this.closeAddTesterModal();
+          this.loadTestersProgress();
+        },
+        error: (err) => {
+          this.isSubmitting = false;
+          Dialog.alert('حدث خطأ أثناء الإضافة: ' + (err.error?.detail || err.message), 'خطأ', 'error');
+        }
+      });
+    }
   }
 }
