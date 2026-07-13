@@ -22,13 +22,14 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
     {
         if (userIds == null || !userIds.Any()) return new Dictionary<Guid, ProgressResult>();
 
-        var userDepartments = await _unitOfWork.Repository<User>().Query()
+        var usersInfo = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => userIds.Contains(u.Id))
-            .Select(u => new { u.Id, u.DepartmentId })
+            .Select(u => new { u.Id, u.DepartmentId, u.Role })
             .ToListAsync();
 
-        var departmentIds = userDepartments.Select(u => u.DepartmentId).Distinct().ToList();
+        var departmentIds = usersInfo.Where(u => u.DepartmentId.HasValue).Select(u => u.DepartmentId!.Value).Distinct().ToList();
+        var testerIds = usersInfo.Where(u => u.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester).Select(u => u.Id).ToList();
 
         var departmentLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
@@ -40,25 +41,56 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
             })
             .ToListAsync();
 
-        var allAssignedLessonIds = departmentLessons.SelectMany(d => d.LessonIds).Distinct().ToList();
+        var testerLessons = await _unitOfWork.Repository<TestCycle>().Query()
+            .AsNoTracking()
+            .Where(tc => testerIds.Contains(tc.TesterId))
+            .Select(tc => new 
+            {
+                TesterId = tc.TesterId,
+                LessonIds = tc.AssignedModules
+                    .Where(am => am.Module != null && am.Module.Units != null)
+                    .SelectMany(am => am.Module!.Units)
+                    .Where(u => u.Lessons != null)
+                    .SelectMany(u => u.Lessons)
+                    .Select(l => l.Id)
+                    .ToList()
+            })
+            .ToListAsync();
+
+        var allAssignedLessonIds = new HashSet<Guid>();
+        foreach (var dl in departmentLessons) { foreach(var id in dl.LessonIds) allAssignedLessonIds.Add(id); }
+        foreach (var tl in testerLessons) { foreach(var id in tl.LessonIds) allAssignedLessonIds.Add(id); }
 
         var completions = new List<LessonProgress>();
         if (allAssignedLessonIds.Any())
         {
+            var allAssignedLessonIdsList = allAssignedLessonIds.ToList();
             completions = await _unitOfWork.Repository<LessonProgress>().Query()
                 .AsNoTracking()
-                .Where(p => p.IsCompleted && userIds.Contains(p.UserId) && allAssignedLessonIds.Contains(p.LessonId))
+                .Where(p => p.IsCompleted && userIds.Contains(p.UserId) && allAssignedLessonIdsList.Contains(p.LessonId))
                 .ToListAsync();
         }
 
         var result = new Dictionary<Guid, ProgressResult>();
 
-        foreach (var user in userDepartments)
+        foreach (var user in usersInfo)
         {
-            var assignedLessonIds = departmentLessons
-                .Where(d => d.DepartmentId == user.DepartmentId)
-                .SelectMany(d => d.LessonIds)
-                .ToHashSet();
+            HashSet<Guid> assignedLessonIds;
+
+            if (user.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+            {
+                assignedLessonIds = testerLessons
+                    .Where(t => t.TesterId == user.Id)
+                    .SelectMany(t => t.LessonIds)
+                    .ToHashSet();
+            }
+            else
+            {
+                assignedLessonIds = departmentLessons
+                    .Where(d => user.DepartmentId.HasValue && d.DepartmentId == user.DepartmentId.Value)
+                    .SelectMany(d => d.LessonIds)
+                    .ToHashSet();
+            }
 
             var completedCount = completions.Count(c => c.UserId == user.Id && assignedLessonIds.Contains(c.LessonId));
 

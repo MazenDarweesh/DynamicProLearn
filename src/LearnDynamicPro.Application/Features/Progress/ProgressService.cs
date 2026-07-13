@@ -105,18 +105,30 @@ public class ProgressService : IProgressService
         if (user == null)
             return Result<UserProgressDto>.Failure(AppErrors.Authentication.UserNotFound);
 
-        // 1. IQueryable for user's department assignments
-        var deptAssignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-            .Where(a => a.DepartmentId == user.DepartmentId);
+        IQueryable<Lesson> accessibleLessons;
 
-        // 2. IQueryable for accessible lessons applying intersection logic in SQL
-        var accessibleLessons = _unitOfWork.Repository<Lesson>().Query()
-            .Where(lesson => deptAssignments.Any(a =>
-                a.ModuleId == lesson.Unit!.ModuleId &&
-                (a.LevelId == null || a.LevelId == lesson.LevelId) &&
-                (a.TypeId == null || a.TypeId == lesson.TypeId)));
+        if (user.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+        {
+            var assignedModuleIds = _unitOfWork.Repository<TestCycle>().Query()
+                .Where(tc => tc.TesterId == userId)
+                .SelectMany(tc => tc.AssignedModules)
+                .Select(am => am.ModuleId);
 
-        // 3. Aggregate stats via SQL GroupBy
+            accessibleLessons = _unitOfWork.Repository<Lesson>().Query()
+                .Where(lesson => assignedModuleIds.Contains(lesson.Unit!.ModuleId));
+        }
+        else
+        {
+            var deptAssignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+                .Where(a => a.DepartmentId == user.DepartmentId);
+
+            accessibleLessons = _unitOfWork.Repository<Lesson>().Query()
+                .Where(lesson => deptAssignments.Any(a =>
+                    a.ModuleId == lesson.Unit!.ModuleId &&
+                    (a.LevelId == null || a.LevelId == lesson.LevelId) &&
+                    (a.TypeId == null || a.TypeId == lesson.TypeId)));
+        }
+
         var modulesProgress = await accessibleLessons
             .GroupBy(l => new { l.Unit!.ModuleId, ModuleName = l.Unit.Module!.Name })
             .Select(g => new ModuleProgressDto

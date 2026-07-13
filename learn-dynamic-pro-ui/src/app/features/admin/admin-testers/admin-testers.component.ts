@@ -10,11 +10,12 @@ import { AdminHeaderComponent } from '../../../shared/components/admin-header/ad
 import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
 import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
+import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 
 @Component({
   selector: 'app-admin-testers',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent, ProgressBarComponent],
   templateUrl: './admin-testers.component.html',
   styleUrl: '../admin-dashboard/admin-dashboard.component.css'
 })

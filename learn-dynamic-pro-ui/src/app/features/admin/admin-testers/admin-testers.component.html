@@ -71,8 +71,7 @@
             <tr>
               <th>المختبر</th>
               <th>الموديولات المتاحة</th>
-              <th>دروس مكتملة</th>
-              <th class="text-right">التقدم</th>
+              <th>التقدم (الدروس المكتملة)</th>
               <th width="100" class="text-left">إجراءات</th>
             </tr>
           </thead>
@@ -80,11 +79,13 @@
             <tr *ngFor="let t of testersProgress">
               <td class="fw-500">{{ t.name }}</td>
               <td class="text-secondary">{{ t.assignedModules }}</td>
-              <td class="text-secondary">{{ t.completed }} / {{ t.totalLessons }}</td>
-              <td class="progress-cell">
-                <div class="progress-track">
-                  <div class="progress-fill" [style.width]="t.progressValue + '%'"></div>
-                </div>
+              <td>
+                <app-progress-bar 
+                  [completed]="t.completed" 
+                  [total]="t.totalLessons" 
+                  width="100%" 
+                  color="var(--color-primary)">
+                </app-progress-bar>
               </td>
               <td class="text-left">
                 <div class="d-flex gap-2 justify-end">

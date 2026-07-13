@@ -24,18 +24,41 @@ public class StudentService : IStudentService
     // ─────────────────────────────────────────────────────────────────────────
     public async Task<Result<List<ModuleDto>>> GetAssignedModulesAsync(Guid userId)
     {
-        var departmentId = await _unitOfWork.Repository<User>().Query()
+        var userInfo = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => u.DepartmentId)
+            .Select(u => new { u.DepartmentId, u.Role })
             .FirstOrDefaultAsync();
 
-        if (departmentId == Guid.Empty)
+        if (userInfo == null)
+            return Result<List<ModuleDto>>.Failure(AppErrors.Authentication.UserNotFound);
+
+        if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+        {
+            var testerModules = await _unitOfWork.Repository<TestCycle>().Query()
+                .AsNoTracking()
+                .Where(tc => tc.TesterId == userId)
+                .SelectMany(tc => tc.AssignedModules)
+                .Where(am => am.Module != null)
+                .Select(am => new ModuleDto
+                {
+                    Id = am.Module!.Id,
+                    Name = am.Module.Name,
+                    Description = am.Module.Description
+                })
+                .Distinct()
+                .OrderBy(m => m.Name)
+                .ToListAsync();
+
+            return Result<List<ModuleDto>>.Success(testerModules);
+        }
+
+        if (!userInfo.DepartmentId.HasValue || userInfo.DepartmentId == Guid.Empty)
             return Result<List<ModuleDto>>.Failure(AppErrors.Authentication.UserNotFound);
 
         var modules = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == departmentId)
+            .Where(a => a.DepartmentId == userInfo.DepartmentId)
             .Select(a => new ModuleDto
             {
                 Id          = a.Module!.Id,
@@ -90,7 +113,7 @@ public class StudentService : IStudentService
         var userInfo = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
             .Where(u => u.Id == userId)
-            .Select(u => new { u.DepartmentId })
+            .Select(u => new { u.DepartmentId, u.Role })
             .FirstOrDefaultAsync();
             
         if (userInfo == null)
@@ -102,17 +125,36 @@ public class StudentService : IStudentService
             .Select(u => u.ModuleId)
             .FirstOrDefaultAsync();
 
-        var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-            .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId);
+        IQueryable<Lesson> accessibleLessonsQuery;
 
-        var accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
-            .AsNoTracking()
-            .Include(l => l.Level)
-            .Include(l => l.Type)
-            .Where(l => l.UnitId == unitId && assignments.Any(a =>
-                (a.LevelId == null || a.LevelId == l.LevelId) &&
-                (a.TypeId  == null || a.TypeId  == l.TypeId)
-            ));
+        if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+        {
+            var hasAccess = await _unitOfWork.Repository<TestCycle>().Query()
+                .AnyAsync(tc => tc.TesterId == userId && tc.AssignedModules.Any(am => am.ModuleId == moduleId));
+
+            if (!hasAccess)
+                return Result<List<LessonDto>>.Success(new List<LessonDto>());
+
+            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Include(l => l.Level)
+                .Include(l => l.Type)
+                .Where(l => l.UnitId == unitId);
+        }
+        else
+        {
+            var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+                .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId);
+
+            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Include(l => l.Level)
+                .Include(l => l.Type)
+                .Where(l => l.UnitId == unitId && assignments.Any(a =>
+                    (a.LevelId == null || a.LevelId == l.LevelId) &&
+                    (a.TypeId  == null || a.TypeId  == l.TypeId)
+                ));
+        }
 
         var lessons = await accessibleLessonsQuery
             .OrderBy(l => l.OrderIndex)

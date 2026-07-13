@@ -6,12 +6,16 @@ import { Router } from '@angular/router';
 
 export interface DashboardModule extends ModuleDto {
   progressPercent: number;
+  completedLessons: number;
+  totalLessons: number;
 }
+
+import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 
 @Component({
   selector: 'app-tester-dashboard',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ProgressBarComponent],
   templateUrl: './tester-dashboard.component.html',
   styleUrl: './tester-dashboard.component.css'
 })
@@ -41,13 +45,21 @@ export class TesterDashboardComponent implements OnInit {
 
       this.modules = mods.map(m => {
         let percent = 0;
+        let completed = 0;
+        let total = 0;
         const prog = progressMap.get(m.id);
-        if (prog && prog.totalLessons > 0) {
-          percent = Math.round((prog.completedLessons / prog.totalLessons) * 100);
+        if (prog) {
+          completed = prog.completedLessons || 0;
+          total = prog.totalLessons || 0;
+          if (total > 0) {
+            percent = Math.round((completed / total) * 100);
+          }
         }
         return {
           ...m,
-          progressPercent: percent
+          progressPercent: percent,
+          completedLessons: completed,
+          totalLessons: total
         };
       });
       

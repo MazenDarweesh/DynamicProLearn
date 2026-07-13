@@ -859,24 +859,23 @@ public class CompanyService : ICompanyService
             })
             .ToListAsync();
 
-        var departmentIds = users.Select(u => u.DepartmentId).Distinct().ToList();
+        var userIds = users.Select(u => u.Id).ToList();
 
-        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+        var testCycles = await _unitOfWork.Repository<TestCycle>().Query()
             .AsNoTracking()
-            .Where(a => departmentIds.Contains(a.DepartmentId))
-            .Select(a => new 
+            .Where(tc => userIds.Contains(tc.TesterId))
+            .Select(tc => new
             {
-                DepartmentId = a.DepartmentId,
-                ModuleName = a.Module != null ? a.Module.Name : ""
+                TesterId = tc.TesterId,
+                Modules = tc.AssignedModules.Select(am => am.Module != null ? am.Module.Name : "")
             })
             .ToListAsync();
 
-        var userIds = users.Select(u => u.Id).ToList();
         var progressMap = await _progressAnalytics.GetUsersProgressAsync(userIds);
 
         var progressList = users.Select(u => {
-            var userAssignments = assignments.Where(a => a.DepartmentId == u.DepartmentId).ToList();
-            var assignedModulesNames = string.Join(", ", userAssignments.Select(a => a.ModuleName));
+            var userCycles = testCycles.Where(tc => tc.TesterId == u.Id).ToList();
+            var assignedModulesNames = string.Join(", ", userCycles.SelectMany(tc => tc.Modules).Distinct());
             var p = progressMap.ContainsKey(u.Id) ? progressMap[u.Id] : new ProgressResult();
 
             return new UserProgressDto
