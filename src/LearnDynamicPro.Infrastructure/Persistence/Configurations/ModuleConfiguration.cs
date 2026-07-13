@@ -9,6 +9,8 @@ public class ModuleConfiguration : IEntityTypeConfiguration<Module>
     public void Configure(EntityTypeBuilder<Module> builder)
     {
         builder.HasKey(m => m.Id);
+        
+        builder.HasQueryFilter(m => !m.IsDeleted);
 
         builder.Property(m => m.Name)
                .IsRequired()

@@ -9,6 +9,8 @@ public class LessonConfiguration : IEntityTypeConfiguration<Lesson>
     public void Configure(EntityTypeBuilder<Lesson> builder)
     {
         builder.HasKey(l => l.Id);
+        
+        builder.HasQueryFilter(l => !l.IsDeleted);
 
         builder.Property(l => l.Title)
                .IsRequired()

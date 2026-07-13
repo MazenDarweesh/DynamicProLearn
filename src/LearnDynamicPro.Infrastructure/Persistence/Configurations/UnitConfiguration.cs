@@ -9,6 +9,8 @@ public class UnitConfiguration : IEntityTypeConfiguration<Unit>
     public void Configure(EntityTypeBuilder<Unit> builder)
     {
         builder.HasKey(u => u.Id);
+        
+        builder.HasQueryFilter(u => !u.IsDeleted);
 
         builder.Property(u => u.Name)
                .IsRequired()
