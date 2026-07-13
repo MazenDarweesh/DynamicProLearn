@@ -1,0 +1,42 @@
+<div class="modal-overlay" *ngIf="show" dir="rtl" (click)="close()">
+  <div class="modal-container" [style.maxWidth]="maxWidth" (click)="$event.stopPropagation()">
+
+    <!-- ── Dark Header ─────────────────────────────────────── -->
+    <div class="modal-header">
+      <div class="d-flex justify-between align-center">
+        <div>
+          <h3 class="modal-title">
+            <ng-content select="[modal-icon]"></ng-content>
+            {{ title }}
+          </h3>
+          <p *ngIf="subtitle" class="modal-subtitle">{{ subtitle }}</p>
+        </div>
+        <button class="modal-close-btn" (click)="close()" type="button" aria-label="إغلاق">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Body (projected content) ───────────────────────── -->
+    <div class="modal-body">
+      <ng-content></ng-content>
+    </div>
+
+    <!-- ── Footer ──────────────────────────────────────────── -->
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn--cancel" type="button"
+              (click)="close()" [disabled]="loading">
+        {{ cancelLabel }}
+      </button>
+      <button class="modal-btn modal-btn--confirm" type="button"
+              (click)="confirm()" [disabled]="loading || confirmDisabled">
+        <span *ngIf="loading" class="modal-spinner"></span>
+        <span *ngIf="!loading">{{ confirmLabel }}</span>
+      </button>
+    </div>
+
+  </div>
+</div>

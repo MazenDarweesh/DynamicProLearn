@@ -6,6 +6,8 @@ import { AdminService } from '../../../core/services/admin.service';
 import { AdminModuleDto, LookupDto } from '../../../core/models/admin.models';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
+import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 import { ContentTreeComponent } from './components/content-tree/content-tree.component';
 import { ModuleEditorComponent } from './components/module-editor/module-editor.component';
 import { LessonEditorComponent } from './components/lesson-editor/lesson-editor.component';
@@ -13,7 +15,11 @@ import { LessonEditorComponent } from './components/lesson-editor/lesson-editor.
 @Component({
   selector: 'app-content-builder',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, ContentTreeComponent, ModuleEditorComponent, LessonEditorComponent],
+  imports: [
+    CommonModule, FormsModule,
+    AdminHeaderComponent, AdminActionButtonComponent, AdminModalComponent,
+    ContentTreeComponent, ModuleEditorComponent, LessonEditorComponent
+  ],
   templateUrl: './content-builder.component.html',
   styleUrls: ['./content-builder.component.css'],
   encapsulation: ViewEncapsulation.None

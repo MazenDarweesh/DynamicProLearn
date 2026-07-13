@@ -1,9 +1,14 @@
-<div class="console-container" dir="rtl">
-  <app-admin-header 
-    title="مُنشئ المحتوى" 
-    subtitle="إدارة وتعديل المناهج، الوحدات، والدروس التفاعلية"
-    [showBackBtn]="true">
-  </app-admin-header>
+<app-admin-header [showBackBtn]="true"></app-admin-header>
+
+<div class="console-container dashboard-container" dir="rtl">
+  <div class="d-flex justify-between w-100 align-center mb-4">
+    <div>
+      <h2 class="m-0" style="color: var(--color-navy)">مُنشئ المحتوى</h2>
+      <p class="text-secondary text-sm m-0 mt-1">إدارة وتعديل المناهج، الوحدات، والدروس التفاعلية</p>
+    </div>
+    <app-admin-action-button label="إضافة موديول" (clicked)="openAddModuleModal()">
+    </app-admin-action-button>
+  </div>
 
   <div class="console-body">
     <!-- Sidebar: Modules and Units Tree -->
@@ -16,7 +21,6 @@
       [selectedLesson]="selectedLesson"
       (moduleChange)="onModuleChange($event)"
       (deleteModule)="deleteModule($event)"
-      (createModule)="openAddModuleModal()"
       (saveAll)="saveAll()"
       (createUnit)="createUnit($event)"
       (deleteUnit)="deleteUnit($event)"
@@ -39,59 +43,42 @@
       </div>
 
       <!-- Module Details Editor (No Lesson Selected) -->
-      <app-module-editor 
-        *ngIf="selectedModuleId && !selectedLesson && selectedModule" 
+      <app-module-editor
+        *ngIf="selectedModuleId && !selectedLesson && selectedModule"
         [module]="selectedModule">
       </app-module-editor>
 
       <!-- Lesson Details Editor -->
-      <app-lesson-editor 
-        *ngIf="selectedLesson" 
-        [lesson]="selectedLesson" 
+      <app-lesson-editor
+        *ngIf="selectedLesson"
+        [lesson]="selectedLesson"
         [lookups]="lookups">
       </app-lesson-editor>
     </div>
   </div>
 </div>
 
-<!-- Add Module Modal -->
-<div class="modal-overlay" *ngIf="showAddModuleModal" dir="rtl">
-  <div class="modal-container" style="max-width: 500px;">
-    <div class="modal-header">
-      <div class="d-flex justify-between align-center">
-        <div>
-          <h3 class="m-0 text-white d-flex align-center gap-2">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-            </svg>
-            إضافة موديول جديد
-          </h3>
-          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">
-            أدخل اسم الموديول، وسيتم نقله للشجرة لبناء الوحدات والدروس بداخله.
-          </p>
-        </div>
-        <button class="icon-btn text-white" (click)="closeAddModuleModal()" style="margin-left: -10px;">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-        </button>
-      </div>
-    </div>
+<!-- ── Add Module Modal (shared app-admin-modal) ───────────────────────── -->
+<app-admin-modal
+  [show]="showAddModuleModal"
+  title="إضافة موديول جديد"
+  subtitle="أدخل اسم الموديول، وسيتم إضافته للشجرة لبناء الوحدات والدروس بداخله."
+  confirmLabel="حفظ وإضافة"
+  [loading]="isSubmittingModal"
+  [confirmDisabled]="!newModuleName"
+  (closed)="closeAddModuleModal()"
+  (confirmed)="submitNewModule()">
 
-    <div class="modal-body" style="background: white; padding: 20px;">
-      <div class="form-group mb-3">
-        <label class="form-label text-secondary text-sm mb-2 d-block">اسم الموديول</label>
-        <input type="text" class="form-control" [(ngModel)]="newModuleName" placeholder="مثال: مقدمة في النظام">
-      </div>
-    </div>
+  <!-- Modal Icon -->
+  <svg modal-icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+  </svg>
 
-    <div class="modal-footer d-flex justify-end gap-3 p-4 border-top" style="background: white; border-radius: 0 0 12px 12px;">
-      <button class="btn-secondary" (click)="closeAddModuleModal()" [disabled]="isSubmittingModal">إلغاء</button>
-      <button class="btn-primary" (click)="submitNewModule()" [disabled]="!newModuleName || isSubmittingModal">
-        <span *ngIf="isSubmittingModal" class="spinner"></span>
-        <span *ngIf="!isSubmittingModal">حفظ وإضافة</span>
-      </button>
-    </div>
+  <!-- Body Content -->
+  <div class="form-group mb-3">
+    <label class="form-label text-secondary text-sm mb-2 d-block">اسم الموديول</label>
+    <input type="text" class="form-control" [(ngModel)]="newModuleName"
+           placeholder="مثال: مقدمة في النظام">
   </div>
-</div>
+
+</app-admin-modal>
