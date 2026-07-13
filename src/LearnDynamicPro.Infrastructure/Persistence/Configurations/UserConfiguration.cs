@@ -10,6 +10,8 @@ public class UserConfiguration : IEntityTypeConfiguration<User>
     public void Configure(EntityTypeBuilder<User> builder)
     {
         builder.HasKey(u => u.Id);
+        
+        builder.HasQueryFilter(u => !u.IsDeleted);
 
         builder.Property(u => u.Username)
                .IsRequired()

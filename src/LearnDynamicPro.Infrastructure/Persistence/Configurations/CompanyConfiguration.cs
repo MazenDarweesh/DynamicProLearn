@@ -9,6 +9,8 @@ public class CompanyConfiguration : IEntityTypeConfiguration<Company>
     public void Configure(EntityTypeBuilder<Company> builder)
     {
         builder.HasKey(c => c.Id);
+        
+        builder.HasQueryFilter(c => !c.IsDeleted);
 
         builder.Property(c => c.Name)
                .IsRequired()

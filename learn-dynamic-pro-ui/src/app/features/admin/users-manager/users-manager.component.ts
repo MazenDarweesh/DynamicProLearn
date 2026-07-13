@@ -148,9 +148,18 @@ export class UsersManagerComponent implements OnInit {
   async deleteCompany(comp: any) {
     const ok = await Dialog.confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟', 'تأكيد الحذف');
     if (ok) {
-      this.adminService.deleteCompany(comp.id).subscribe(() => {
-        this.expandedCompanyId = null;
-        this.loadData();
+      console.log(`[FRONTEND] Triggering delete for company ${comp.id}...`);
+      this.adminService.deleteCompany(comp.id).subscribe({
+        next: () => {
+          console.log(`[FRONTEND] Delete company SUCCESS`);
+          this.expandedCompanyId = null;
+          this.loadData();
+          Dialog.alert('تم حذف الشركة بنجاح.', 'نجاح', 'success');
+        },
+        error: (err) => {
+          console.error(`[FRONTEND] Delete company FAILED`, err);
+          Dialog.alert('حدث خطأ أثناء حذف الشركة. تحقق من الـ Console.', 'خطأ', 'error');
+        }
       });
     }
   }

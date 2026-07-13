@@ -185,13 +185,16 @@ export class EmployeesManagerComponent implements OnInit {
   deleteEmployee(userId: string) {
     Dialog.confirm('هل أنت متأكد من حذف هذا الموظف؟ لا يمكن التراجع عن هذا الإجراء.', 'تأكيد الحذف').then(confirmed => {
       if (confirmed) {
+        console.log(`[FRONTEND] Triggering delete for employee ${userId}...`);
         this.adminService.deleteUser(userId).subscribe({
           next: () => {
+            console.log(`[FRONTEND] Delete employee SUCCESS`);
             Dialog.alert('تم حذف الموظف بنجاح', 'نجاح', 'success');
             this.loadEmployees();
           },
-          error: () => {
-            Dialog.alert('حدث خطأ أثناء الحذف', 'خطأ', 'error');
+          error: (err) => {
+            console.error(`[FRONTEND] Delete employee FAILED`, err);
+            Dialog.alert('حدث خطأ أثناء الحذف. تحقق من الـ Console.', 'خطأ', 'error');
           }
         });
       }

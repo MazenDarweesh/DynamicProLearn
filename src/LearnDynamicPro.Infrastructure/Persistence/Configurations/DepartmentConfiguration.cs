@@ -9,6 +9,8 @@ public class DepartmentConfiguration : IEntityTypeConfiguration<Department>
     public void Configure(EntityTypeBuilder<Department> builder)
     {
         builder.HasKey(d => d.Id);
+        
+        builder.HasQueryFilter(d => !d.IsDeleted);
 
         builder.Property(d => d.Name)
                .IsRequired()

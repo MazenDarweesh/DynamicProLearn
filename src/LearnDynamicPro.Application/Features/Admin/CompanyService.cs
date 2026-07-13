@@ -188,6 +188,7 @@ public class CompanyService : ICompanyService
     {
         try
         {
+            Console.WriteLine($"[BACKEND] Executing DeleteUserAsync for UserId: {id}");
             var user = await _unitOfWork.Repository<User>().GetByIdAsync(id);
             if (user == null)
                 return Result<bool>.Failure(AppErrors.General.NotFound);
@@ -230,10 +231,15 @@ public class CompanyService : ICompanyService
 
             _unitOfWork.Repository<User>().Remove(user);
             await _unitOfWork.SaveChangesAsync();
+            Console.WriteLine($"[BACKEND] Successfully deleted UserId: {id}");
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[BACKEND] Error deleting UserId {id}: {ex.Message}");
+            if (ex.InnerException != null)
+                Console.WriteLine($"[BACKEND] Inner Exception: {ex.InnerException.Message}");
+
             var inner = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
             System.IO.File.WriteAllText("delete_error_user.txt", inner);
             throw;
@@ -256,6 +262,7 @@ public class CompanyService : ICompanyService
     {
         try
         {
+            Console.WriteLine($"[BACKEND] Executing DeleteCompanyAsync for CompanyId: {id}");
             var company = await _unitOfWork.Repository<Company>().Query()
                 .Include(c => c.Users)
                 .Include(c => c.Departments)
@@ -322,10 +329,15 @@ public class CompanyService : ICompanyService
 
             _unitOfWork.Repository<Company>().Remove(company);
             await _unitOfWork.SaveChangesAsync();
+            Console.WriteLine($"[BACKEND] Successfully deleted CompanyId: {id}");
             return Result<bool>.Success(true);
         }
         catch (Exception ex)
         {
+            Console.WriteLine($"[BACKEND] Error deleting CompanyId {id}: {ex.Message}");
+            if (ex.InnerException != null)
+                Console.WriteLine($"[BACKEND] Inner Exception: {ex.InnerException.Message}");
+                
             var inner = ex.InnerException != null ? ex.InnerException.Message : ex.Message;
             System.IO.File.WriteAllText("delete_error.txt", inner);
             throw;
