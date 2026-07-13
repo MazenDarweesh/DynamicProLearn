@@ -40,6 +40,9 @@ export class AdminModalComponent {
   /** Label for the cancel button */
   @Input() cancelLabel: string = 'إلغاء';
 
+  /** CSS class for the confirm button */
+  @Input() confirmButtonClass: string = 'btn-primary';
+
   /** Shows a spinner and disables the confirm button */
   @Input() loading: boolean = false;
 

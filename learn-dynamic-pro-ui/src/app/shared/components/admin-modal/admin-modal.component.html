@@ -31,7 +31,8 @@
               (click)="close()" [disabled]="loading">
         {{ cancelLabel }}
       </button>
-      <button class="btn-primary" type="button"
+      <button type="button"
+              [ngClass]="confirmButtonClass"
               (click)="confirm()" [disabled]="loading || confirmDisabled">
         <span *ngIf="loading" class="modal-spinner"></span>
         <span *ngIf="!loading">{{ confirmLabel }}</span>
