@@ -22,6 +22,8 @@ export class AdminHeaderComponent {
   @Input() backUrl?: string;
 
   currentRoute = '';
+  userRole = this.authService.userRole;
+  userName = this.authService.userName;
 
   constructor() {
     this.router.events.pipe(

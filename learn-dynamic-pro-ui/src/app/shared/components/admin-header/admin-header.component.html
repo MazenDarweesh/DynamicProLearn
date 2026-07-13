@@ -30,7 +30,7 @@
       </div>
 
     </div>
-    <nav class="header-nav">
+    <nav class="header-nav" *ngIf="userRole() === 'Admin'">
       <button class="nav-btn" [class.active]="currentRoute === '/admin'" (click)="goTo('/admin')">الرئيسية <span
           class="icon">🏠</span></button>
       <button class="nav-btn" [class.active]="currentRoute === '/admin/companies'"
@@ -42,5 +42,8 @@
       <button class="nav-btn" [class.active]="currentRoute === '/admin/testers'"
         (click)="goTo('/admin/testers')">المختبرون <span class="icon">🧪</span></button>
     </nav>
+    <div *ngIf="userRole() !== 'Admin'" class="d-flex align-center gap-2" style="padding: 0 20px; margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px; color: white;">
+      <span class="icon">👤</span> أهلاً بك، {{ userName() || 'المستخدم' }}
+    </div>
   </div>
 </header>
