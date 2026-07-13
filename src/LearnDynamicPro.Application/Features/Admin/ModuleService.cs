@@ -57,9 +57,6 @@ public class ModuleService : IModuleService
         var modules = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Include(m => m.Assignments)
-                .ThenInclude(a => a.Department)
-                    .ThenInclude(d => d.Company)
             .Select(m => new ModuleDto { 
                 Id = m.Id, 
                 Name = m.Name, 
@@ -208,9 +205,7 @@ public class ModuleService : IModuleService
     {
         var query = _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
-            .Where(l => l.UnitId == unitId)
-            .Include(l => l.Level)
-            .Include(l => l.Type);
+            .Where(l => l.UnitId == unitId);
             
         var totalCount = await query.CountAsync();
 
@@ -239,8 +234,6 @@ public class ModuleService : IModuleService
     {
         var lesson = await _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
-            .Include(l => l.Level)
-            .Include(l => l.Type)
             .FirstOrDefaultAsync(l => l.Id == lessonId);
 
         if (lesson == null) return Result<LessonDetailDto>.Failure(AppErrors.General.NotFound);

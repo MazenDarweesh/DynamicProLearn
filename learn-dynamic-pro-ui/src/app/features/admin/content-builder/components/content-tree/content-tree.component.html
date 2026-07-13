@@ -19,10 +19,15 @@
   
   <div class="form-group mb-3">
     <label>اختر الموديول</label>
-    <select class="form-control" [ngModel]="selectedModuleId" (ngModelChange)="onModuleChange($event)">
-      <option [ngValue]="null" disabled>-- اختر الموديول --</option>
-      <option *ngFor="let mod of modules" [ngValue]="mod.id">{{ mod.name }}</option>
-    </select>
+    <div class="d-flex gap-2">
+      <select class="form-control" [ngModel]="selectedModuleId" (ngModelChange)="onModuleChange($event)">
+        <option [ngValue]="null" disabled>-- اختر الموديول --</option>
+        <option *ngFor="let mod of modules" [ngValue]="mod.id">{{ mod.name }}</option>
+      </select>
+      <button *ngIf="selectedModuleId" class="btn-icon-danger" (click)="onDeleteModule()" title="حذف الموديول بالكامل" style="border: 1px solid var(--color-border); background: white; padding: 0 12px; border-radius: 6px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+      </button>
+    </div>
   </div>
 
   <div *ngIf="selectedModuleId && !isLoadingTree">

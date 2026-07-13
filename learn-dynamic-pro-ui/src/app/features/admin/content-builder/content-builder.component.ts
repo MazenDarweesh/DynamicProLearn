@@ -108,6 +108,25 @@ export class ContentBuilderComponent implements OnInit {
     });
   }
 
+  async deleteModule(moduleId: string) {
+    const ok = await Dialog.confirm('هل أنت متأكد من حذف هذا الموديول بالكامل؟ (سيتم حذف جميع الوحدات والدروس المرتبطة به!)', 'تأكيد الحذف النهائي');
+    if (!ok) return;
+
+    this.adminService.deleteModule(moduleId).subscribe({
+      next: () => {
+        this.modules = this.modules.filter(m => m.id !== moduleId);
+        if (this.selectedModuleId === moduleId) {
+          this.selectedModuleId = null;
+          this.selectedModule = null;
+          this.units = [];
+          this.selectedLesson = null;
+        }
+        Dialog.alert('تم حذف الموديول بنجاح.', 'نجاح', 'success');
+      },
+      error: (err) => Dialog.alert('فشل حذف الموديول: ' + (err.error?.detail || err.message), 'خطأ', 'error')
+    });
+  }
+
   createUnit(name: string) {
     if (!this.selectedModuleId) return;
     

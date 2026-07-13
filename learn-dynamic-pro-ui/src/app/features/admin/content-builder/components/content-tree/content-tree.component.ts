@@ -25,6 +25,7 @@ export class ContentTreeComponent {
   @Output() createLesson = new EventEmitter<{unit: any, title: string}>();
   @Output() deleteLesson = new EventEmitter<{unit: any, lesson: any}>();
   @Output() selectLesson = new EventEmitter<any>();
+  @Output() deleteModule = new EventEmitter<string>();
 
   isAddingUnit = false;
   newUnitName = '';
@@ -33,6 +34,12 @@ export class ContentTreeComponent {
 
   onModuleChange(moduleId: string) {
     this.moduleChange.emit(moduleId);
+  }
+
+  onDeleteModule() {
+    if (this.selectedModuleId) {
+      this.deleteModule.emit(this.selectedModuleId);
+    }
   }
 
   onSaveAll() {
