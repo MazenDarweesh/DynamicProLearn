@@ -27,4 +27,17 @@ public class AuthController : ControllerBase
 
         return Ok(result.Value);
     }
+
+    [HttpPost("erp-login")]
+    public async Task<IActionResult> ErpLogin([FromBody] ErpLoginRequest request)
+    {
+        var result = await _authService.ErpLoginAsync(request);
+        
+        if (!result.IsSuccess)
+        {
+            return Unauthorized(new { message = result.Error });
+        }
+
+        return Ok(result.Value);
+    }
 }

@@ -52,4 +52,65 @@ public class AuthService : IAuthService
 
         return Result<LoginResponse>.Success(response);
     }
+
+    public async Task<Result<ErpLoginResponse>> ErpLoginAsync(ErpLoginRequest request)
+    {
+        var user = await _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
+
+        if (user is null)
+            return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+
+        bool isValid = false;
+        if (request.Password == user.PasswordHash) 
+        {
+            isValid = true;
+        }
+        else if (_passwordHasher.Verify(request.Password, user.PasswordHash))
+        {
+            isValid = true;
+        }
+
+        if (!isValid)
+            return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+
+        var token = _tokenService.GenerateToken(user);
+
+        ErpRedirectDto? erpRedirect = null;
+        if (!string.IsNullOrWhiteSpace(request.ErpKey))
+        {
+            var redirectData = await _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Where(l => l.ErpKey == request.ErpKey)
+                .Select(l => new
+                {
+                    LessonId = l.Id,
+                    ModuleId = l.Unit!.ModuleId
+                })
+                .FirstOrDefaultAsync();
+            
+            if (redirectData != null)
+            {
+                erpRedirect = new ErpRedirectDto
+                {
+                    ModuleId = redirectData.ModuleId,
+                    LessonId = redirectData.LessonId
+                };
+            }
+        }
+
+        var response = new ErpLoginResponse
+        {
+            UserId       = user.Id,
+            Username     = user.Username,
+            Role         = user.Role,
+            Token        = token,
+            CompanyId    = user.CompanyId,
+            DepartmentId = user.DepartmentId,
+            ErpRedirect  = erpRedirect
+        };
+
+        return Result<ErpLoginResponse>.Success(response);
+    }
 }

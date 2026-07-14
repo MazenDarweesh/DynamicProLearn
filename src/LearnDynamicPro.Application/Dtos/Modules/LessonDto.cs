@@ -13,6 +13,7 @@ public class LessonDto
     public string VideoUrl { get; set; } = string.Empty;
     public string PdfUrl { get; set; } = string.Empty;
     public string ExternalLink { get; set; } = string.Empty;
+    public string? ErpKey { get; set; }
     public int OrderIndex { get; set; }
     public bool IsCompleted { get; set; }
 }

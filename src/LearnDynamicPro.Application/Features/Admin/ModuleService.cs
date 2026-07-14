@@ -136,6 +136,7 @@ public class ModuleService : IModuleService
             VideoUrl = request.VideoUrl, 
             PdfUrl = request.PdfUrl,
             ExternalLink = request.ExternalLink,
+            ErpKey = request.ErpKey,
             UnitId = request.UnitId,
             LevelId = levelId,
             TypeId = typeId,
@@ -152,6 +153,7 @@ public class ModuleService : IModuleService
             VideoUrl = lesson.VideoUrl,
             PdfUrl = lesson.PdfUrl,
             ExternalLink = lesson.ExternalLink,
+            ErpKey = lesson.ErpKey,
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
@@ -177,6 +179,7 @@ public class ModuleService : IModuleService
         lesson.VideoUrl = request.VideoUrl;
         lesson.PdfUrl = request.PdfUrl;
         lesson.ExternalLink = request.ExternalLink;
+        lesson.ErpKey = request.ErpKey;
         lesson.LevelId = levelId;
         lesson.TypeId = typeId;
         lesson.Description = request.Description;
@@ -192,6 +195,7 @@ public class ModuleService : IModuleService
             VideoUrl = lesson.VideoUrl,
             PdfUrl = lesson.PdfUrl,
             ExternalLink = lesson.ExternalLink,
+            ErpKey = lesson.ErpKey,
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
@@ -230,6 +234,7 @@ public class ModuleService : IModuleService
                 VideoUrl = l.VideoUrl,
                 PdfUrl = l.PdfUrl,
                 ExternalLink = l.ExternalLink,
+                ErpKey = l.ErpKey,
                 UnitId = l.UnitId, 
                 LevelId = l.LevelId,
                 LevelLabel = l.Level != null ? l.Level.Label : string.Empty,

@@ -9,6 +9,7 @@ public class LessonDetailDto
     public string VideoUrl { get; set; } = string.Empty;
     public string PdfUrl { get; set; } = string.Empty;
     public string ExternalLink { get; set; } = string.Empty;
+    public string? ErpKey { get; set; }
     public Guid LevelId { get; set; }
     public string LevelLabel { get; set; } = string.Empty;
     public Guid TypeId { get; set; }

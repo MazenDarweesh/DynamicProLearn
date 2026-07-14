@@ -227,6 +227,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ErpKey")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<string>("ExternalLink")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");

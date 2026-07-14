@@ -33,6 +33,7 @@ public class CreateLessonRequest
     public string VideoUrl { get; set; } = string.Empty;
     public string PdfUrl { get; set; } = string.Empty;
     public string ExternalLink { get; set; } = string.Empty;
+    public string? ErpKey { get; set; }
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
     public int OrderIndex { get; set; }
@@ -45,6 +46,7 @@ public class UpdateLessonRequest
     public string VideoUrl { get; set; } = string.Empty;
     public string PdfUrl { get; set; } = string.Empty;
     public string ExternalLink { get; set; } = string.Empty;
+    public string? ErpKey { get; set; }
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
     public int OrderIndex { get; set; }
