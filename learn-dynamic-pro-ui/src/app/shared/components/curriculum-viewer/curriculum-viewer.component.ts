@@ -18,6 +18,7 @@ export class CurriculumViewerComponent {
   // Flags for what mode we are in
   @Input() isDepartmentView: boolean = true;
   @Input() isStudentView: boolean = false;
+  @Input() isTesterView: boolean = false;
 
   @Output() onMarkLessonComplete = new EventEmitter<string>();
   @Output() onUnmarkLessonComplete = new EventEmitter<string>();

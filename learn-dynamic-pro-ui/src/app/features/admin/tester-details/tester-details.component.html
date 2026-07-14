@@ -9,7 +9,14 @@
   <div class="d-flex justify-between w-100 align-center mb-4">
     <h2 class="m-0" style="color: var(--color-navy)">بيانات المختبر وتقييماته</h2>
     <div class="d-flex align-center gap-3">
-      
+      <button (click)="toggleExpandAll()" 
+              style="background: rgba(67, 56, 202, 0.1); color: #4338ca; padding: 10px 15px; border-radius: 8px; font-weight: 500; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; font-size: 14px; transition: opacity 0.2s;"
+              onmouseover="this.style.opacity='0.8'"
+              onmouseout="this.style.opacity='1'">
+        <i class="fi" [ngClass]="isAllExpanded ? 'fi-rr-compress-alt' : 'fi-rr-expand-arrows-alt'" style="margin-top: 3px;"></i>
+        {{ isAllExpanded ? 'إخفاء الكل' : 'عرض الكل' }}
+      </button>
+
       <button (click)="exportToExcel()" class="btn-green d-flex align-center gap-2" style="padding: 10px 15px; border-radius: 8px; font-weight: 500; border: none; cursor: pointer;">
         <i class="fi fi-rr-file-excel"></i> تصدير إكسيل
       </button>
@@ -45,48 +52,22 @@
 
   <div class="card p-0">
     <!-- Empty State -->
-    <div *ngIf="testerDetails.feedbacks.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
+    <div *ngIf="formattedModules.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
       <i class="fi fi-rr-folder-open mb-3" style="font-size: 40px; color: rgba(0,0,0,0.1);"></i>
       <h3 class="m-0">لا توجد تقييمات</h3>
       <p class="mt-2">لم يقم هذا المختبر بتقييم أي دروس حتى الآن.</p>
     </div>
 
     <!-- Feedbacks Table -->
-    <table *ngIf="testerDetails.feedbacks.length > 0" class="data-table w-100">
-      <thead>
-        <tr>
-          <th>الموديول</th>
-          <th>الوحدة</th>
-          <th>الدرس</th>
-          <th>الحالة</th>
-          <th style="width: 35%;">تعليقات المختبر</th>
-          <th>تاريخ التقييم</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr *ngFor="let f of testerDetails.feedbacks">
-          <td class="fw-500 text-primary">{{ f.moduleName }}</td>
-          <td class="text-secondary">{{ f.unitName }}</td>
-          <td class="text-secondary">{{ f.lessonName }}</td>
-          <td>
-            <span class="badge" 
-                  [ngClass]="{
-                    'badge-success': f.status === 'مكتمل' || f.status === 'سليم 100%',
-                    'badge-danger': f.status === 'بها أخطاء',
-                    'badge-secondary': f.status === 'غير مختبر'
-                  }">
-              {{ f.status }}
-            </span>
-          </td>
-          <td>
-            <p class="m-0" style="font-size: 13px; color: #475569; white-space: pre-wrap; line-height: 1.5;">{{ f.comment || '-' }}</p>
-          </td>
-          <td class="text-secondary text-sm">
-            {{ f.evaluationDate ? (f.evaluationDate | date:'yyyy-MM-dd') : '-' }}
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <app-curriculum-viewer 
+      *ngIf="formattedModules.length > 0"
+      [modules]="formattedModules"
+      [isAllExpanded]="isAllExpanded"
+      [isLoading]="isLoading"
+      [isDepartmentView]="false"
+      [isStudentView]="false"
+      [isTesterView]="true">
+    </app-curriculum-viewer>
   </div>
 </div>
 

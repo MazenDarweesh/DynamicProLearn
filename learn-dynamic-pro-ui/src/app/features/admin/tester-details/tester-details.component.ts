@@ -7,10 +7,12 @@ import { ProgressBarComponent } from '../../../shared/components/progress-bar/pr
 import { Dialog } from '../../../core/utils/dialog';
 import * as XLSX from 'xlsx';
 
+import { CurriculumViewerComponent } from '../../../shared/components/curriculum-viewer/curriculum-viewer.component';
+
 @Component({
   selector: 'app-tester-details',
   standalone: true,
-  imports: [CommonModule, AdminHeaderComponent, ProgressBarComponent],
+  imports: [CommonModule, AdminHeaderComponent, ProgressBarComponent, CurriculumViewerComponent],
   templateUrl: './tester-details.component.html',
   styleUrls: ['./tester-details.component.css']
 })
@@ -22,6 +24,13 @@ export class TesterDetailsComponent implements OnInit {
   testerId = '';
   testerDetails: any = null;
   isLoading = true;
+  isAllExpanded = false;
+  
+  formattedModules: any[] = [];
+
+  toggleExpandAll(): void {
+    this.isAllExpanded = !this.isAllExpanded;
+  }
 
   ngOnInit(): void {
     this.testerId = this.route.snapshot.paramMap.get('id') || '';
@@ -37,6 +46,7 @@ export class TesterDetailsComponent implements OnInit {
     this.adminService.getTesterDetails(this.testerId).subscribe({
       next: (res) => {
         this.testerDetails = res;
+        this.formatFeedbacksToModules();
         this.isLoading = false;
       },
       error: () => {
@@ -47,9 +57,54 @@ export class TesterDetailsComponent implements OnInit {
     });
   }
 
+  formatFeedbacksToModules(): void {
+    if (!this.testerDetails || !this.testerDetails.feedbacks) return;
+    
+    const modulesMap = new Map<string, any>();
+    
+    this.testerDetails.feedbacks.forEach((f: any) => {
+      if (!modulesMap.has(f.moduleName)) {
+        modulesMap.set(f.moduleName, {
+          name: f.moduleName,
+          totalLessons: 0,
+          completedLessons: 0,
+          unitsMap: new Map<string, any>()
+        });
+      }
+      
+      const moduleObj = modulesMap.get(f.moduleName);
+      moduleObj.totalLessons++;
+      if (f.status === 'مكتمل' || f.status === 'سليم 100%' || f.status === 'بها أخطاء') {
+          moduleObj.completedLessons++;
+      }
+      
+      if (!moduleObj.unitsMap.has(f.unitName)) {
+        moduleObj.unitsMap.set(f.unitName, {
+          name: f.unitName,
+          lessons: []
+        });
+      }
+      
+      const unitObj = moduleObj.unitsMap.get(f.unitName);
+      unitObj.lessons.push({
+        name: f.lessonName,
+        status: f.status,
+        comment: f.comment,
+        evaluationDate: f.evaluationDate
+      });
+    });
+    
+    this.formattedModules = Array.from(modulesMap.values()).map(m => ({
+      name: m.name,
+      totalLessons: m.totalLessons,
+      completedLessons: m.completedLessons,
+      units: Array.from((m.unitsMap as Map<string, any>).values())
+    }));
+  }
+
   exportToExcel(): void {
     if (!this.testerDetails || !this.testerDetails.feedbacks || this.testerDetails.feedbacks.length === 0) {
-      Dialog.alert('لا توجد بيانات لتصديرها', 'تنبيه', 'warning');
+      Dialog.alert('لا توجد بيانات لتصديرها', 'تنبيه', 'info');
       return;
     }
 
