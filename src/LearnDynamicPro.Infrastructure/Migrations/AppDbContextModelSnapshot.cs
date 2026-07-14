@@ -227,6 +227,10 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<string>("ExternalLink")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
 
@@ -241,6 +245,10 @@ namespace LearnDynamicPro.Infrastructure.Migrations
 
                     b.Property<int>("OrderIndex")
                         .HasColumnType("int");
+
+                    b.Property<string>("PdfUrl")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<string>("Title")
                         .IsRequired()

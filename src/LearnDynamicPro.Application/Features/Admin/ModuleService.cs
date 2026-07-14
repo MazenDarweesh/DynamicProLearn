@@ -134,6 +134,8 @@ public class ModuleService : IModuleService
         { 
             Title = request.Title, 
             VideoUrl = request.VideoUrl, 
+            PdfUrl = request.PdfUrl,
+            ExternalLink = request.ExternalLink,
             UnitId = request.UnitId,
             LevelId = levelId,
             TypeId = typeId,
@@ -147,6 +149,9 @@ public class ModuleService : IModuleService
         { 
             Id = lesson.Id, 
             Title = lesson.Title, 
+            VideoUrl = lesson.VideoUrl,
+            PdfUrl = lesson.PdfUrl,
+            ExternalLink = lesson.ExternalLink,
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
@@ -170,6 +175,8 @@ public class ModuleService : IModuleService
 
         lesson.Title = request.Title;
         lesson.VideoUrl = request.VideoUrl;
+        lesson.PdfUrl = request.PdfUrl;
+        lesson.ExternalLink = request.ExternalLink;
         lesson.LevelId = levelId;
         lesson.TypeId = typeId;
         lesson.Description = request.Description;
@@ -182,6 +189,9 @@ public class ModuleService : IModuleService
         { 
             Id = lesson.Id, 
             Title = lesson.Title, 
+            VideoUrl = lesson.VideoUrl,
+            PdfUrl = lesson.PdfUrl,
+            ExternalLink = lesson.ExternalLink,
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
@@ -217,6 +227,9 @@ public class ModuleService : IModuleService
                 Id = l.Id, 
                 Title = l.Title, 
                 Description = l.Description,
+                VideoUrl = l.VideoUrl,
+                PdfUrl = l.PdfUrl,
+                ExternalLink = l.ExternalLink,
                 UnitId = l.UnitId, 
                 LevelId = l.LevelId,
                 LevelLabel = l.Level != null ? l.Level.Label : string.Empty,
@@ -244,6 +257,8 @@ public class ModuleService : IModuleService
             Title = lesson.Title, 
             Description = lesson.Description,
             VideoUrl = lesson.VideoUrl,
+            PdfUrl = lesson.PdfUrl,
+            ExternalLink = lesson.ExternalLink,
             UnitId = lesson.UnitId, 
             LevelId = lesson.LevelId,
             LevelLabel = lesson.Level != null ? lesson.Level.Label : string.Empty,

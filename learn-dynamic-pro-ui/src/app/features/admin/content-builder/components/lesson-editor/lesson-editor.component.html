@@ -26,10 +26,30 @@
     <textarea class="form-control" rows="4" [(ngModel)]="lesson.description" placeholder="أدخل وصفاً مفصلاً للدرس..."></textarea>
   </div>
 
-  <div class="form-group mb-4">
+  <div class="form-group mb-3">
     <label>رابط الفيديو (Video URL)</label>
     <input type="text" class="form-control" [(ngModel)]="lesson.videoUrl" placeholder="https://youtube.com/watch?v=...">
     <small class="text-secondary mt-1 d-block">سيدعم النظام تحويل روابط يوتيوب تلقائياً إلى Embed.</small>
+  </div>
+
+  <div class="form-group mb-3">
+    <label>رابط ملف الـ PDF</label>
+    <div class="d-flex align-center gap-2">
+      <div style="background: rgba(220, 38, 38, 0.1); color: #dc2626; padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+        <i class="fi fi-rr-document" style="font-size: 18px;"></i>
+      </div>
+      <input type="text" class="form-control flex-1" [(ngModel)]="lesson.pdfUrl" placeholder="https://example.com/file.pdf">
+    </div>
+  </div>
+
+  <div class="form-group mb-4">
+    <label>رابط خارجي (مثل Google Drive وغيرها)</label>
+    <div class="d-flex align-center gap-2">
+      <div style="background: rgba(67, 56, 202, 0.1); color: var(--color-primary); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
+        <i class="fi fi-rr-link" style="font-size: 18px;"></i>
+      </div>
+      <input type="text" class="form-control flex-1" [(ngModel)]="lesson.externalLink" placeholder="https://drive.google.com/...">
+    </div>
   </div>
 
   <div class="video-preview" *ngIf="lesson.videoUrl">

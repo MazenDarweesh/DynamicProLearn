@@ -10,6 +10,9 @@ public class LessonDto
     public string LevelLabel { get; set; } = string.Empty;
     public Guid TypeId { get; set; }
     public string TypeLabel { get; set; } = string.Empty;
+    public string VideoUrl { get; set; } = string.Empty;
+    public string PdfUrl { get; set; } = string.Empty;
+    public string ExternalLink { get; set; } = string.Empty;
     public int OrderIndex { get; set; }
     public bool IsCompleted { get; set; }
 }

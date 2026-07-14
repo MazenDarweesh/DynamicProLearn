@@ -31,6 +31,8 @@ public class CreateLessonRequest
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string VideoUrl { get; set; } = string.Empty;
+    public string PdfUrl { get; set; } = string.Empty;
+    public string ExternalLink { get; set; } = string.Empty;
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
     public int OrderIndex { get; set; }
@@ -41,6 +43,8 @@ public class UpdateLessonRequest
     public string Title { get; set; } = string.Empty;
     public string Description { get; set; } = string.Empty;
     public string VideoUrl { get; set; } = string.Empty;
+    public string PdfUrl { get; set; } = string.Empty;
+    public string ExternalLink { get; set; } = string.Empty;
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
     public int OrderIndex { get; set; }

@@ -203,6 +203,8 @@ export class ContentBuilderComponent implements OnInit {
       title: title,
       description: '',
       videoUrl: '',
+      pdfUrl: '',
+      externalLink: '',
       levelId: this.lookups.levels.length ? this.lookups.levels[0].id : '00000000-0000-0000-0000-000000000001',
       typeId: this.lookups.types.length ? this.lookups.types[0].id : '00000000-0000-0000-0000-000000000001',
       orderIndex: unit.lessons.length + 1
@@ -261,6 +263,8 @@ export class ContentBuilderComponent implements OnInit {
             title: l.title,
             description: l.description || '',
             videoUrl: l.videoUrl || '',
+            pdfUrl: l.pdfUrl || '',
+            externalLink: l.externalLink || '',
             levelId: l.levelId,
             typeId: l.typeId,
             orderIndex: lIndex + 1
