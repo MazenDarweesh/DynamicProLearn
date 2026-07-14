@@ -34,16 +34,18 @@
 
   <div class="form-group mb-3">
     <label>رابط / ملف الـ PDF</label>
+    
+    <input type="text" class="form-control mb-2" [(ngModel)]="lesson.pdfUrl" placeholder="أدخل الرابط المباشر للملف (https://...) أو ارفع ملفاً">
+    
     <div class="d-flex gap-2">
       <input type="file" class="form-control flex-1" accept="application/pdf" (change)="onPdfFileSelected($event)">
       <button class="btn-blue" [disabled]="!selectedPdfFile || isUploadingPdf" (click)="uploadPdf()" style="white-space: nowrap;">
         {{ isUploadingPdf ? 'جاري الرفع...' : 'رفع الملف' }}
       </button>
     </div>
-    <input *ngIf="lesson.pdfUrl" type="text" class="form-control mt-2" [(ngModel)]="lesson.pdfUrl" placeholder="أو أدخل الرابط مباشرة (https://...)">
-    <small class="text-secondary mt-1 d-block" *ngIf="!lesson.pdfUrl">يمكنك اختيار ملف ورفعه، أو لصق رابط مباشر لملف PDF.</small>
-    <small class="text-success mt-1 d-block" *ngIf="lesson.pdfUrl">
-      <i class="fi fi-rr-check-circle"></i> تم ربط الملف بنجاح
+    <small class="text-secondary mt-1 d-block">يمكنك إدخال رابط خارجي، أو رفع ملف ليقوم النظام بتوليد وحفظ مساره التلقائي.</small>
+    <small class="text-success mt-1 d-block" *ngIf="lesson.pdfUrl && lesson.pdfUrl.includes('/uploads/')">
+      <i class="fi fi-rr-check-circle"></i> تم رفع الملف بنجاح وتوليد مساره في النظام
     </small>
   </div>
 

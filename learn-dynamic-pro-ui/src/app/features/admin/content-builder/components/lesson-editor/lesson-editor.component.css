@@ -1,1 +1,65 @@
 /* Specific styles for lesson editor can go here */
+
+input[type="file"].form-control {
+  padding: 6px 12px;
+  line-height: 1.8;
+  color: var(--color-text-secondary);
+}
+
+input[type="file"]::file-selector-button {
+  background-color: var(--color-bg-page, #f8fafc);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  padding: 6px 14px;
+  color: var(--color-navy, #1e293b);
+  cursor: pointer;
+  margin-left: 12px;
+  font-family: inherit;
+  transition: all 0.2s;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+input[type="file"]::file-selector-button:hover {
+  background-color: var(--color-primary-light, #e0e7ff);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.btn-blue {
+  background-color: var(--color-primary);
+  color: white;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-blue:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(67, 56, 202, 0.25);
+  background-color: #3730a3; /* dark primary */
+}
+
+.btn-blue:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.text-success {
+  color: #16a34a !important;
+  font-size: 13px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
