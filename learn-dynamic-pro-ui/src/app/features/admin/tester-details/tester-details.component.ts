@@ -62,9 +62,10 @@ export class TesterDetailsComponent implements OnInit {
     
     const modulesMap = new Map<string, any>();
     
-    this.testerDetails.feedbacks.forEach((f: any) => {
+    this.testerDetails.feedbacks.forEach((f: any, index: number) => {
       if (!modulesMap.has(f.moduleName)) {
         modulesMap.set(f.moduleName, {
+          moduleId: f.moduleName,
           name: f.moduleName,
           totalLessons: 0,
           completedLessons: 0,
@@ -80,6 +81,7 @@ export class TesterDetailsComponent implements OnInit {
       
       if (!moduleObj.unitsMap.has(f.unitName)) {
         moduleObj.unitsMap.set(f.unitName, {
+          unitId: f.moduleName + '_' + f.unitName,
           name: f.unitName,
           lessons: []
         });
@@ -87,6 +89,7 @@ export class TesterDetailsComponent implements OnInit {
       
       const unitObj = moduleObj.unitsMap.get(f.unitName);
       unitObj.lessons.push({
+        lessonId: f.moduleName + '_' + f.unitName + '_' + f.lessonName + index,
         name: f.lessonName,
         status: f.status,
         comment: f.comment,
@@ -95,6 +98,7 @@ export class TesterDetailsComponent implements OnInit {
     });
     
     this.formattedModules = Array.from(modulesMap.values()).map(m => ({
+      moduleId: m.moduleId,
       name: m.name,
       totalLessons: m.totalLessons,
       completedLessons: m.completedLessons,
