@@ -32,21 +32,39 @@
     <small class="text-secondary mt-1 d-block">سيدعم النظام تحويل روابط يوتيوب تلقائياً إلى Embed.</small>
   </div>
 
-  <div class="form-group mb-3">
+  <div class="form-group mb-4">
     <label>رابط / ملف الـ PDF</label>
     
-    <input type="text" class="form-control mb-2" [(ngModel)]="lesson.pdfUrl" placeholder="أدخل الرابط المباشر للملف (https://...) أو ارفع ملفاً">
-    
-    <div class="d-flex gap-2">
-      <input type="file" class="form-control flex-1" accept="application/pdf" (change)="onPdfFileSelected($event)">
-      <button class="btn-blue" [disabled]="!selectedPdfFile || isUploadingPdf" (click)="uploadPdf()" style="white-space: nowrap;">
-        {{ isUploadingPdf ? 'جاري الرفع...' : 'رفع الملف' }}
-      </button>
+    <div class="d-flex flex-column gap-3">
+      <!-- Link Input -->
+      <div>
+        <input type="text" class="form-control" [(ngModel)]="pdfLinkInput" placeholder="أدخل الرابط المباشر للملف (https://...)">
+      </div>
+
+      <!-- File Upload UI -->
+      <div *ngIf="lesson.pdfUrl && lesson.pdfUrl.includes('/uploads/')" class="p-3" style="background: var(--color-bg-page); border: 1px solid var(--color-border); border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <div class="d-flex align-center gap-2">
+          <i class="fi fi-rr-document" style="color: #dc2626; font-size: 24px;"></i>
+          <div>
+            <span style="color: var(--color-navy); font-weight: 600; font-size: 14px; display: block;">ملف PDF محلي مرفوع</span>
+            <span class="text-secondary text-sm">تم إرفاق الملف المرفوع وحفظ مساره في النظام.</span>
+          </div>
+        </div>
+        <button class="btn-icon-danger" (click)="removeUploadedPdf()" title="إزالة الملف">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      
+      <!-- Upload Input -->
+      <div *ngIf="!lesson.pdfUrl || !lesson.pdfUrl.includes('/uploads/')" class="d-flex gap-2">
+        <input type="file" class="form-control flex-1" accept="application/pdf" (change)="onPdfFileSelected($event)">
+        <button class="btn-blue" [disabled]="!selectedPdfFile || isUploadingPdf" (click)="uploadPdf()" style="white-space: nowrap;">
+          {{ isUploadingPdf ? 'جاري الرفع...' : 'رفع الملف' }}
+        </button>
+      </div>
     </div>
-    <small class="text-secondary mt-1 d-block">يمكنك إدخال رابط خارجي، أو رفع ملف ليقوم النظام بتوليد وحفظ مساره التلقائي.</small>
-    <small class="text-success mt-1 d-block" *ngIf="lesson.pdfUrl && lesson.pdfUrl.includes('/uploads/')">
-      <i class="fi fi-rr-check-circle"></i> تم رفع الملف بنجاح وتوليد مساره في النظام
-    </small>
+    
+    <small class="text-secondary mt-2 d-block">ملاحظة: يمكنك استخدام الرابط المباشر أو الرفع المحلي، كلاهما متاح وسيتولى النظام حفظ الأخير.</small>
   </div>
 
   <div class="form-group mb-4">

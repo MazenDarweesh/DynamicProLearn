@@ -21,6 +21,22 @@ export class LessonEditorComponent {
   selectedPdfFile: File | null = null;
   isUploadingPdf = false;
 
+  get pdfLinkInput(): string {
+    return this.lesson?.pdfUrl?.includes('/uploads/') ? '' : (this.lesson?.pdfUrl || '');
+  }
+  set pdfLinkInput(val: string) {
+    if (this.lesson) {
+      this.lesson.pdfUrl = val;
+    }
+  }
+
+  removeUploadedPdf() {
+    if (this.lesson) {
+      this.lesson.pdfUrl = null;
+    }
+    this.selectedPdfFile = null;
+  }
+
   onPdfFileSelected(event: any): void {
     const file = event.target.files[0];
     if (file && file.type === 'application/pdf') {

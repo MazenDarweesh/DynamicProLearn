@@ -6,6 +6,8 @@ import { TesterService, LookupDto } from '../../../core/services/tester.service'
 import { StudentService, UnitDto, LessonDto } from '../../../core/services/student.service';
 import { Router, ActivatedRoute } from '@angular/router';
 
+import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+
 export interface UnitWithLessons extends UnitDto {
   lessons: LessonDto[];
 }
@@ -20,26 +22,11 @@ export interface ModuleOverview {
 @Component({
   selector: 'app-feedback-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent],
   template: `
     <div class="console-container" dir="rtl">
       <!-- Header -->
-      <header class="console-header">
-        <div class="header-content">
-          <div class="brand w-100 d-flex justify-between align-center">
-            <h1>DynamicProLearn <span class="font-light">نافذة التقييم (QA)</span></h1>
-            <div>
-              <button class="btn-back" (click)="goBack()">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path d="M9 14l-4-4 4-4"></path>
-                  <path d="M5 10h11a4 4 0 1 1 0 8h-1"></path>
-                </svg>
-                العودة للوحة المختبر
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+      <app-admin-header title="نافذة التقييم (QA)" subtitle="DynamicProLearn" [showBackBtn]="true" backUrl="/tester/dashboard"></app-admin-header>
 
       <div class="console-body">
         <!-- Sidebar -->
@@ -166,50 +153,7 @@ export interface ModuleOverview {
     }
 
     /* Header */
-    .console-header { 
-      background-color: var(--color-primary); 
-      color: white; 
-      padding: 25px 0; 
-      position: sticky;
-      top: 0;
-      z-index: 1000;
-    }
-
-    .header-content { 
-      max-width: 1400px; 
-      margin: 0 auto; 
-      padding: 0 30px; 
-      display: flex; 
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .brand h1 { 
-      margin: 0; 
-      font-size: 24px; 
-      font-weight: 600; 
-      color: white; 
-      display: flex; 
-      align-items: center; 
-      gap: 8px; 
-    }
-    .font-light { font-weight: 400; font-size: 16px; opacity: 0.9; margin-right: 5px; }
-
-    .btn-back {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: white;
-      padding: 6px 15px;
-      border-radius: 6px;
-      font-family: inherit;
-      font-size: 14px;
-      cursor: pointer;
-      transition: 0.2s;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .btn-back:hover { background: rgba(255,255,255,0.2); }
+    /* Handled by AdminHeaderComponent now */
 
     /* Body */
     .console-body { 

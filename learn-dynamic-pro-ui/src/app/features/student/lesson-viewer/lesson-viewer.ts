@@ -4,6 +4,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StudentService, UnitDto, LessonDto, LessonDetailDto } from '../../../core/services/student.service';
 import { Dialog } from '../../../core/utils/dialog';
+import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 
 export interface UnitWithLessons extends UnitDto {
   lessons: LessonDto[];
@@ -12,7 +13,7 @@ export interface UnitWithLessons extends UnitDto {
 @Component({
   selector: 'app-lesson-viewer',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, AdminHeaderComponent],
   templateUrl: './lesson-viewer.html',
   styleUrl: './lesson-viewer.css'
 })

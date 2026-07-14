@@ -181,7 +181,9 @@ public class StudentService : IStudentService
             TypeId      = l.TypeId,
             TypeLabel   = l.Type?.Label ?? string.Empty,
             OrderIndex  = l.OrderIndex,
-            IsCompleted = completedLessonIds.Contains(l.Id)
+            IsCompleted = completedLessonIds.Contains(l.Id),
+            PdfUrl      = l.PdfUrl,
+            ExternalLink = l.ExternalLink
         }).ToList();
 
         return Result<List<LessonDto>>.Success(dtos);
@@ -221,7 +223,9 @@ public class StudentService : IStudentService
             TypeId      = lesson.TypeId,
             TypeLabel   = lesson.Type?.Label ?? string.Empty,
             OrderIndex  = lesson.OrderIndex,
-            IsCompleted = isCompleted
+            IsCompleted = isCompleted,
+            PdfUrl      = lesson.PdfUrl,
+            ExternalLink = lesson.ExternalLink
         };
         
         return Result<LessonDetailDto>.Success(detail);

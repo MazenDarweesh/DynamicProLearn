@@ -482,3 +482,7 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# PDFs and Uploads
+*.pdf
+wwwroot/uploads/
