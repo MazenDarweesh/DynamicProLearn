@@ -20,6 +20,7 @@
 .data-table th { background-color: var(--color-bg-page, #f8fafc); color: var(--color-text-secondary, #64748b); font-weight: 500; font-size: 13px; }
 .data-table tbody tr:hover { background-color: var(--color-bg-page, #f8fafc); }
 .data-table .expanded-row { background-color: #f8fafc; }
+.data-table .expanded-row td { padding: 0 !important; border: none !important; }
 .data-table .expanded-bg { background-color: #f8fafc; }
 
 .sub-table-container {
