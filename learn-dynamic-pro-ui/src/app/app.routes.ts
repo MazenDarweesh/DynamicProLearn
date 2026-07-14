@@ -7,6 +7,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/auth/login/login').then(m => m.LoginComponent)
   },
   {
+    path: 'erp-redirect',
+    loadComponent: () => import('./features/auth/erp-redirect/erp-redirect.component').then(m => m.ErpRedirectComponent)
+  },
+  {
     path: 'student',
     canActivate: [roleGuard(['Student', 'Admin'])],
     loadComponent: () => import('./features/student/dashboard/dashboard').then(m => m.DashboardComponent)

@@ -51,8 +51,11 @@ export class LessonViewer implements OnInit {
         
         this.units = await Promise.all(unitsWithLessonsPromises);
         
-        // Auto-load first lesson if available
-        if (this.units.length > 0 && this.units[0].lessons.length > 0) {
+        // Auto-load specific lesson if provided in query params, else load first lesson
+        const queryLessonId = this.route.snapshot.queryParamMap.get('lessonId');
+        if (queryLessonId) {
+          this.loadLesson(queryLessonId);
+        } else if (this.units.length > 0 && this.units[0].lessons.length > 0) {
           this.loadLesson(this.units[0].lessons[0].id);
         }
       }

@@ -24,6 +24,7 @@ export interface LessonDto {
   isCompleted: boolean;
   pdfUrl?: string;
   externalLink?: string;
+  erpKey?: string;
 }
 
 export interface LessonDetailDto extends LessonDto {

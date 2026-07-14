@@ -1,12 +1,19 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private http = inject(HttpClient);
+  
   readonly token = signal<string | null>(localStorage.getItem('jwt_token'));
   readonly userRole = signal<string | null>(this.extractRole(this.token()));
   readonly userName = signal<string | null>(this.extractName(this.token()));
+
+  erpLogin(username: string, password: string, erpKey: string | null) {
+    return this.http.post<any>('http://localhost:5115/api/Auth/erp-login', { username, password, erpKey });
+  }
 
   login(token: string) {
     localStorage.setItem('jwt_token', token);
