@@ -68,6 +68,13 @@ export class AdminService {
     return this.http.delete(`${this.apiUrl}/lessons/${id}`);
   }
 
+  // ── Files ─────────────────────────────────────────────────────────────────
+  uploadFile(file: File): Observable<{fileUrl: string}> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.http.post<{fileUrl: string}>(`${this.apiUrl}/files/upload`, formData);
+  }
+
   // ── Lookups ───────────────────────────────────────────────────────────────
   getLevels(): Observable<LookupDto[]> {
     return this.http.get<LookupDto[]>(`${this.apiUrl}/lookups/levels`);

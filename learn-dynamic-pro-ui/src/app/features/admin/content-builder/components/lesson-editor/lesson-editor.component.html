@@ -33,23 +33,23 @@
   </div>
 
   <div class="form-group mb-3">
-    <label>رابط ملف الـ PDF</label>
-    <div class="d-flex align-center gap-2">
-      <div style="background: rgba(220, 38, 38, 0.1); color: #dc2626; padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-        <i class="fi fi-rr-document" style="font-size: 18px;"></i>
-      </div>
-      <input type="text" class="form-control flex-1" [(ngModel)]="lesson.pdfUrl" placeholder="https://example.com/file.pdf">
+    <label>رابط / ملف الـ PDF</label>
+    <div class="d-flex gap-2">
+      <input type="file" class="form-control flex-1" accept="application/pdf" (change)="onPdfFileSelected($event)">
+      <button class="btn-blue" [disabled]="!selectedPdfFile || isUploadingPdf" (click)="uploadPdf()" style="white-space: nowrap;">
+        {{ isUploadingPdf ? 'جاري الرفع...' : 'رفع الملف' }}
+      </button>
     </div>
+    <input *ngIf="lesson.pdfUrl" type="text" class="form-control mt-2" [(ngModel)]="lesson.pdfUrl" placeholder="أو أدخل الرابط مباشرة (https://...)">
+    <small class="text-secondary mt-1 d-block" *ngIf="!lesson.pdfUrl">يمكنك اختيار ملف ورفعه، أو لصق رابط مباشر لملف PDF.</small>
+    <small class="text-success mt-1 d-block" *ngIf="lesson.pdfUrl">
+      <i class="fi fi-rr-check-circle"></i> تم ربط الملف بنجاح
+    </small>
   </div>
 
   <div class="form-group mb-4">
     <label>رابط خارجي (مثل Google Drive وغيرها)</label>
-    <div class="d-flex align-center gap-2">
-      <div style="background: rgba(67, 56, 202, 0.1); color: var(--color-primary); padding: 12px; border-radius: 8px; display: flex; align-items: center; justify-content: center;">
-        <i class="fi fi-rr-link" style="font-size: 18px;"></i>
-      </div>
-      <input type="text" class="form-control flex-1" [(ngModel)]="lesson.externalLink" placeholder="https://drive.google.com/...">
-    </div>
+    <input type="text" class="form-control" [(ngModel)]="lesson.externalLink" placeholder="https://drive.google.com/...">
   </div>
 
   <div class="video-preview" *ngIf="lesson.videoUrl">

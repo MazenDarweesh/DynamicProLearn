@@ -22,10 +22,14 @@ export interface LessonDto {
   typeLabel: string;
   orderIndex: number;
   isCompleted: boolean;
+  pdfUrl?: string;
+  externalLink?: string;
 }
 
 export interface LessonDetailDto extends LessonDto {
   videoUrl: string;
+  pdfUrl?: string;
+  externalLink?: string;
 }
 
 @Injectable({

@@ -13,6 +13,9 @@
   background-color: var(--color-primary); 
   color: white; 
   padding: 25px 0; 
+  position: sticky;
+  top: 0;
+  z-index: 1000;
 }
 
 .header-content { 

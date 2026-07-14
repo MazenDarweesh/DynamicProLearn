@@ -94,6 +94,15 @@ export interface ModuleOverview {
                   <p class="text-secondary">يرجى فحص هذه الشاشة بعناية وتسجيل الملاحظات الهيكلية حولها لضمان خلوها من العيوب قبل إطلاقها للطلاب.</p>
                 </div>
               </div>
+              
+              <div *ngIf="currentLesson.pdfUrl || currentLesson.externalLink" style="display: flex; gap: 15px; margin-top: 20px;">
+                <a *ngIf="currentLesson.pdfUrl" [href]="currentLesson.pdfUrl" target="_blank" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(220, 38, 38, 0.1); color: #dc2626; padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 1px solid rgba(220, 38, 38, 0.2); transition: 0.2s;">
+                  <i class="fi fi-rr-document" style="font-size: 18px;"></i> عرض الـ PDF
+                </a>
+                <a *ngIf="currentLesson.externalLink" [href]="currentLesson.externalLink" target="_blank" style="flex: 1; display: flex; align-items: center; justify-content: center; gap: 10px; background: rgba(67, 56, 202, 0.1); color: var(--color-primary); padding: 12px; border-radius: 8px; text-decoration: none; font-weight: 600; border: 1px solid rgba(67, 56, 202, 0.2); transition: 0.2s;">
+                  <i class="fi fi-rr-link" style="font-size: 18px;"></i> الرابط الخارجي
+                </a>
+              </div>
             </div>
 
             <div class="lesson-details" style="margin-top: 0;">
@@ -161,6 +170,9 @@ export interface ModuleOverview {
       background-color: var(--color-primary); 
       color: white; 
       padding: 25px 0; 
+      position: sticky;
+      top: 0;
+      z-index: 1000;
     }
 
     .header-content { 
