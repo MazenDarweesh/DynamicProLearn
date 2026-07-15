@@ -432,6 +432,14 @@ public class AdminController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpPost("versions")]
+    public async Task<IActionResult> CreateVersion([FromBody] CreateErpVersionRequest request)
+    {
+        var result = await _testerService.CreateErpVersionAsync(request);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     [HttpGet("versions/{versionId}/progress")]
     public async Task<IActionResult> GetVersionProgress(Guid versionId)
     {

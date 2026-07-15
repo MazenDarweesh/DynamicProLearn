@@ -146,16 +146,12 @@ export class AdminTestersComponent implements OnInit {
   openAddVersionModal() {
     this.editingVersionId = null;
     this.newVersionLabel = '';
-    this.testerIdForVersion = '';
-    this.selectedModules = [];
     this.showAddVersionModal = true;
   }
 
   editVersion(version: any) {
     this.editingVersionId = version.id;
     this.newVersionLabel = version.versionLabel;
-    this.testerIdForVersion = version.testerId;
-    this.selectedModules = version.moduleIds ? [...version.moduleIds] : [];
     this.showAddVersionModal = true;
   }
 
@@ -205,16 +201,14 @@ export class AdminTestersComponent implements OnInit {
   }
 
   submitVersion() {
-    if (!this.newVersionLabel.trim() || !this.testerIdForVersion) {
-      Dialog.alert('الرجاء إدخال اسم الإصدار وتحديد المختبر.', 'خطأ', 'info');
+    if (!this.newVersionLabel.trim()) {
+      Dialog.alert('الرجاء إدخال اسم الإصدار.', 'خطأ', 'info');
       return;
     }
     
     this.isSubmitting = true;
     const payload = {
-      versionLabel: this.newVersionLabel.trim(),
-      testerId: this.testerIdForVersion,
-      moduleIds: this.selectedModules
+      versionLabel: this.newVersionLabel.trim()
     };
 
     if (this.editingVersionId) {
@@ -231,30 +225,12 @@ export class AdminTestersComponent implements OnInit {
         }
       });
     } else {
-      this.http.post<any>('http://localhost:5115/api/admin/versions', { 
-        versionLabel: this.newVersionLabel.trim(),
-        testerId: this.testerIdForVersion
-      }).subscribe({
+      this.http.post<any>('http://localhost:5115/api/admin/versions', payload).subscribe({
         next: (res) => {
-          if (this.selectedModules.length > 0) {
-            this.adminService.assignTesterToVersion(res.id, this.testerIdForVersion, this.selectedModules).subscribe({
-              next: () => {
-                this.isSubmitting = false;
-                Dialog.alert('تمت إضافة الدورة وتخصيص الموديولات بنجاح!', 'نجاح', 'success');
-                this.closeAddVersionModal();
-                this.loadVersions();
-              },
-              error: () => {
-                this.isSubmitting = false;
-                Dialog.alert('تم إنشاء الدورة ولكن حدث خطأ أثناء ربط الموديولات.', 'تحذير', 'info');
-              }
-            });
-          } else {
-            this.isSubmitting = false;
-            Dialog.alert('تمت إضافة الدورة بنجاح!', 'نجاح', 'success');
-            this.closeAddVersionModal();
-            this.loadVersions();
-          }
+          this.isSubmitting = false;
+          Dialog.alert('تمت إضافة الدورة بنجاح!', 'نجاح', 'success');
+          this.closeAddVersionModal();
+          this.loadVersions();
         },
         error: (err) => {
           this.isSubmitting = false;

@@ -1,0 +1,103 @@
+<div class="console-container" dir="rtl">
+  <app-admin-header></app-admin-header>
+
+  <div class="console-body">
+    <div class="panel mb-4">
+      <div class="panel-header d-flex justify-between align-center">
+        <div>
+          <h3 class="panel-title m-0 d-flex align-center gap-2">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            تفاصيل الإصدار: {{ versionProgress?.versionLabel || '...' }}
+          </h3>
+          <p class="text-secondary text-sm m-0 mt-1">
+            إدارة المختبرين المخصصين وتتبع تقدمهم في هذا الإصدار
+          </p>
+        </div>
+        <div class="d-flex gap-3">
+          <button class="btn-primary" (click)="openAssignTesterModal()">+ إسناد مختبر للإصدار</button>
+        </div>
+      </div>
+
+      <div class="panel-content mt-4">
+        <div *ngIf="isLoading" class="loading text-center py-4 text-secondary">
+          جاري تحميل البيانات...
+        </div>
+
+        <div *ngIf="!isLoading && (!versionProgress?.modules || versionProgress.modules.length === 0)" class="empty-state text-center py-4">
+          لا يوجد أي تقدم مسجل أو لم يتم تعيين مختبرين بعد.
+        </div>
+
+        <div *ngIf="!isLoading && versionProgress?.modules?.length > 0">
+          <div class="d-flex justify-between align-center mb-3 p-3 bg-light" style="border-radius: 8px; border: 1px solid var(--color-border);">
+            <div>
+              <span class="text-navy fw-500">المختبر الحالي: </span>
+              <span class="text-primary">{{ versionProgress.testerName }}</span>
+            </div>
+            <div>
+              <span class="text-navy fw-500">إجمالي نسبة الإنجاز: </span>
+              <span class="badge badge-success">{{ versionProgress.progressPercentage }}%</span>
+            </div>
+          </div>
+
+          <div class="module-group mb-4 p-3 bg-light flex-column gap-2" *ngFor="let mod of versionProgress?.modules" style="border-radius: 8px; border: 1px solid var(--color-border);">
+            <h4 class="text-primary mt-0 mb-2 d-flex justify-between">
+              {{ mod.moduleName }}
+              <span class="text-sm text-secondary">{{ mod.completedLessons }} / {{ mod.totalLessons }} مكتمل</span>
+            </h4>
+            
+            <div class="lesson-list mt-3 flex-column gap-2">
+              <div class="lesson-item d-flex justify-between align-center p-2 mb-2" *ngFor="let lesson of mod.lessons" style="background: #fff; border: 1px solid var(--color-border); border-radius: 6px;">
+                <span class="text-navy text-sm">{{ lesson.lessonTitle }}</span>
+                <div class="d-flex align-center gap-2">
+                  <span class="badge" [class.badge-success]="lesson.isCompleted" [class.badge-secondary]="!lesson.isCompleted">
+                    {{ lesson.isCompleted ? 'تم الاختبار' : 'قيد الانتظار' }}
+                  </span>
+                  <span class="text-xs text-secondary" *ngIf="lesson.isCompleted" dir="ltr">{{ lesson.completedAt | date:'short' }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Assign Tester Modal -->
+<app-admin-modal
+  [show]="showAssignTesterModal"
+  title="إسناد مختبر للإصدار"
+  subtitle="اختر المختبر وحدد الموديولات التي سيقوم باختبارها"
+  confirmLabel="حفظ الإسناد"
+  [loading]="isSubmitting"
+  (closed)="closeAssignTesterModal()"
+  (confirmed)="submitAssignTester()">
+
+  <div class="form-group mb-3">
+    <label class="form-label text-secondary text-sm mb-2 d-block">اختر المختبر</label>
+    <div class="custom-select-wrapper">
+      <select class="form-control blue-select" [(ngModel)]="selectedTesterId">
+        <option value="" disabled selected>قائمة المختبرين...</option>
+        <option *ngFor="let t of allTesters" [value]="t.userId">{{ t.name }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group mb-3">
+    <label class="form-label text-secondary text-sm mb-2 d-block">تحديد الموديولات للاختبار</label>
+    <div class="modules-checkbox-list" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 8px; padding: 10px;">
+      <div class="form-check mb-2" *ngFor="let m of allModules">
+        <input class="form-check-input" type="checkbox" [id]="'mod_' + m.id" 
+               [checked]="selectedModules.includes(m.id)"
+               (change)="toggleModuleSelection(m.id)">
+        <label class="form-check-label text-sm ms-2 me-2" [for]="'mod_' + m.id" style="cursor: pointer;">
+          {{ m.name }}
+        </label>
+      </div>
+      <div *ngIf="allModules.length === 0" class="text-secondary text-sm text-center py-2">لا توجد موديولات متوفرة</div>
+    </div>
+  </div>
+
+</app-admin-modal>

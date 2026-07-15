@@ -89,6 +89,11 @@ export const routes: Routes = [
     ]
   },
   {
+    path: 'admin/versions/:id',
+    canActivate: [roleGuard(['Admin'])],
+    loadComponent: () => import('./features/admin/admin-version-details/admin-version-details.component').then(m => m.AdminVersionDetailsComponent)
+  },
+  {
     path: '',
     redirectTo: 'login',
     pathMatch: 'full'

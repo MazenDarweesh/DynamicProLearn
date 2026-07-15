@@ -141,6 +141,7 @@
 .mt-4 { margin-top: 30px; }
 .d-block { display: block; }
 .flex-1 { flex: 1; }
+.flex-column { display: flex; flex-direction: column; }
 .text-right { text-align: right; }
 .bg-light { background-color: #f8f9fa; }
 .cursor-pointer { cursor: pointer; }
@@ -166,21 +167,7 @@
   cursor: pointer; 
   transition: 0.2s; 
 }
-.btn-accent:hover { opacity: 0.9; transform: translateY(-1px); }
 
-.btn-primary { 
-  background-color: var(--color-primary); 
-  color: white; 
-  border: none; 
-  padding: 10px 20px; 
-  border-radius: var(--radius-btn); 
-  font-family: inherit; 
-  font-weight: 500; 
-  font-size: 14px; 
-  cursor: pointer; 
-  transition: 0.2s; 
-}
-.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
 
 .icon-btn {
   background: none;
