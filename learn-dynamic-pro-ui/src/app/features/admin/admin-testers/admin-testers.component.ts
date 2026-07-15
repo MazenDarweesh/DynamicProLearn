@@ -170,34 +170,9 @@ export class AdminTestersComponent implements OnInit {
     }
   }
 
-  viewVersionProgress(version: any) {
-    this.adminService.getVersionProgress(version.id).subscribe({
-      next: (data) => {
-        this.selectedVersionProgress = data;
-        this.showProgressModal = true;
-      },
-      error: (err) => {
-        Dialog.alert('حدث خطأ أثناء جلب بيانات التقدم.', 'خطأ', 'error');
-      }
-    });
-  }
-
-  closeProgressModal() {
-    this.showProgressModal = false;
-    this.selectedVersionProgress = null;
-  }
 
   closeAddVersionModal() {
     this.showAddVersionModal = false;
-  }
-
-  toggleModuleSelection(moduleId: string) {
-    const idx = this.selectedModules.indexOf(moduleId);
-    if (idx > -1) {
-      this.selectedModules.splice(idx, 1);
-    } else {
-      this.selectedModules.push(moduleId);
-    }
   }
 
   submitVersion() {

@@ -19,6 +19,10 @@
         <option *ngFor="let type of lookups.types" [ngValue]="type.id">{{ type.label }}</option>
       </select>
     </div>
+    <div class="form-group flex-1" style="max-width: 150px;">
+      <label>ترتيب الدرس</label>
+      <input type="number" class="form-control" [(ngModel)]="lesson.levelOrderIndex" placeholder="مثال: 1">
+    </div>
   </div>
 
   <div class="form-group mb-3">
