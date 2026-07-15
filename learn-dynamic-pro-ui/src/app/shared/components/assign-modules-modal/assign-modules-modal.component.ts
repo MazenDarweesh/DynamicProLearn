@@ -32,7 +32,7 @@ export class AssignModulesModalComponent implements OnInit, OnChanges {
   isSubmitting = false;
 
   ngOnInit() {
-    this.adminService.getModules().subscribe(res => this.modules = res);
+    this.adminService.getModules(1, 1000).subscribe(res => this.modules = res);
     this.adminService.getLevels().subscribe(res => this.allLevels = res);
     this.adminService.getTypes().subscribe(res => this.allTypes = res);
   }
@@ -46,7 +46,7 @@ export class AssignModulesModalComponent implements OnInit, OnChanges {
   loadAssignments() {
     this.pendingAssignedModuleIds.clear();
     this.moduleSelections = {};
-    this.adminService.getDepartmentAssignments(this.departmentId).subscribe(assignments => {
+    this.adminService.getDepartmentAssignments(this.departmentId, 1, 1000).subscribe(assignments => {
       this.assignedModules = assignments;
       assignments.forEach((a: any) => {
         this.pendingAssignedModuleIds.add(a.moduleId);
@@ -99,12 +99,8 @@ export class AssignModulesModalComponent implements OnInit, OnChanges {
     this.isSubmitting = true;
     const currentAssignedModuleIds = new Set(this.assignedModules.map(a => a.moduleId));
     
-    // Modules to add (newly checked)
-    const toAdd = Array.from(this.pendingAssignedModuleIds).filter(id => !currentAssignedModuleIds.has(id));
     // Modules to remove (unchecked)
     const toRemove = this.assignedModules.filter(a => !this.pendingAssignedModuleIds.has(a.moduleId));
-    // Modules that stay assigned but may have changed filters (delete + re-create)
-    const toUpdate = this.assignedModules.filter(a => this.pendingAssignedModuleIds.has(a.moduleId));
 
     try {
       // Remove deselected modules
@@ -117,28 +113,8 @@ export class AssignModulesModalComponent implements OnInit, OnChanges {
         });
       }
 
-      // Update existing assignments: remove old + re-create with new filters
-      for (const assignment of toUpdate) {
-        const moduleId = assignment.moduleId;
-        const selection = this.moduleSelections[moduleId] || { levelIds: [], typeIds: [] };
-        // Remove old
-        await new Promise<void>((resolve, reject) => {
-          this.adminService.removeAssignment(assignment.id).subscribe({
-            next: () => resolve(),
-            error: (err) => reject(err)
-          });
-        });
-        // Re-create with updated filters
-        await new Promise<void>((resolve, reject) => {
-          this.adminService.assignModule(moduleId, this.departmentId, selection.levelIds, selection.typeIds).subscribe({
-            next: () => resolve(),
-            error: (err) => reject(err)
-          });
-        });
-      }
-
-      // Add newly selected modules
-      for (const moduleId of toAdd) {
+      // Add or update all currently selected modules (backend will overwrite existing to prevent duplicates)
+      for (const moduleId of this.pendingAssignedModuleIds) {
         await new Promise<void>((resolve, reject) => {
           const selection = this.moduleSelections[moduleId] || { levelIds: [], typeIds: [] };
           this.adminService.assignModule(moduleId, this.departmentId, selection.levelIds, selection.typeIds).subscribe({

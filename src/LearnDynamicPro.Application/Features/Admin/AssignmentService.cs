@@ -18,6 +18,28 @@ public class AssignmentService : IAssignmentService
 
     public async Task<Result<DepartmentModuleDto>> AssignModuleToDepartmentAsync(AssignModuleRequest request)
     {
+        var existingAssignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+            .Where(a => a.DepartmentId == request.DepartmentId && a.ModuleId == request.ModuleId && !a.IsDeleted)
+            .ToListAsync();
+            
+        if (existingAssignments.Any())
+        {
+            foreach (var existing in existingAssignments)
+            {
+                // Manually delete child filters to avoid FK constraint errors if DB lacks CASCADE
+                var levelFilters = await _unitOfWork.Repository<AssignmentLevelFilter>().Query()
+                    .Where(f => f.AssignmentId == existing.Id && !f.IsDeleted).ToListAsync();
+                if (levelFilters.Any()) _unitOfWork.Repository<AssignmentLevelFilter>().RemoveRange(levelFilters);
+
+                var typeFilters = await _unitOfWork.Repository<AssignmentTypeFilter>().Query()
+                    .Where(f => f.AssignmentId == existing.Id && !f.IsDeleted).ToListAsync();
+                if (typeFilters.Any()) _unitOfWork.Repository<AssignmentTypeFilter>().RemoveRange(typeFilters);
+
+                _unitOfWork.Repository<DepartmentModuleAssignment>().Remove(existing);
+            }
+            await _unitOfWork.SaveChangesAsync();
+        }
+
         var assignment = new DepartmentModuleAssignment
         {
             DepartmentId = request.DepartmentId,
@@ -68,9 +90,17 @@ public class AssignmentService : IAssignmentService
 
     public async Task<Result> RemoveAssignmentAsync(Guid assignmentId)
     {
-        var assignment = await _unitOfWork.Repository<DepartmentModuleAssignment>().GetByIdAsync(assignmentId);
+        var assignment = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query().FirstOrDefaultAsync(a => a.Id == assignmentId && !a.IsDeleted);
         if (assignment != null)
         {
+            var levelFilters = await _unitOfWork.Repository<AssignmentLevelFilter>().Query()
+                .Where(f => f.AssignmentId == assignmentId && !f.IsDeleted).ToListAsync();
+            if (levelFilters.Any()) _unitOfWork.Repository<AssignmentLevelFilter>().RemoveRange(levelFilters);
+
+            var typeFilters = await _unitOfWork.Repository<AssignmentTypeFilter>().Query()
+                .Where(f => f.AssignmentId == assignmentId && !f.IsDeleted).ToListAsync();
+            if (typeFilters.Any()) _unitOfWork.Repository<AssignmentTypeFilter>().RemoveRange(typeFilters);
+
             _unitOfWork.Repository<DepartmentModuleAssignment>().Remove(assignment);
             await _unitOfWork.SaveChangesAsync();
         }
@@ -81,11 +111,12 @@ public class AssignmentService : IAssignmentService
     {
         var query = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == departmentId);
-            
+            .Where(a => a.DepartmentId == departmentId && !a.IsDeleted);
+
         var totalCount = await query.CountAsync();
 
         var assignments = await query
+            .OrderByDescending(a => a.AssignedAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
             .Select(a => new DepartmentModuleDto
@@ -93,10 +124,10 @@ public class AssignmentService : IAssignmentService
                 Id = a.Id,
                 DepartmentId = a.DepartmentId,
                 ModuleId = a.ModuleId,
-                LevelIds = a.LevelFilters.Select(lf => lf.LevelId).ToList(),
-                LevelLabels = a.LevelFilters.Select(lf => lf.Level!.Label).ToList(),
-                TypeIds = a.TypeFilters.Select(tf => tf.TypeId).ToList(),
-                TypeLabels = a.TypeFilters.Select(tf => tf.Type!.Label).ToList()
+                LevelIds = a.LevelFilters.Where(lf => !lf.IsDeleted).Select(lf => lf.LevelId).ToList(),
+                LevelLabels = a.LevelFilters.Where(lf => !lf.IsDeleted).Select(lf => lf.Level!.Label).ToList(),
+                TypeIds = a.TypeFilters.Where(tf => !tf.IsDeleted).Select(tf => tf.TypeId).ToList(),
+                TypeLabels = a.TypeFilters.Where(tf => !tf.IsDeleted).Select(tf => tf.Type!.Label).ToList()
             })
             .ToListAsync();
             

@@ -460,14 +460,14 @@ public class CompanyService : ICompanyService
         // Fetch assignments with their level/type filters
         var rawAssignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == departmentId)
+            .Where(a => a.DepartmentId == departmentId && !a.IsDeleted)
             .Select(a => new
             {
                 AssignmentId = a.Id,
                 ModuleId = a.ModuleId,
                 ModuleName = a.Module!.Name,
-                FilterLevelIds = a.LevelFilters.Select(lf => lf.LevelId).ToList(),
-                FilterTypeIds = a.TypeFilters.Select(tf => tf.TypeId).ToList(),
+                FilterLevelIds = a.LevelFilters.Where(lf => !lf.IsDeleted).Select(lf => lf.LevelId).ToList(),
+                FilterTypeIds = a.TypeFilters.Where(tf => !tf.IsDeleted).Select(tf => tf.TypeId).ToList(),
                 Units = a.Module.Units!.OrderBy(u => u.OrderIndex).Select(u => new
                 {
                     UnitId = u.Id,
@@ -484,8 +484,11 @@ public class CompanyService : ICompanyService
             })
             .ToListAsync();
 
-        // Apply level/type filters to lessons per assignment
-        var assignments = rawAssignments.Select(a =>
+        // Apply level/type filters to lessons per assignment and eliminate duplicates
+        var assignments = rawAssignments
+            .GroupBy(a => a.ModuleId)
+            .Select(g => g.Last()) // In case of DB duplicates, take the latest one
+            .Select(a =>
         {
             var hasLevelFilter = a.FilterLevelIds.Any();
             var hasTypeFilter = a.FilterTypeIds.Any();
@@ -511,7 +514,7 @@ public class CompanyService : ICompanyService
                 a.ModuleName,
                 Units = filteredUnits
             };
-        }).ToList();
+        }).Where(m => m.Units.Any()).ToList();
 
         var assignedLessonIds = assignments.SelectMany(m => m.Units.SelectMany(u => u.Lessons.Select(l => l.LessonId))).ToList();
 
