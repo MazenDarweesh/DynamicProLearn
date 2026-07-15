@@ -80,4 +80,19 @@ public class StudentController : ControllerBase
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
+    [HttpGet("last-lesson")]
+    public async Task<IActionResult> GetLastAccessedLesson()
+    {
+        var result = await _studentService.GetLastAccessedLessonAsync(_currentUserService.UserId);
+        if (!result.IsSuccess) return NotFound(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("modules/{moduleId}/levels")]
+    public async Task<IActionResult> GetLessonsByLevel(Guid moduleId)
+    {
+        var result = await _studentService.GetLessonsByLevelAsync(moduleId, _currentUserService.UserId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
 }

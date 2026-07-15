@@ -253,4 +253,154 @@ public class TesterService : ITesterService
         await _unitOfWork.SaveChangesAsync();
         return Result.Success();
     }
+
+    public async Task<Result<VersionTesterDto>> AssignTesterToVersionAsync(Guid versionId, Guid testerId, List<Guid> moduleIds)
+    {
+        var version = await _unitOfWork.Repository<ErpVersion>().GetByIdAsync(versionId);
+        if (version == null) return Result<VersionTesterDto>.Failure("Version not found");
+
+        var tester = await _unitOfWork.Repository<User>().GetByIdAsync(testerId);
+        if (tester == null || tester.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester) 
+            return Result<VersionTesterDto>.Failure("Invalid Tester");
+
+        var vt = await _unitOfWork.Repository<VersionTester>().Query()
+            .Include(x => x.AssignedModules)
+            .FirstOrDefaultAsync(x => x.VersionId == versionId && x.TesterId == testerId);
+
+        if (vt == null)
+        {
+            vt = new VersionTester { VersionId = versionId, TesterId = testerId };
+            await _unitOfWork.Repository<VersionTester>().AddAsync(vt);
+            await _unitOfWork.SaveChangesAsync(); // Need Id
+        }
+        else
+        {
+            _unitOfWork.Repository<VersionTesterModule>().RemoveRange(vt.AssignedModules);
+        }
+
+        foreach (var mId in moduleIds)
+        {
+            await _unitOfWork.Repository<VersionTesterModule>().AddAsync(new VersionTesterModule
+            {
+                VersionTesterId = vt.Id,
+                ModuleId = mId
+            });
+        }
+        await _unitOfWork.SaveChangesAsync();
+
+        return Result<VersionTesterDto>.Success(new VersionTesterDto
+        {
+            Id = vt.Id,
+            VersionId = vt.VersionId,
+            TesterId = vt.TesterId,
+            TesterName = tester.Username,
+            AssignedModulesCount = moduleIds.Count,
+            ModuleIds = moduleIds
+        });
+    }
+
+    public async Task<Result<List<VersionSummaryDto>>> GetVersionSummariesAsync()
+    {
+        var versions = await _unitOfWork.Repository<ErpVersion>().Query()
+            .AsNoTracking()
+            .Select(v => new VersionSummaryDto
+            {
+                VersionId = v.Id,
+                VersionLabel = v.VersionLabel,
+                TestersCount = _unitOfWork.Repository<VersionTester>().Query().Count(vt => vt.VersionId == v.Id),
+                TotalModulesAssigned = _unitOfWork.Repository<VersionTesterModule>().Query().Count(vtm => vtm.VersionTester!.VersionId == v.Id),
+                TotalFeedbacks = _unitOfWork.Repository<TesterFeedback>().Query().Count(f => f.ErpVersionId == v.Id)
+            })
+            .ToListAsync();
+            
+        return Result<List<VersionSummaryDto>>.Success(versions);
+    }
+
+    public async Task<Result<VersionProgressDto>> GetVersionProgressAsync(Guid versionId)
+    {
+        var version = await _unitOfWork.Repository<ErpVersion>().Query()
+            .AsNoTracking()
+            .Where(v => v.Id == versionId)
+            .Select(v => new { v.Id, v.VersionLabel })
+            .FirstOrDefaultAsync();
+
+        if (version == null) return Result<VersionProgressDto>.Failure("Not found");
+
+        var testersData = await _unitOfWork.Repository<VersionTester>().Query()
+            .AsNoTracking()
+            .Where(vt => vt.VersionId == versionId)
+            .Select(vt => new 
+            {
+                TesterId = vt.TesterId,
+                TesterName = vt.Tester!.Username,
+                Modules = vt.AssignedModules.Select(am => new 
+                {
+                    ModuleId = am.ModuleId,
+                    ModuleName = am.Module!.Name
+                }).ToList()
+            })
+            .ToListAsync();
+
+        var allFeedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
+            .AsNoTracking()
+            .Where(f => f.ErpVersionId == versionId && f.Lesson != null && f.Lesson.Unit != null)
+            .Select(f => new 
+            {
+                f.UserId,
+                ModuleId = f.Lesson!.Unit!.ModuleId,
+                f.LessonId,
+                LessonTitle = f.Lesson.Title,
+                ConditionLabel = f.ConditionOption != null ? f.ConditionOption.Label : null,
+                f.Notes,
+                f.CreatedAt
+            })
+            .ToListAsync();
+
+        var dto = new VersionProgressDto
+        {
+            VersionId = version.Id,
+            VersionLabel = version.VersionLabel,
+            Testers = new List<TesterProgressInVersionDto>()
+        };
+
+        foreach (var vt in testersData)
+        {
+            var tDto = new TesterProgressInVersionDto
+            {
+                TesterId = vt.TesterId,
+                TesterName = vt.TesterName,
+                Modules = new List<ModuleProgressDto>()
+            };
+
+            foreach (var am in vt.Modules)
+            {
+                var mDto = new ModuleProgressDto
+                {
+                    ModuleId = am.ModuleId,
+                    ModuleName = am.ModuleName,
+                    Lessons = new List<LessonFeedbackDto>()
+                };
+
+                var mFeedbacks = allFeedbacks.Where(f => 
+                    f.UserId == vt.TesterId && 
+                    f.ModuleId == am.ModuleId).ToList();
+
+                foreach (var f in mFeedbacks)
+                {
+                    mDto.Lessons.Add(new LessonFeedbackDto
+                    {
+                        LessonId = f.LessonId,
+                        LessonTitle = f.LessonTitle,
+                        ConditionLabel = f.ConditionLabel,
+                        Notes = f.Notes,
+                        FeedbackDate = f.CreatedAt
+                    });
+                }
+                tDto.Modules.Add(mDto);
+            }
+            dto.Testers.Add(tDto);
+        }
+
+        return Result<VersionProgressDto>.Success(dto);
+    }
 }

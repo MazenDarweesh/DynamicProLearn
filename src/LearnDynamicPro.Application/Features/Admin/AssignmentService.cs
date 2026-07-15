@@ -22,20 +22,47 @@ public class AssignmentService : IAssignmentService
         {
             DepartmentId = request.DepartmentId,
             ModuleId = request.ModuleId,
-            LevelId = request.LevelId,
-            TypeId = request.TypeId
         };
 
-        _unitOfWork.Repository<DepartmentModuleAssignment>().AddAsync(assignment);
-        await _unitOfWork.SaveChangesAsync();
+        await _unitOfWork.Repository<DepartmentModuleAssignment>().AddAsync(assignment);
+        await _unitOfWork.SaveChangesAsync(); // Need Id first
+
+        if (request.LevelIds != null && request.LevelIds.Any())
+        {
+            foreach (var levelId in request.LevelIds)
+            {
+                await _unitOfWork.Repository<AssignmentLevelFilter>().AddAsync(new AssignmentLevelFilter 
+                { 
+                    AssignmentId = assignment.Id, 
+                    LevelId = levelId 
+                });
+            }
+        }
+
+        if (request.TypeIds != null && request.TypeIds.Any())
+        {
+            foreach (var typeId in request.TypeIds)
+            {
+                await _unitOfWork.Repository<AssignmentTypeFilter>().AddAsync(new AssignmentTypeFilter 
+                { 
+                    AssignmentId = assignment.Id, 
+                    TypeId = typeId 
+                });
+            }
+        }
+
+        if (request.LevelIds?.Any() == true || request.TypeIds?.Any() == true)
+        {
+            await _unitOfWork.SaveChangesAsync();
+        }
 
         return Result<DepartmentModuleDto>.Success(new DepartmentModuleDto
         {
             Id = assignment.Id,
             DepartmentId = assignment.DepartmentId,
             ModuleId = assignment.ModuleId,
-            LevelId = assignment.LevelId,
-            TypeId = assignment.TypeId
+            LevelIds = request.LevelIds ?? new List<Guid>(),
+            TypeIds = request.TypeIds ?? new List<Guid>()
         });
     }
 
@@ -66,8 +93,10 @@ public class AssignmentService : IAssignmentService
                 Id = a.Id,
                 DepartmentId = a.DepartmentId,
                 ModuleId = a.ModuleId,
-                LevelId = a.LevelId,
-                TypeId = a.TypeId
+                LevelIds = a.LevelFilters.Select(lf => lf.LevelId).ToList(),
+                LevelLabels = a.LevelFilters.Select(lf => lf.Level!.Label).ToList(),
+                TypeIds = a.TypeFilters.Select(tf => tf.TypeId).ToList(),
+                TypeLabels = a.TypeFilters.Select(tf => tf.Type!.Label).ToList()
             })
             .ToListAsync();
             

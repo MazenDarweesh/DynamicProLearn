@@ -125,8 +125,8 @@ public class ProgressService : IProgressService
             accessibleLessons = _unitOfWork.Repository<Lesson>().Query()
                 .Where(lesson => deptAssignments.Any(a =>
                     a.ModuleId == lesson.Unit!.ModuleId &&
-                    (a.LevelId == null || a.LevelId == lesson.LevelId) &&
-                    (a.TypeId == null || a.TypeId == lesson.TypeId)));
+                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == lesson.LevelId)) &&
+                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == lesson.TypeId))));
         }
 
         var modulesProgress = await accessibleLessons

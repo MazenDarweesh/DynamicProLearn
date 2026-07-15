@@ -15,4 +15,6 @@ public interface IStudentService
     /// <summary>Returns lessons filtered by the assignment's Level AND Type (Intersection logic).</summary>
     Task<Result<List<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, Guid userId);
     Task<Result<LessonDetailDto>> GetLessonDetailAsync(Guid lessonId, Guid userId);
+    Task<Result<LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto>> GetLastAccessedLessonAsync(Guid userId);
+    Task<Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>> GetLessonsByLevelAsync(Guid moduleId, Guid userId);
 }

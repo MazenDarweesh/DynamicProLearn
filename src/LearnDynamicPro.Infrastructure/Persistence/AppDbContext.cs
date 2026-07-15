@@ -29,6 +29,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
 
     // ── Bridge & Assignment ───────────────────────────────────────────
     public DbSet<DepartmentModuleAssignment> DepartmentModuleAssignments => Set<DepartmentModuleAssignment>();
+    public DbSet<AssignmentLevelFilter> AssignmentLevelFilters => Set<AssignmentLevelFilter>();
+    public DbSet<AssignmentTypeFilter> AssignmentTypeFilters => Set<AssignmentTypeFilter>();
 
     // ── Progress ──────────────────────────────────────────────────────
     public DbSet<LessonProgress> LessonProgresses => Set<LessonProgress>();
@@ -38,6 +40,8 @@ public class AppDbContext : DbContext, IApplicationDbContext
     public DbSet<TesterActiveVersion> TesterActiveVersions => Set<TesterActiveVersion>();
     public DbSet<TestCycle> TestCycles => Set<TestCycle>();
     public DbSet<TestCycleModule> TestCycleModules => Set<TestCycleModule>();
+    public DbSet<VersionTester> VersionTesters => Set<VersionTester>();
+    public DbSet<VersionTesterModule> VersionTesterModules => Set<VersionTesterModule>();
     public DbSet<TesterFeedback> TesterFeedbacks => Set<TesterFeedback>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)

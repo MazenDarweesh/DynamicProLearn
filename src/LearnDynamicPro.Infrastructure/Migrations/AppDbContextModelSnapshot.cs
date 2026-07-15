@@ -22,6 +22,78 @@ namespace LearnDynamicPro.Infrastructure.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.AssignmentLevelFilter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("LevelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignmentId");
+
+                    b.HasIndex("LevelId");
+
+                    b.ToTable("AssignmentLevelFilters");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.AssignmentTypeFilter", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AssignmentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TypeId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AssignmentId");
+
+                    b.HasIndex("TypeId");
+
+                    b.ToTable("AssignmentTypeFilters");
+                });
+
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.Company", b =>
                 {
                     b.Property<Guid>("Id")
@@ -116,24 +188,24 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid?>("LevelId")
+                    b.Property<Guid?>("LevelOptionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid>("ModuleId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("TypeId")
+                    b.Property<Guid?>("TypeOptionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LevelId");
+                    b.HasIndex("LevelOptionId");
 
                     b.HasIndex("ModuleId");
 
-                    b.HasIndex("TypeId");
+                    b.HasIndex("TypeOptionId");
 
-                    b.HasIndex("DepartmentId", "ModuleId", "LevelId", "TypeId");
+                    b.HasIndex("DepartmentId", "ModuleId");
 
                     b.ToTable("DepartmentModuleAssignments");
                 });
@@ -246,6 +318,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Property<Guid>("LevelId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("LevelOrderIndex")
+                        .HasColumnType("int");
+
                     b.Property<int>("OrderIndex")
                         .HasColumnType("int");
 
@@ -298,6 +373,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
 
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("bit");
+
+                    b.Property<DateTime>("LastAccessedAt")
+                        .HasColumnType("datetime2");
 
                     b.Property<Guid?>("MarkedByUserId")
                         .HasColumnType("uniqueidentifier");
@@ -634,6 +712,116 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.VersionTester", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("TesterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("VersionId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TesterId");
+
+                    b.HasIndex("VersionId");
+
+                    b.ToTable("VersionTesters");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.VersionTesterModule", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("ModuleId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("VersionTesterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModuleId");
+
+                    b.HasIndex("VersionTesterId");
+
+                    b.ToTable("VersionTesterModules");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.AssignmentLevelFilter", b =>
+                {
+                    b.HasOne("LearnDynamicPro.Domain.Entities.DepartmentModuleAssignment", "Assignment")
+                        .WithMany("LevelFilters")
+                        .HasForeignKey("AssignmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LearnDynamicPro.Domain.Entities.LevelOption", "Level")
+                        .WithMany()
+                        .HasForeignKey("LevelId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Assignment");
+
+                    b.Navigation("Level");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.AssignmentTypeFilter", b =>
+                {
+                    b.HasOne("LearnDynamicPro.Domain.Entities.DepartmentModuleAssignment", "Assignment")
+                        .WithMany("TypeFilters")
+                        .HasForeignKey("AssignmentId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LearnDynamicPro.Domain.Entities.TypeOption", "Type")
+                        .WithMany()
+                        .HasForeignKey("TypeId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Assignment");
+
+                    b.Navigation("Type");
+                });
+
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.Department", b =>
                 {
                     b.HasOne("LearnDynamicPro.Domain.Entities.Company", "Company")
@@ -653,10 +841,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LearnDynamicPro.Domain.Entities.LevelOption", "Level")
+                    b.HasOne("LearnDynamicPro.Domain.Entities.LevelOption", null)
                         .WithMany("Assignments")
-                        .HasForeignKey("LevelId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .HasForeignKey("LevelOptionId");
 
                     b.HasOne("LearnDynamicPro.Domain.Entities.Module", "Module")
                         .WithMany("Assignments")
@@ -664,18 +851,13 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LearnDynamicPro.Domain.Entities.TypeOption", "Type")
+                    b.HasOne("LearnDynamicPro.Domain.Entities.TypeOption", null)
                         .WithMany("Assignments")
-                        .HasForeignKey("TypeId")
-                        .OnDelete(DeleteBehavior.NoAction);
+                        .HasForeignKey("TypeOptionId");
 
                     b.Navigation("Department");
 
-                    b.Navigation("Level");
-
                     b.Navigation("Module");
-
-                    b.Navigation("Type");
                 });
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.FeedbackConditionOption", b =>
@@ -884,6 +1066,44 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Navigation("Department");
                 });
 
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.VersionTester", b =>
+                {
+                    b.HasOne("LearnDynamicPro.Domain.Entities.User", "Tester")
+                        .WithMany()
+                        .HasForeignKey("TesterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LearnDynamicPro.Domain.Entities.ErpVersion", "Version")
+                        .WithMany()
+                        .HasForeignKey("VersionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Tester");
+
+                    b.Navigation("Version");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.VersionTesterModule", b =>
+                {
+                    b.HasOne("LearnDynamicPro.Domain.Entities.Module", "Module")
+                        .WithMany()
+                        .HasForeignKey("ModuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LearnDynamicPro.Domain.Entities.VersionTester", "VersionTester")
+                        .WithMany("AssignedModules")
+                        .HasForeignKey("VersionTesterId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Module");
+
+                    b.Navigation("VersionTester");
+                });
+
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.Company", b =>
                 {
                     b.Navigation("Departments");
@@ -896,6 +1116,13 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Navigation("Assignments");
 
                     b.Navigation("Users");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.DepartmentModuleAssignment", b =>
+                {
+                    b.Navigation("LevelFilters");
+
+                    b.Navigation("TypeFilters");
                 });
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.ErpVersion", b =>
@@ -963,6 +1190,11 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Navigation("MarkedProgresses");
 
                     b.Navigation("TestCycles");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.VersionTester", b =>
+                {
+                    b.Navigation("AssignedModules");
                 });
 #pragma warning restore 612, 618
         }

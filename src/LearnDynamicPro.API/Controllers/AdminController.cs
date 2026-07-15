@@ -415,6 +415,31 @@ public class AdminController : ControllerBase
         return NoContent();
     }
 
+    // ── Version Testers (New Structure) ─────────────────────────────────────
+    [HttpPost("versions/{versionId}/testers/{testerId}")]
+    public async Task<IActionResult> AssignTesterToVersion(Guid versionId, Guid testerId, [FromBody] AssignTesterToVersionRequest request)
+    {
+        var result = await _testerService.AssignTesterToVersionAsync(versionId, testerId, request.ModuleIds);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("versions/summary")]
+    public async Task<IActionResult> GetVersionSummaries()
+    {
+        var result = await _testerService.GetVersionSummariesAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("versions/{versionId}/progress")]
+    public async Task<IActionResult> GetVersionProgress(Guid versionId)
+    {
+        var result = await _testerService.GetVersionProgressAsync(versionId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     // ── Files ───────────────────────────────────────────────────────────────
     [HttpPost("files/upload")]
     public async Task<IActionResult> UploadFile(IFormFile file)

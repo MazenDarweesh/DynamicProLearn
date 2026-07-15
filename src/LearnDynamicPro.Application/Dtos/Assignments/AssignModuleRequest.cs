@@ -4,6 +4,6 @@ public class AssignModuleRequest
 {
     public Guid DepartmentId { get; set; }
     public Guid ModuleId { get; set; }
-    public Guid? LevelId { get; set; } // Nullable = any level
-    public Guid? TypeId { get; set; }  // Nullable = any type
+    public List<Guid> LevelIds { get; set; } = new(); // Empty = any level
+    public List<Guid> TypeIds { get; set; } = new();  // Empty = any type
 }

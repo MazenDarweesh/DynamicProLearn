@@ -10,6 +10,7 @@ public class LessonProgress
     public DateTime? CompletedAt { get; set; }
     public CompletionSource CompletionSource { get; set; }
     public Guid? MarkedByUserId { get; set; }
+    public DateTime LastAccessedAt { get; set; } = DateTime.UtcNow;
 
     // Navigation
     public User? User { get; set; }

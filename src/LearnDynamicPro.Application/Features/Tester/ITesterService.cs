@@ -18,6 +18,11 @@ public interface ITesterService
     Task<Result<List<FeedbackDto>>> GetFeedbackByActiveVersionAsync();
     Task<Result<List<LookupDto>>> GetConditionOptionsAsync();
 
+    // Version Testers (New Structure)
+    Task<Result<VersionTesterDto>> AssignTesterToVersionAsync(Guid versionId, Guid testerId, List<Guid> moduleIds);
+    Task<Result<List<VersionSummaryDto>>> GetVersionSummariesAsync();
+    Task<Result<VersionProgressDto>> GetVersionProgressAsync(Guid versionId);
+
     // Test Cycles
     Task<Result<List<TestCycleDto>>> GetAllTestCyclesAsync();
     Task<Result<TestCycleDto>> CreateTestCycleAsync(CreateTestCycleRequest request);

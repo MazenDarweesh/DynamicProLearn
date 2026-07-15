@@ -15,5 +15,6 @@ public class LessonDetailDto
     public Guid TypeId { get; set; }
     public string TypeLabel { get; set; } = string.Empty;
     public int OrderIndex { get; set; }
+    public int LevelOrderIndex { get; set; }
     public bool IsCompleted { get; set; }
 }
