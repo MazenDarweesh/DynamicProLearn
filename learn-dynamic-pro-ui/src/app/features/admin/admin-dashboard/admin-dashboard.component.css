@@ -142,6 +142,9 @@
 .d-block { display: block; }
 .flex-1 { flex: 1; }
 .text-right { text-align: right; }
+.bg-light { background-color: #f8f9fa; }
+.cursor-pointer { cursor: pointer; }
+.text-navy { color: var(--color-navy); }
 
 /* Text */
 .text-primary { color: var(--color-primary); }
@@ -165,6 +168,20 @@
 }
 .btn-accent:hover { opacity: 0.9; transform: translateY(-1px); }
 
+.btn-primary { 
+  background-color: var(--color-primary); 
+  color: white; 
+  border: none; 
+  padding: 10px 20px; 
+  border-radius: var(--radius-btn); 
+  font-family: inherit; 
+  font-weight: 500; 
+  font-size: 14px; 
+  cursor: pointer; 
+  transition: 0.2s; 
+}
+.btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
 .icon-btn {
   background: none;
   border: none;
@@ -184,6 +201,8 @@
 .badge-primary { background: var(--color-primary-light); color: var(--color-primary); }
 .badge-primary-light { background: var(--color-primary-light); color: var(--color-primary); }
 .badge-accent-light { background: var(--color-accent-light); color: #B35E11; }
+.badge-success { background: rgba(40, 167, 69, 0.1); color: #28a745; border: 1px solid rgba(40,167,69,0.2); }
+.badge-secondary { background: rgba(108, 117, 125, 0.1); color: #6c757d; border: 1px solid rgba(108,117,125,0.2); }
 
 /* Select Dropdowns */
 .blue-select {

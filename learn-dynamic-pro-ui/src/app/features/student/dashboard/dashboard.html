@@ -2,7 +2,73 @@
   <app-admin-header title="بوابة المتدرب" subtitle="DynamicProLearn"></app-admin-header>
 
   <div class="console-body">
-    <div class="panel mt-4">
+    <div class="tabs-header mb-4 d-flex gap-3 border-bottom pb-2">
+      <button class="btn-tab" [class.active]="activeTab === 'resume'" (click)="switchTab('resume')">متابعة التعلم</button>
+      <button class="btn-tab" [class.active]="activeTab === 'browse'" (click)="switchTab('browse')">تصفح الموديولات</button>
+    </div>
+
+    <!-- RESUME TAB -->
+    <div class="panel" *ngIf="activeTab === 'resume'">
+      <div class="panel-header d-flex justify-between align-center">
+        <h3 class="panel-title">🔄 استئناف اخر درس</h3>
+      </div>
+      <div class="panel-content">
+        <div *ngIf="isLoading" class="loading">جاري التحميل...</div>
+        <div *ngIf="!isLoading && !lastLesson" class="empty-state">
+          لا يوجد سجل لأي دروس سابقة لكي تتابعها. اذهب لتصفح الموديولات للبدء.
+        </div>
+
+        <div class="d-flex gap-4" *ngIf="!isLoading && lastLesson">
+          <!-- Lesson Viewer Side -->
+          <div class="flex-2" style="flex: 2;">
+            <h2 class="text-primary mt-0 mb-2">{{ lastLesson.title }}</h2>
+            <div class="video-container mb-3" *ngIf="safeVideoUrl" style="border-radius: 8px; overflow: hidden; background: #000; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">
+              <iframe [src]="safeVideoUrl" width="100%" height="450" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+            </div>
+            <div class="video-placeholder d-flex align-center justify-center bg-light text-secondary mb-3" *ngIf="!safeVideoUrl" style="height: 450px; border-radius: 8px; border: 2px dashed var(--color-border);">
+              <p>لا يوجد فيديو متاح لهذا الدرس</p>
+            </div>
+            
+            <div class="d-flex justify-between align-center border-top pt-3">
+              <button class="btn-primary d-flex align-center gap-2" [class.btn-success]="lastLesson.isCompleted" (click)="toggleCompletion()" [disabled]="isSubmitting">
+                <svg *ngIf="lastLesson.isCompleted" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                {{ lastLesson.isCompleted ? 'تم إنجاز الدرس' : 'تحديد كمكتمل' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Tree Sidebar Side -->
+          <div class="flex-1 bg-light p-3" style="flex: 1; border-radius: 8px; max-height: 550px; overflow-y: auto;">
+            <h4 class="text-navy mt-0 mb-3 border-bottom pb-2">شجرة مستويات الموديول</h4>
+            <div class="level-group mb-3" *ngFor="let level of levelGroups">
+              <h5 class="text-primary mt-0 mb-2 d-flex justify-between">
+                {{ level.levelLabel }}
+                <span class="text-xs text-secondary">{{ level.completed }} / {{ level.totalLessons }}</span>
+              </h5>
+              <div class="lesson-items">
+                <div class="lesson-item p-2 mb-1 cursor-pointer" 
+                     *ngFor="let lesson of level.lessons"
+                     [ngStyle]="{
+                       'background': lesson.id === lastLesson.id ? 'var(--color-primary-light)' : '#fff',
+                       'border': lesson.id === lastLesson.id ? '1px solid var(--color-primary)' : '1px solid var(--color-border)',
+                       'border-radius': '6px'
+                     }"
+                     (click)="loadSpecificLesson(lesson.id, level.moduleId)">
+                  
+                  <div class="d-flex justify-between align-center">
+                    <span class="text-sm text-navy" [style.font-weight]="lesson.id === lastLesson.id ? '600' : '400'">{{ lesson.title }}</span>
+                    <svg *ngIf="lesson.isCompleted" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-success)" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BROWSE TAB -->
+    <div class="panel" *ngIf="activeTab === 'browse'">
       <div class="panel-header d-flex justify-between align-center">
         <h3 class="panel-title">📚 الموديولات المخصصة لك</h3>
       </div>
@@ -34,12 +100,11 @@
               </div>
 
               <button class="btn-accent w-100 d-flex justify-center align-center gap-2" (click)="openLesson(mod.id)">
-                ابدأ التعلم
+                الدخول للموديول (الوحدات)
               </button>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   </div>

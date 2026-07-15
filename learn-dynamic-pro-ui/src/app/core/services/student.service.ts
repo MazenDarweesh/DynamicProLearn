@@ -21,6 +21,7 @@ export interface LessonDto {
   levelLabel: string;
   typeLabel: string;
   orderIndex: number;
+  levelOrderIndex: number;
   isCompleted: boolean;
   pdfUrl?: string;
   externalLink?: string;
@@ -62,5 +63,13 @@ export class StudentService {
 
   completeLesson(lessonId: string, isCompleted: boolean): Observable<any> {
     return this.http.post(`${this.apiUrl}/lessons/${lessonId}/complete`, isCompleted);
+  }
+
+  getLastLesson(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/last-lesson`);
+  }
+
+  getLessonsByLevel(moduleId: string): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/modules/${moduleId}/levels`);
   }
 }

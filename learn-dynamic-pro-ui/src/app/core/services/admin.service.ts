@@ -189,10 +189,12 @@ export class AdminService {
   }
 
   // ── Assignments ───────────────────────────────────────────────────────────
-  assignModule(moduleId: string, departmentId: string): Observable<any> {
+  assignModule(moduleId: string, departmentId: string, levelIds: string[] = [], typeIds: string[] = []): Observable<any> {
     return this.http.post(`${this.apiUrl}/assignments`, {
       moduleId,
       departmentId,
+      levelIds,
+      typeIds,
       isMandatory: true,
       dueDate: new Date(new Date().setMonth(new Date().getMonth() + 1)).toISOString()
     });
@@ -211,5 +213,18 @@ export class AdminService {
   // ── Stats ─────────────────────────────────────────────────────────────────
   getDashboardStats(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/stats`);
+  }
+
+  // ── Versions & Testers (New Architecture) ─────────────────────────────────
+  getVersionSummaries(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/versions/summary`);
+  }
+
+  getVersionProgress(versionId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/versions/${versionId}/progress`);
+  }
+
+  assignTesterToVersion(versionId: string, testerId: string, moduleIds: string[]): Observable<any> {
+    return this.http.post(`${this.apiUrl}/versions/${versionId}/testers/${testerId}`, { moduleIds });
   }
 }

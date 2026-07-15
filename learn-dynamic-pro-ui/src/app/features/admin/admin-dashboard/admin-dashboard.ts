@@ -57,6 +57,10 @@ export class AdminDashboardComponent implements OnInit {
   testerDepartmentId = '';
   testerDepartments: any[] = [];
 
+  // Lookups for assignments
+  allLevels: any[] = [];
+  allTypes: any[] = [];
+
 
 
   ngOnInit() {
@@ -68,9 +72,15 @@ export class AdminDashboardComponent implements OnInit {
     this.loadCompanies();
     this.loadModules();
     this.loadTestersProgress();
+    this.loadLookups();
     if (this.selectedDepartmentId) {
       this.onDepartmentChange();
     }
+  }
+
+  loadLookups() {
+    this.adminService.getLevels().subscribe(res => this.allLevels = res);
+    this.adminService.getTypes().subscribe(res => this.allTypes = res);
   }
 
   loadStats() {
@@ -192,7 +202,10 @@ export class AdminDashboardComponent implements OnInit {
       lessons: (u.lessons || []).map((l: any) => ({
         id: l.id,
         title: l.title,
-        videoUrl: l.videoUrl || ''
+        videoUrl: l.videoUrl || '',
+        levelId: l.levelId || '',
+        typeId: l.typeId || '',
+        levelOrderIndex: l.levelOrderIndex || 1
       }))
     }));
     
@@ -312,7 +325,7 @@ export class AdminDashboardComponent implements OnInit {
   originalUnits: any[] = [];
   newModuleName = '';
   newModuleDescription = '';
-  newUnitsList: { id?: string, name: string, lessons: { id?: string, title: string, videoUrl: string }[] }[] = [];
+  newUnitsList: { id?: string, name: string, lessons: { id?: string, title: string, videoUrl: string, levelId: string, typeId: string, levelOrderIndex: number }[] }[] = [];
 
   openAddModuleModal() {
     this.editingModuleId = null;
@@ -321,7 +334,7 @@ export class AdminDashboardComponent implements OnInit {
     this.newModuleName = '';
     this.newModuleDescription = '';
     this.newUnitsList = [
-      { name: 'الوحدة الأولى', lessons: [{ title: '', videoUrl: '' }, { title: '', videoUrl: '' }] }
+      { name: 'الوحدة الأولى', lessons: [{ title: '', videoUrl: '', levelId: '', typeId: '', levelOrderIndex: 1 }] }
     ];
   }
 
@@ -338,7 +351,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   addLessonToUnit(unitIndex: number) {
-    this.newUnitsList[unitIndex].lessons.push({ title: '', videoUrl: '' });
+    this.newUnitsList[unitIndex].lessons.push({ title: '', videoUrl: '', levelId: '', typeId: '', levelOrderIndex: 1 });
   }
 
   removeLessonFromUnit(unitIndex: number, lessonIndex: number) {
@@ -400,10 +413,18 @@ export class AdminDashboardComponent implements OnInit {
           
           const validLessons = unit.lessons.filter(l => l.title.trim());
           const lessonPromises = validLessons.map(lesson => {
+            const payload = {
+              title: lesson.title.trim(),
+              videoUrl: lesson.videoUrl.trim(),
+              levelId: lesson.levelId || '00000000-0000-0000-0000-000000000001',
+              typeId: lesson.typeId || '00000000-0000-0000-0000-000000000001',
+              levelOrderIndex: lesson.levelOrderIndex || 1,
+              orderIndex: 1
+            };
             if (lesson.id) {
-              return this.adminService.updateLesson(lesson.id, { title: lesson.title.trim(), videoUrl: lesson.videoUrl.trim(), levelId: '00000000-0000-0000-0000-000000000001', typeId: '00000000-0000-0000-0000-000000000001', orderIndex: 1 }).toPromise();
+              return this.adminService.updateLesson(lesson.id, payload).toPromise();
             } else {
-              return this.adminService.createLesson({ unitId: unitId!, title: lesson.title.trim(), videoUrl: lesson.videoUrl.trim(), levelId: '00000000-0000-0000-0000-000000000001', typeId: '00000000-0000-0000-0000-000000000001', orderIndex: 1 }).toPromise();
+              return this.adminService.createLesson({ unitId: unitId!, ...payload }).toPromise();
             }
           });
           
@@ -423,9 +444,17 @@ export class AdminDashboardComponent implements OnInit {
           const newUnit = await this.adminService.createUnit(moduleId, unit.name.trim()).toPromise();
           
           const validLessons = unit.lessons.filter(l => l.title.trim());
-          const lessonPromises = validLessons.map(lesson => 
-            this.adminService.createLesson({ unitId: newUnit.id, title: lesson.title.trim(), videoUrl: lesson.videoUrl.trim(), levelId: '00000000-0000-0000-0000-000000000001', typeId: '00000000-0000-0000-0000-000000000001', orderIndex: 1 }).toPromise()
-          );
+          const lessonPromises = validLessons.map(lesson => {
+            const payload = {
+              title: lesson.title.trim(),
+              videoUrl: lesson.videoUrl.trim(),
+              levelId: lesson.levelId || '00000000-0000-0000-0000-000000000001',
+              typeId: lesson.typeId || '00000000-0000-0000-0000-000000000001',
+              levelOrderIndex: lesson.levelOrderIndex || 1,
+              orderIndex: 1
+            };
+            return this.adminService.createLesson({ unitId: newUnit.id, ...payload }).toPromise();
+          });
           
           return Promise.all(lessonPromises);
         });
@@ -506,18 +535,26 @@ export class AdminDashboardComponent implements OnInit {
   assigningCompany: any = null;
   assigningDepartment: any = null;
   assignedModules: any[] = [];
+  pendingAssignedLevelIds: { [moduleId: string]: Set<string> } = {};
+  pendingAssignedTypeIds: { [moduleId: string]: Set<string> } = {};
 
   openAssignModulesModal(company: any, department: any) {
     this.assigningCompany = company;
     this.assigningDepartment = department;
     this.assignedModules = [];
     this.pendingAssignedModuleIds.clear();
+    this.pendingAssignedLevelIds = {};
+    this.pendingAssignedTypeIds = {};
     this.showAssignModulesModal = true;
     
     this.adminService.getDepartmentAssignments(department.id).subscribe({
       next: (assignments) => {
         this.assignedModules = assignments;
-        assignments.forEach((a: any) => this.pendingAssignedModuleIds.add(a.moduleId));
+        assignments.forEach((a: any) => {
+          this.pendingAssignedModuleIds.add(a.moduleId);
+          this.pendingAssignedLevelIds[a.moduleId] = new Set(a.levelFilters?.map((f: any) => f.levelId) || []);
+          this.pendingAssignedTypeIds[a.moduleId] = new Set(a.typeFilters?.map((f: any) => f.typeId) || []);
+        });
       },
       error: (err) => {
         console.error('Error fetching assignments', err);
@@ -530,6 +567,8 @@ export class AdminDashboardComponent implements OnInit {
     this.assigningCompany = null;
     this.assigningDepartment = null;
     this.pendingAssignedModuleIds.clear();
+    this.pendingAssignedLevelIds = {};
+    this.pendingAssignedTypeIds = {};
   }
 
   isModuleAssigned(moduleId: string): boolean {
@@ -539,9 +578,25 @@ export class AdminDashboardComponent implements OnInit {
   toggleModuleAssignment(moduleId: string, event: any) {
     if (event.target.checked) {
       this.pendingAssignedModuleIds.add(moduleId);
+      if (!this.pendingAssignedLevelIds[moduleId]) this.pendingAssignedLevelIds[moduleId] = new Set();
+      if (!this.pendingAssignedTypeIds[moduleId]) this.pendingAssignedTypeIds[moduleId] = new Set();
     } else {
       this.pendingAssignedModuleIds.delete(moduleId);
+      delete this.pendingAssignedLevelIds[moduleId];
+      delete this.pendingAssignedTypeIds[moduleId];
     }
+  }
+
+  isFilterSelected(moduleId: string, filterType: 'level' | 'type', filterId: string): boolean {
+    if (filterType === 'level') return this.pendingAssignedLevelIds[moduleId]?.has(filterId) || false;
+    return this.pendingAssignedTypeIds[moduleId]?.has(filterId) || false;
+  }
+
+  toggleFilterSelection(moduleId: string, filterType: 'level' | 'type', filterId: string, event: any) {
+    const targetSet = filterType === 'level' ? this.pendingAssignedLevelIds[moduleId] : this.pendingAssignedTypeIds[moduleId];
+    if (!targetSet) return;
+    if (event.target.checked) targetSet.add(filterId);
+    else targetSet.delete(filterId);
   }
 
   async saveModuleAssignments() {
@@ -555,14 +610,44 @@ export class AdminDashboardComponent implements OnInit {
     try {
       for (const moduleId of toAdd) {
         await new Promise<void>((resolve, reject) => {
-          this.adminService.assignModule(moduleId, departmentId).subscribe({
+          const levelIds = Array.from(this.pendingAssignedLevelIds[moduleId] || []);
+          const typeIds = Array.from(this.pendingAssignedTypeIds[moduleId] || []);
+          this.adminService.assignModule(moduleId, departmentId, levelIds, typeIds).subscribe({
             next: () => resolve(),
             error: (err) => reject(err)
           });
         });
       }
 
+      for (const assignment of this.assignedModules) {
+        if (this.pendingAssignedModuleIds.has(assignment.moduleId)) {
+          // It's still assigned, check if filters changed. For simplicity, delete and re-assign if it exists.
+          // Wait, to keep it simple and correct, we can remove the old assignment and recreate it with new filters,
+          // OR we can just let backend handle it if we modify assignModule to overwrite (but backend might just add duplicates).
+          // Let's remove and recreate it so the filters update correctly.
+          await new Promise<void>((resolve, reject) => {
+            this.adminService.removeAssignment(assignment.id).subscribe({
+              next: () => resolve(),
+              error: (err) => reject(err)
+            });
+          });
+          const moduleId = assignment.moduleId;
+          await new Promise<void>((resolve, reject) => {
+            const levelIds = Array.from(this.pendingAssignedLevelIds[moduleId] || []);
+            const typeIds = Array.from(this.pendingAssignedTypeIds[moduleId] || []);
+            this.adminService.assignModule(moduleId, departmentId, levelIds, typeIds).subscribe({
+              next: () => resolve(),
+              error: (err) => reject(err)
+            });
+          });
+        }
+      }
+
       for (const assignment of toRemove) {
+        // We already handled re-creating updated ones above.
+        // Wait, if it was in toRemove, we should also delete it.
+        // But above we deleted EVERY assigned module that was kept. 
+        // Let's just delete the ones in toRemove too.
         await new Promise<void>((resolve, reject) => {
           this.adminService.removeAssignment(assignment.id).subscribe({
             next: () => resolve(),

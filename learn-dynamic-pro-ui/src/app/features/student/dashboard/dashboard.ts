@@ -1,8 +1,10 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
-import { StudentService, ModuleDto } from '../../../core/services/student.service';
+import { StudentService, ModuleDto, LessonDetailDto } from '../../../core/services/student.service';
 import { Router } from '@angular/router';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { Dialog } from '../../../core/utils/dialog';
 
 export interface DashboardModule extends ModuleDto {
   progressPercent: number;
@@ -27,6 +29,13 @@ export class DashboardComponent implements OnInit {
 
   modules: DashboardModule[] = [];
   isLoading = true;
+
+  activeTab: 'resume' | 'browse' = 'resume';
+
+  lastLesson: LessonDetailDto | null = null;
+  safeVideoUrl: SafeResourceUrl | null = null;
+  levelGroups: any[] = [];
+  isSubmitting = false;
 
   ngOnInit() {
     // Fetch modules and progress concurrently
@@ -66,10 +75,85 @@ export class DashboardComponent implements OnInit {
       
     }).catch(err => {
       console.error('Failed to load dashboard data', err);
-      // Fallback
       this.modules = [];
-    }).finally(() => {
-      this.isLoading = false;
+    });
+
+    this.loadLastLessonData();
+  }
+
+  loadLastLessonData() {
+    this.studentService.getLastLesson().subscribe({
+      next: (res: any) => {
+        if (res && res.lessonId) {
+          const san = inject(DomSanitizer);
+          this.studentService.getLessonDetail(res.lessonId).subscribe(detail => {
+            this.lastLesson = detail;
+            if (detail.videoUrl) {
+              let url = detail.videoUrl;
+              if (url.includes('youtube.com/watch?v=')) {
+                url = url.replace('watch?v=', 'embed/');
+              }
+              this.safeVideoUrl = san.bypassSecurityTrustResourceUrl(url);
+            }
+          });
+
+          this.studentService.getLessonsByLevel(res.moduleId).subscribe(levels => {
+            this.levelGroups = levels;
+          });
+        } else {
+          // No last lesson, default to browse tab
+          this.activeTab = 'browse';
+          this.isLoading = false;
+        }
+      },
+      error: () => {
+        this.activeTab = 'browse';
+        this.isLoading = false;
+      },
+      complete: () => {
+        this.isLoading = false;
+      }
+    });
+  }
+
+  switchTab(tab: 'resume' | 'browse') {
+    this.activeTab = tab;
+  }
+
+  loadSpecificLesson(lessonId: string, moduleId: string) {
+    const san = inject(DomSanitizer);
+    this.studentService.getLessonDetail(lessonId).subscribe(detail => {
+      this.lastLesson = detail;
+      if (detail.videoUrl) {
+        let url = detail.videoUrl;
+        if (url.includes('youtube.com/watch?v=')) {
+          url = url.replace('watch?v=', 'embed/');
+        }
+        this.safeVideoUrl = san.bypassSecurityTrustResourceUrl(url);
+      }
+    });
+  }
+
+  toggleCompletion() {
+    if (!this.lastLesson) return;
+    
+    this.isSubmitting = true;
+    const newStatus = !this.lastLesson.isCompleted;
+
+    this.studentService.completeLesson(this.lastLesson.id, newStatus).subscribe({
+      next: () => {
+        this.lastLesson!.isCompleted = newStatus;
+        // Also update in levelGroups tree
+        this.levelGroups.forEach(g => {
+          const l = g.lessons.find((x: any) => x.id === this.lastLesson?.id);
+          if (l) l.isCompleted = newStatus;
+        });
+        this.isSubmitting = false;
+      },
+      error: (err: any) => {
+        Dialog.alert('فشل في تحديث حالة الدرس.', 'خطأ', 'error');
+        this.isSubmitting = false;
+      }
     });
   }
 

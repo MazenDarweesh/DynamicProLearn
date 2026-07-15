@@ -39,6 +39,10 @@ export class AdminTestersComponent implements OnInit {
   modules: any[] = [];
   selectedModules: string[] = [];
   
+  // Progress Viewer
+  showProgressModal = false;
+  selectedVersionProgress: any = null;
+  
   private http = inject(HttpClient);
 
   newTesterUsername = '';
@@ -133,7 +137,7 @@ export class AdminTestersComponent implements OnInit {
   }
 
   loadVersions() {
-    this.http.get<any[]>('http://localhost:5115/api/admin/test-cycles').subscribe({
+    this.adminService.getVersionSummaries().subscribe({
       next: (data) => this.erpVersions = data,
       error: (err) => console.error(err)
     });
@@ -158,7 +162,7 @@ export class AdminTestersComponent implements OnInit {
   async deleteVersion(version: any) {
     const ok = await Dialog.confirm('هل أنت متأكد من حذف هذا الإصدار؟', 'تأكيد الحذف');
     if (ok) {
-      this.http.delete(`http://localhost:5115/api/admin/test-cycles/${version.id}`).subscribe({
+      this.http.delete(`http://localhost:5115/api/admin/versions/${version.id}`).subscribe({
         next: () => {
           Dialog.alert('تم حذف الإصدار بنجاح.', 'نجاح', 'success');
           this.loadVersions();
@@ -168,6 +172,23 @@ export class AdminTestersComponent implements OnInit {
         }
       });
     }
+  }
+
+  viewVersionProgress(version: any) {
+    this.adminService.getVersionProgress(version.id).subscribe({
+      next: (data) => {
+        this.selectedVersionProgress = data;
+        this.showProgressModal = true;
+      },
+      error: (err) => {
+        Dialog.alert('حدث خطأ أثناء جلب بيانات التقدم.', 'خطأ', 'error');
+      }
+    });
+  }
+
+  closeProgressModal() {
+    this.showProgressModal = false;
+    this.selectedVersionProgress = null;
   }
 
   closeAddVersionModal() {
@@ -197,7 +218,7 @@ export class AdminTestersComponent implements OnInit {
     };
 
     if (this.editingVersionId) {
-      this.http.put(`http://localhost:5115/api/admin/test-cycles/${this.editingVersionId}`, payload).subscribe({
+      this.http.put(`http://localhost:5115/api/admin/versions/${this.editingVersionId}`, payload).subscribe({
         next: () => {
           this.isSubmitting = false;
           Dialog.alert('تم تعديل الإصدار بنجاح!', 'نجاح', 'success');
@@ -210,15 +231,13 @@ export class AdminTestersComponent implements OnInit {
         }
       });
     } else {
-      this.http.post<any>('http://localhost:5115/api/admin/test-cycles', { 
+      this.http.post<any>('http://localhost:5115/api/admin/versions', { 
         versionLabel: this.newVersionLabel.trim(),
         testerId: this.testerIdForVersion
       }).subscribe({
         next: (res) => {
           if (this.selectedModules.length > 0) {
-            this.http.post(`http://localhost:5115/api/admin/test-cycles/${res.id}/modules`, {
-              moduleIds: this.selectedModules
-            }).subscribe({
+            this.adminService.assignTesterToVersion(res.id, this.testerIdForVersion, this.selectedModules).subscribe({
               next: () => {
                 this.isSubmitting = false;
                 Dialog.alert('تمت إضافة الدورة وتخصيص الموديولات بنجاح!', 'نجاح', 'success');
