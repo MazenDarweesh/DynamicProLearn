@@ -15,6 +15,5 @@ public class LessonDto
     public string ExternalLink { get; set; } = string.Empty;
     public string? ErpKey { get; set; }
     public int OrderIndex { get; set; }
-    public int LevelOrderIndex { get; set; }
     public bool IsCompleted { get; set; }
 }

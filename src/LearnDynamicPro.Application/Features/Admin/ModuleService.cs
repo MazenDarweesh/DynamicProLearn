@@ -140,8 +140,7 @@ public class ModuleService : IModuleService
             LevelId = levelId,
             TypeId = typeId,
             Description = request.Description,
-            OrderIndex = request.OrderIndex,
-            LevelOrderIndex = request.LevelOrderIndex
+            OrderIndex = request.OrderIndex
         };
         await _unitOfWork.Repository<Lesson>().AddAsync(lesson);
         await _unitOfWork.SaveChangesAsync();
@@ -157,8 +156,7 @@ public class ModuleService : IModuleService
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
             Description = lesson.Description,
-            OrderIndex = lesson.OrderIndex,
-            LevelOrderIndex = lesson.LevelOrderIndex
+            OrderIndex = lesson.OrderIndex
         });
     }
 
@@ -183,7 +181,6 @@ public class ModuleService : IModuleService
         lesson.TypeId = typeId;
         lesson.Description = request.Description;
         lesson.OrderIndex = request.OrderIndex;
-        lesson.LevelOrderIndex = request.LevelOrderIndex;
         
         _unitOfWork.Repository<Lesson>().Update(lesson);
         await _unitOfWork.SaveChangesAsync();
@@ -199,8 +196,7 @@ public class ModuleService : IModuleService
             LevelId = lesson.LevelId,
             TypeId = lesson.TypeId,
             Description = lesson.Description,
-            OrderIndex = lesson.OrderIndex,
-            LevelOrderIndex = lesson.LevelOrderIndex
+            OrderIndex = lesson.OrderIndex
         });
     }
 
@@ -239,8 +235,7 @@ public class ModuleService : IModuleService
                 LevelLabel = l.Level != null ? l.Level.Label : string.Empty,
                 TypeId = l.TypeId,
                 TypeLabel = l.Type != null ? l.Type.Label : string.Empty,
-                OrderIndex = l.OrderIndex,
-                LevelOrderIndex = l.LevelOrderIndex
+                OrderIndex = l.OrderIndex
             })
             .ToListAsync();
             
@@ -269,8 +264,7 @@ public class ModuleService : IModuleService
             LevelLabel = lesson.Level != null ? lesson.Level.Label : string.Empty,
             TypeId = lesson.TypeId,
             TypeLabel = lesson.Type != null ? lesson.Type.Label : string.Empty,
-            OrderIndex = lesson.OrderIndex,
-            LevelOrderIndex = lesson.LevelOrderIndex
+            OrderIndex = lesson.OrderIndex
         });
     }
 }

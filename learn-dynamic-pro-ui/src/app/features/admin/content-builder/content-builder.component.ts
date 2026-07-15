@@ -267,7 +267,7 @@ export class ContentBuilderComponent implements OnInit {
             externalLink: l.externalLink || '',
             levelId: l.levelId,
             typeId: l.typeId,
-            orderIndex: lIndex + 1
+            orderIndex: l.orderIndex && l.orderIndex >= 1 ? l.orderIndex : lIndex + 1
           };
           lessonPromises.push(this.adminService.updateLesson(l.id, payload).toPromise());
         });

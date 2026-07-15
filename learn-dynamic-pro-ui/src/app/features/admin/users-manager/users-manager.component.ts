@@ -17,20 +17,24 @@ import { CompanyModalComponent } from '../../../shared/components/company-modal/
 @Component({
   selector: 'app-users-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, RouterModule, ExpandableTableComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent, AssignModulesModalComponent, CompanyModalComponent],
+  imports: [
+    CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent,
+    RouterModule, ExpandableTableComponent, AdminActionButtonComponent,
+    AdminModalComponent, AdminActionIconComponent, AssignModulesModalComponent, CompanyModalComponent
+  ],
   templateUrl: './users-manager.component.html',
   styleUrls: ['./users-manager.component.css']
 })
 export class UsersManagerComponent implements OnInit {
   private router = inject(Router);
   private adminService = inject(AdminService);
-  
+
   companies: any[] = [];
   filteredCompanies: any[] = [];
   paginatedCompanies: any[] = [];
   allModules: any[] = [];
   moduleSearchQuery: string = '';
-  
+
   isLoading = true;
   isSubmitting = false;
 
@@ -46,6 +50,7 @@ export class UsersManagerComponent implements OnInit {
   showEditDepartmentModal = false;
   editingDepartmentId: string | null = null;
   editingDepartmentName = '';
+  editingDepartmentCompany: any = null; // Track company for module assignment from edit modal
 
   showAddCompanyModal = false;
   editingCompanyId: string | null = null;
@@ -53,12 +58,10 @@ export class UsersManagerComponent implements OnInit {
   newDepartmentsList: { id?: string, name: string }[] = [];
   originalDepartments: any[] = [];
   newDepartmentName = '';
-  
+
   showAssignModulesModal = false;
   assigningCompany: any = null;
   assigningDepartment: any = null;
-  assignedModules: any[] = [];
-  pendingAssignedModuleIds = new Set<string>();
 
   ngOnInit() {
     this.loadData();
@@ -122,11 +125,7 @@ export class UsersManagerComponent implements OnInit {
   }
 
   toggleExpand(companyId: string) {
-    if (this.expandedCompanyId === companyId) {
-      this.expandedCompanyId = null;
-    } else {
-      this.expandedCompanyId = companyId;
-    }
+    this.expandedCompanyId = this.expandedCompanyId === companyId ? null : companyId;
   }
 
   // --- Company Edit/Delete ---
@@ -153,18 +152,13 @@ export class UsersManagerComponent implements OnInit {
   async deleteCompany(comp: any) {
     const ok = await Dialog.confirm('هل أنت متأكد من حذف الشركة بجميع محتوياتها؟', 'تأكيد الحذف');
     if (ok) {
-      console.log(`[FRONTEND] Triggering delete for company ${comp.id}...`);
       this.adminService.deleteCompany(comp.id).subscribe({
         next: () => {
-          console.log(`[FRONTEND] Delete company SUCCESS`);
           this.expandedCompanyId = null;
           this.loadData();
           Dialog.alert('تم حذف الشركة بنجاح.', 'نجاح', 'success');
         },
-        error: (err) => {
-          console.error(`[FRONTEND] Delete company FAILED`, err);
-          Dialog.alert('حدث خطأ أثناء حذف الشركة. تحقق من الـ Console.', 'خطأ', 'error');
-        }
+        error: () => Dialog.alert('حدث خطأ أثناء حذف الشركة.', 'خطأ', 'error')
       });
     }
   }
@@ -173,6 +167,7 @@ export class UsersManagerComponent implements OnInit {
   editDepartment(comp: any, dept: any) {
     this.editingDepartmentId = dept.id;
     this.editingDepartmentName = dept.name;
+    this.editingDepartmentCompany = comp; // Store company reference
     this.showEditDepartmentModal = true;
   }
 
@@ -180,11 +175,12 @@ export class UsersManagerComponent implements OnInit {
     this.showEditDepartmentModal = false;
     this.editingDepartmentId = null;
     this.editingDepartmentName = '';
+    this.editingDepartmentCompany = null;
   }
 
   saveDepartmentEdit() {
     if (!this.editingDepartmentName.trim() || !this.editingDepartmentId) return;
-    
+
     this.isSubmitting = true;
     this.adminService.updateDepartment(this.editingDepartmentId, this.editingDepartmentName.trim()).subscribe({
       next: () => {
@@ -198,6 +194,14 @@ export class UsersManagerComponent implements OnInit {
         Dialog.alert('حدث خطأ أثناء التعديل.', 'خطأ', 'error');
       }
     });
+  }
+
+  /** Opens AssignModulesModal directly from the department edit modal */
+  openModulesFromEdit() {
+    if (!this.editingDepartmentId || !this.editingDepartmentCompany) return;
+    const deptObj = { id: this.editingDepartmentId, name: this.editingDepartmentName };
+    this.closeEditDepartmentModal();
+    this.openAssignModulesModal(this.editingDepartmentCompany, deptObj);
   }
 
   async deleteDepartment(comp: any, dept: any) {
@@ -235,21 +239,20 @@ export class UsersManagerComponent implements OnInit {
       Dialog.alert('الرجاء إدخال اسم الشركة', 'تنبيه', 'info');
       return;
     }
-    
+
     this.isSubmitting = true;
     try {
       if (this.editingCompanyId) {
-        // --- EDIT MODE ---
         await this.adminService.updateCompany(this.editingCompanyId, this.newCompanyName).toPromise();
-        
+
         const currentDeptIds = this.newDepartmentsList.filter(d => d.id).map(d => d.id);
         const originalDeptIds = this.originalDepartments.map(d => d.id);
-        
         const deptsToDelete = originalDeptIds.filter(id => !currentDeptIds.includes(id));
+
         if (deptsToDelete.length > 0) {
           await Promise.all(deptsToDelete.map(id => this.adminService.deleteDepartment(id).toPromise()));
         }
-        
+
         const validDepts = this.newDepartmentsList.filter(d => d.name.trim());
         const deptPromises = validDepts.map(dept => {
           if (dept.id) {
@@ -258,27 +261,22 @@ export class UsersManagerComponent implements OnInit {
             return this.adminService.createDepartment(this.editingCompanyId!, dept.name.trim()).toPromise();
           }
         });
-        
         await Promise.all(deptPromises);
       } else {
-        // --- CREATE MODE ---
         const comp = await this.adminService.createCompany(this.newCompanyName).toPromise();
         const companyId = comp.id;
-        
         const validDepts = this.newDepartmentsList.filter(d => d.name.trim());
-        const deptPromises = validDepts.map(dept => 
+        const deptPromises = validDepts.map(dept =>
           this.adminService.createDepartment(companyId, dept.name.trim()).toPromise()
         );
-        
         await Promise.all(deptPromises);
       }
-      
+
       this.isSubmitting = false;
       this.closeAddCompanyModal();
       this.loadData();
     } catch (err) {
       this.isSubmitting = false;
-      console.error('Error saving company', err);
       Dialog.alert('حدث خطأ أثناء حفظ الشركة.', 'خطأ', 'error');
     }
   }
@@ -287,80 +285,18 @@ export class UsersManagerComponent implements OnInit {
   openAssignModulesModal(company: any, department: any) {
     this.assigningCompany = company;
     this.assigningDepartment = department;
-    this.assignedModules = [];
-    this.pendingAssignedModuleIds.clear();
     this.showAssignModulesModal = true;
-    
-    this.adminService.getDepartmentAssignments(department.id).subscribe({
-      next: (assignments) => {
-        this.assignedModules = assignments;
-        assignments.forEach((a: any) => this.pendingAssignedModuleIds.add(a.moduleId));
-      },
-      error: (err) => {
-        console.error('Error fetching assignments', err);
-      }
-    });
   }
 
   closeAssignModulesModal() {
     this.showAssignModulesModal = false;
     this.assigningCompany = null;
     this.assigningDepartment = null;
-    this.pendingAssignedModuleIds.clear();
-  }
-
-  isModuleAssigned(moduleId: string): boolean {
-    return this.pendingAssignedModuleIds.has(moduleId);
   }
 
   getFilteredModules() {
     if (!this.moduleSearchQuery.trim()) return this.allModules;
     const query = this.moduleSearchQuery.toLowerCase();
     return this.allModules.filter(m => m.name && m.name.toLowerCase().includes(query));
-  }
-
-  toggleModuleAssignment(moduleId: string, event: any) {
-    if (event.target.checked) {
-      this.pendingAssignedModuleIds.add(moduleId);
-    } else {
-      this.pendingAssignedModuleIds.delete(moduleId);
-    }
-  }
-
-  async saveModuleAssignments() {
-    this.isSubmitting = true;
-    const currentAssignmentIds = new Set(this.assignedModules.map(a => a.moduleId));
-    const departmentId = this.assigningDepartment.id;
-
-    const toAdd = Array.from(this.pendingAssignedModuleIds).filter(id => !currentAssignmentIds.has(id));
-    const toRemove = this.assignedModules.filter(a => !this.pendingAssignedModuleIds.has(a.moduleId));
-
-    try {
-      for (const moduleId of toAdd) {
-        await new Promise<void>((resolve, reject) => {
-          this.adminService.assignModule(moduleId, departmentId).subscribe({
-            next: () => resolve(),
-            error: (err) => reject(err)
-          });
-        });
-      }
-
-      for (const assignment of toRemove) {
-        await new Promise<void>((resolve, reject) => {
-          this.adminService.removeAssignment(assignment.id).subscribe({
-            next: () => resolve(),
-            error: (err) => reject(err)
-          });
-        });
-      }
-      
-      this.isSubmitting = false;
-      Dialog.alert('تم حفظ إسنادات الموديولات بنجاح!', 'نجاح', 'success');
-      this.closeAssignModulesModal();
-    } catch (err: any) {
-      this.isSubmitting = false;
-      console.error('Error saving assignments', err);
-      Dialog.alert('حدث خطأ أثناء حفظ الإسنادات.', 'خطأ', 'error');
-    }
   }
 }

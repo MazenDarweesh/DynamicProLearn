@@ -207,7 +207,7 @@ export class AdminDashboardComponent implements OnInit {
         videoUrl: l.videoUrl || '',
         levelId: l.levelId || '',
         typeId: l.typeId || '',
-        levelOrderIndex: l.levelOrderIndex || 1
+        orderIndex: l.orderIndex || 1
       }))
     }));
     
@@ -327,7 +327,7 @@ export class AdminDashboardComponent implements OnInit {
   originalUnits: any[] = [];
   newModuleName = '';
   newModuleDescription = '';
-  newUnitsList: { id?: string, name: string, lessons: { id?: string, title: string, videoUrl: string, levelId: string, typeId: string, levelOrderIndex: number }[] }[] = [];
+  newUnitsList: { id?: string, name: string, lessons: { id?: string, title: string, videoUrl: string, levelId: string, typeId: string, orderIndex: number }[] }[] = [];
 
   openAddModuleModal() {
     this.editingModuleId = null;
@@ -336,7 +336,7 @@ export class AdminDashboardComponent implements OnInit {
     this.newModuleName = '';
     this.newModuleDescription = '';
     this.newUnitsList = [
-      { name: 'الوحدة الأولى', lessons: [{ title: '', videoUrl: '', levelId: '', typeId: '', levelOrderIndex: 1 }] }
+      { name: 'الوحدة الأولى', lessons: [{ title: '', videoUrl: '', levelId: '', typeId: '', orderIndex: 1 }] }
     ];
   }
 
@@ -353,7 +353,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   addLessonToUnit(unitIndex: number) {
-    this.newUnitsList[unitIndex].lessons.push({ title: '', videoUrl: '', levelId: '', typeId: '', levelOrderIndex: 1 });
+    this.newUnitsList[unitIndex].lessons.push({ title: '', videoUrl: '', levelId: '', typeId: '', orderIndex: 1 });
   }
 
   removeLessonFromUnit(unitIndex: number, lessonIndex: number) {
@@ -420,8 +420,7 @@ export class AdminDashboardComponent implements OnInit {
               videoUrl: lesson.videoUrl.trim(),
               levelId: lesson.levelId || '00000000-0000-0000-0000-000000000001',
               typeId: lesson.typeId || '00000000-0000-0000-0000-000000000001',
-              levelOrderIndex: lesson.levelOrderIndex || 1,
-              orderIndex: 1
+              orderIndex: lesson.orderIndex || 1
             };
             if (lesson.id) {
               return this.adminService.updateLesson(lesson.id, payload).toPromise();
@@ -452,8 +451,7 @@ export class AdminDashboardComponent implements OnInit {
               videoUrl: lesson.videoUrl.trim(),
               levelId: lesson.levelId || '00000000-0000-0000-0000-000000000001',
               typeId: lesson.typeId || '00000000-0000-0000-0000-000000000001',
-              levelOrderIndex: lesson.levelOrderIndex || 1,
-              orderIndex: 1
+              orderIndex: lesson.orderIndex || 1
             };
             return this.adminService.createLesson({ unitId: newUnit.id, ...payload }).toPromise();
           });

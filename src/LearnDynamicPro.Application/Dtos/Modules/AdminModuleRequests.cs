@@ -36,7 +36,6 @@ public class CreateLessonRequest
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
     public int OrderIndex { get; set; }
-    public int LevelOrderIndex { get; set; }
 }
 
 public class UpdateLessonRequest
@@ -49,5 +48,4 @@ public class UpdateLessonRequest
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
     public int OrderIndex { get; set; }
-    public int LevelOrderIndex { get; set; }
 }

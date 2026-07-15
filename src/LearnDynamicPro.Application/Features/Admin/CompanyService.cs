@@ -457,25 +457,61 @@ public class CompanyService : ICompanyService
             .Select(u => u.Id)
             .ToListAsync();
 
-        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+        // Fetch assignments with their level/type filters
+        var rawAssignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
             .Where(a => a.DepartmentId == departmentId)
-            .Select(a => new 
+            .Select(a => new
             {
+                AssignmentId = a.Id,
                 ModuleId = a.ModuleId,
                 ModuleName = a.Module!.Name,
-                Units = a.Module.Units!.Select(u => new 
+                FilterLevelIds = a.LevelFilters.Select(lf => lf.LevelId).ToList(),
+                FilterTypeIds = a.TypeFilters.Select(tf => tf.TypeId).ToList(),
+                Units = a.Module.Units!.OrderBy(u => u.OrderIndex).Select(u => new
                 {
                     UnitId = u.Id,
                     UnitName = u.Name,
-                    Lessons = u.Lessons!.Select(l => new 
+                    UnitOrderIndex = u.OrderIndex,
+                    Lessons = u.Lessons!.OrderBy(l => l.OrderIndex).Select(l => new
                     {
                         LessonId = l.Id,
-                        LessonName = l.Title
+                        LessonName = l.Title,
+                        LevelId = l.LevelId,
+                        TypeId = l.TypeId
                     }).ToList()
                 }).ToList()
             })
             .ToListAsync();
+
+        // Apply level/type filters to lessons per assignment
+        var assignments = rawAssignments.Select(a =>
+        {
+            var hasLevelFilter = a.FilterLevelIds.Any();
+            var hasTypeFilter = a.FilterTypeIds.Any();
+
+            var filteredUnits = a.Units.Select(u => new
+            {
+                u.UnitId,
+                u.UnitName,
+                u.UnitOrderIndex,
+                Lessons = u.Lessons.Where(l =>
+                {
+                    // If levels selected, lesson must match one of them
+                    bool levelMatch = !hasLevelFilter || a.FilterLevelIds.Contains(l.LevelId);
+                    // If types selected, lesson must match one of them
+                    bool typeMatch = !hasTypeFilter || a.FilterTypeIds.Contains(l.TypeId);
+                    return levelMatch && typeMatch;
+                }).ToList()
+            }).Where(u => u.Lessons.Any()).ToList();
+
+            return new
+            {
+                a.ModuleId,
+                a.ModuleName,
+                Units = filteredUnits
+            };
+        }).ToList();
 
         var assignedLessonIds = assignments.SelectMany(m => m.Units.SelectMany(u => u.Lessons.Select(l => l.LessonId))).ToList();
 
@@ -498,7 +534,7 @@ public class CompanyService : ICompanyService
                 ModuleId = m.ModuleId,
                 Name = m.ModuleName,
                 TotalLessons = m.Units.SelectMany(u => u.Lessons).Count(),
-                CompletedLessons = m.Units.SelectMany(u => u.Lessons).Count(l => 
+                CompletedLessons = m.Units.SelectMany(u => u.Lessons).Count(l =>
                     userIds.Any() && userIds.All(uid => completions.Any(c => c.UserId == uid && c.LessonId == l.LessonId))
                 ),
                 Units = m.Units.Select(u => new DepartmentUnitProgressDto
