@@ -15,6 +15,8 @@ public class Lesson : BaseEntity
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
     public int OrderIndex { get; set; }
+    /// <summary>ترتيب الدرس داخل مستواه (Level) - يُستخدم لتجميع وعرض الدروس مرتبة بداخل كل مستوى</summary>
+    public int LevelOrderIndex { get; set; }
 
     // Navigation
     public Unit? Unit { get; set; }

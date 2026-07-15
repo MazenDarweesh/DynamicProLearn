@@ -543,7 +543,7 @@
                       <option *ngFor="let typ of allTypes" [value]="typ.id">{{ typ.label }}</option>
                     </select>
                   </div>
-                  <input type="number" class="form-control text-sm" style="width: 70px;" [(ngModel)]="lesson.orderIndex" min="1" placeholder="الترتيب" title="ترتيب الدرس داخل الوحدة">
+                  <input type="number" class="form-control text-sm" style="width: 70px;" [(ngModel)]="lesson.levelOrderIndex" min="1" placeholder="الترتيب" title="ترتيب الدرس داخل المستوى">
                 </div>
               </div>
               <svg class="drag-handle text-secondary mt-2" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="opacity:0.4"><circle cx="9" cy="12" r="1"></circle><circle cx="9" cy="5" r="1"></circle><circle cx="9" cy="19" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="15" cy="5" r="1"></circle><circle cx="15" cy="19" r="1"></circle></svg>

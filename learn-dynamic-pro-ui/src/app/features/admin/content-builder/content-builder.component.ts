@@ -207,7 +207,8 @@ export class ContentBuilderComponent implements OnInit {
       externalLink: '',
       levelId: this.lookups.levels.length ? this.lookups.levels[0].id : '00000000-0000-0000-0000-000000000001',
       typeId: this.lookups.types.length ? this.lookups.types[0].id : '00000000-0000-0000-0000-000000000001',
-      orderIndex: unit.lessons.length + 1
+      orderIndex: unit.lessons.length + 1,
+      levelOrderIndex: 1
     };
 
     this.adminService.createLesson(payload).subscribe({
@@ -267,7 +268,8 @@ export class ContentBuilderComponent implements OnInit {
             externalLink: l.externalLink || '',
             levelId: l.levelId,
             typeId: l.typeId,
-            orderIndex: l.orderIndex && l.orderIndex >= 1 ? l.orderIndex : lIndex + 1
+            orderIndex: l.orderIndex && l.orderIndex >= 1 ? l.orderIndex : lIndex + 1,
+            levelOrderIndex: l.levelOrderIndex && l.levelOrderIndex >= 1 ? l.levelOrderIndex : 1
           };
           lessonPromises.push(this.adminService.updateLesson(l.id, payload).toPromise());
         });

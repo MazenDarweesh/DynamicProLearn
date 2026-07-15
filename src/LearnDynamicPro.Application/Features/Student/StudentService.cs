@@ -154,7 +154,7 @@ public class StudentService : IStudentService
 
         var lessonProjections = await accessibleLessonsQuery
             .OrderBy(l => l.Level!.SortOrder)
-            .ThenBy(l => l.OrderIndex)
+            .ThenBy(l => l.LevelOrderIndex)
             .ThenBy(l => l.CreatedAt)
             .Select(l => new 
             {
@@ -167,6 +167,7 @@ public class StudentService : IStudentService
                 l.TypeId,
                 TypeLabel = l.Type!.Label,
                 l.OrderIndex,
+                l.LevelOrderIndex,
                 l.PdfUrl,
                 l.ExternalLink
             })
@@ -193,6 +194,7 @@ public class StudentService : IStudentService
             TypeId      = l.TypeId,
             TypeLabel   = l.TypeLabel ?? string.Empty,
             OrderIndex  = l.OrderIndex,
+            LevelOrderIndex = l.LevelOrderIndex,
             IsCompleted = completedLessonIds.Contains(l.Id),
             PdfUrl      = l.PdfUrl,
             ExternalLink = l.ExternalLink
@@ -324,7 +326,7 @@ public class StudentService : IStudentService
 
         var lessonProjections = await accessibleLessonsQuery
             .OrderBy(l => l.Level!.SortOrder)
-            .ThenBy(l => l.OrderIndex)
+            .ThenBy(l => l.LevelOrderIndex)
             .ThenBy(l => l.CreatedAt)
             .Select(l => new 
             {
@@ -338,6 +340,7 @@ public class StudentService : IStudentService
                 l.TypeId,
                 TypeLabel = l.Type!.Label,
                 l.OrderIndex,
+                l.LevelOrderIndex,
                 l.PdfUrl,
                 l.ExternalLink
             })
@@ -364,6 +367,7 @@ public class StudentService : IStudentService
             TypeId      = l.TypeId,
             TypeLabel   = l.TypeLabel ?? string.Empty,
             OrderIndex  = l.OrderIndex,
+            LevelOrderIndex = l.LevelOrderIndex,
             IsCompleted = completedLessonIds.Contains(l.Id),
             PdfUrl      = l.PdfUrl,
             ExternalLink = l.ExternalLink

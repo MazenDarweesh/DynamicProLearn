@@ -318,6 +318,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Property<Guid>("LevelId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("LevelOrderIndex")
+                        .HasColumnType("int");
+
                     b.Property<int>("OrderIndex")
                         .HasColumnType("int");
 
