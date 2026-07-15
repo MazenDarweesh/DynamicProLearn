@@ -11,11 +11,13 @@ import { ExpandableTableComponent } from '../../../shared/components/expandable-
 import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
 import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
+import { AssignModulesModalComponent } from '../../../shared/components/assign-modules-modal/assign-modules-modal.component';
+import { CompanyModalComponent } from '../../../shared/components/company-modal/company-modal.component';
 
 @Component({
   selector: 'app-users-manager',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, RouterModule, ExpandableTableComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, RouterModule, ExpandableTableComponent, AdminActionButtonComponent, AdminModalComponent, AdminActionIconComponent, AssignModulesModalComponent, CompanyModalComponent],
   templateUrl: './users-manager.component.html',
   styleUrls: ['./users-manager.component.css']
 })

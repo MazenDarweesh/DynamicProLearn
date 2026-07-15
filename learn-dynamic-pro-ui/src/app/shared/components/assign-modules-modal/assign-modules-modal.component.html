@@ -1,0 +1,87 @@
+<div class="modal-overlay " *ngIf="show" dir="rtl">
+  <div class="modal-container">
+    <div class="modal-header">
+      <div class="d-flex justify-between align-center">
+        <div>
+          <h3 class="m-0 text-white d-flex align-center gap-2">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect>
+              <path d="M9 14h6"></path>
+              <path d="M9 10h6"></path>
+            </svg>
+            إسناد الموديولات
+          </h3>
+          <p class="text-white-50 m-0 text-sm mt-1" style="padding-right: 28px;">شركة {{ companyName }} - قسم {{ departmentName }}</p>
+        </div>
+        <button class="icon-btn text-white" (click)="closeModal()" style="margin-left: -10px;">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+    
+    <div class="modal-body">
+      <p class="text-secondary text-sm mb-3">اختر الموديولات التي ترغب بإتاحتها لمستخدمي هذا القسم:</p>
+      
+      <div class="modules-list" style="max-height: 400px; overflow-y: auto; padding-right: 10px;">
+        <div class="item-card mb-3" *ngFor="let mod of modules">
+          <div class="d-flex align-center gap-3">
+            <input type="checkbox" [checked]="isModuleAssigned(mod.id)" (change)="toggleModuleAssignment(mod.id, $event)" style="width: 18px; height: 18px; cursor: pointer;">
+            <div>
+              <h4 class="text-primary m-0" style="font-size: 15px;">{{ mod.name }}</h4>
+              <span class="text-secondary text-sm">{{ mod.description || 'لا يوجد وصف' }}</span>
+            </div>
+          </div>
+          
+          <!-- Filters Area (Shown only if module is checked) -->
+          <div *ngIf="isModuleAssigned(mod.id)" class="filters-area mt-3 p-3 d-flex flex-column gap-2" style="background: var(--color-background-secondary); border-radius: 8px; margin-right: 32px; border: 1px dashed var(--color-border);">
+            <div class="d-flex gap-4">
+              
+              <!-- Levels -->
+              <div class="flex-1">
+                <h5 class="m-0 mb-2 text-secondary text-sm">مستويات الدروس (اختياري)</h5>
+                <div class="d-flex flex-column gap-2">
+                  <label class="d-flex align-center gap-2 text-sm" *ngFor="let level of allLevels">
+                    <input type="checkbox" [checked]="isFilterSelected(mod.id, 'level', level.id)" (change)="toggleFilterSelection(mod.id, 'level', level.id, $event)">
+                    {{ level.label }}
+                  </label>
+                  <span *ngIf="allLevels.length === 0" class="text-secondary text-xs">لا توجد مستويات.</span>
+                </div>
+              </div>
+              
+              <!-- Types -->
+              <div class="flex-1">
+                <h5 class="m-0 mb-2 text-secondary text-sm">أنواع الدروس (اختياري)</h5>
+                <div class="d-flex flex-column gap-2">
+                  <label class="d-flex align-center gap-2 text-sm" *ngFor="let type of allTypes">
+                    <input type="checkbox" [checked]="isFilterSelected(mod.id, 'type', type.id)" (change)="toggleFilterSelection(mod.id, 'type', type.id, $event)">
+                    {{ type.label }}
+                  </label>
+                  <span *ngIf="allTypes.length === 0" class="text-secondary text-xs">لا توجد أنواع.</span>
+                </div>
+              </div>
+              
+            </div>
+            <p class="text-xs text-secondary mt-3 mb-0" style="opacity: 0.8;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-left: 2px;"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+              إذا لم تقم بتحديد أي فلتر، فسيتم عرض جميع الدروس للقسم بشكل افتراضي.
+            </p>
+          </div>
+        </div>
+        <div *ngIf="modules.length === 0" class="text-center text-secondary py-3">
+          لا توجد موديولات متاحة.
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer d-flex gap-3">
+      <button class="btn-accent flex-2 d-flex justify-center align-center gap-2" (click)="saveModuleAssignments()" [disabled]="isSubmitting">
+        {{ isSubmitting ? 'جاري الحفظ...' : 'حفظ الإسنادات والتغييرات' }}
+      </button>
+      <button class="btn-secondary flex-1" (click)="closeModal()">إلغاء</button>
+    </div>
+  </div>
+</div>

@@ -8,10 +8,12 @@ import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
 
+import { AssignModulesModalComponent } from '../../../shared/components/assign-modules-modal/assign-modules-modal.component';
+
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionIconComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionIconComponent, AssignModulesModalComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrl: './admin-dashboard.component.css'
 })
