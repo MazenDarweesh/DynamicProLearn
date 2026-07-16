@@ -40,6 +40,11 @@ export class AdminTestersComponent implements OnInit {
 
   // Available testers for version linking
   availableTesters: any[] = [];
+  showAssignTesterModal = false;
+  assigningVersionId: string | null = null;
+  selectedTesterId = '';
+  selectedModuleIds: string[] = [];
+  currentVersionProgress: any = null;
 
   ngOnInit() {
     this.loadTestersProgress();
@@ -225,5 +230,66 @@ export class AdminTestersComponent implements OnInit {
         }
       });
     }
+  }
+
+  // ── Version-Tester Assignment ──────────────────────────────────────────────
+  openAssignTesterModal(version: any) {
+    this.assigningVersionId = version.id;
+    this.selectedTesterId = '';
+    this.selectedModuleIds = [];
+    this.currentVersionProgress = null;
+    this.showAssignTesterModal = true;
+
+    // Load current assignments
+    this.adminService.getVersionProgress(version.id).subscribe({
+      next: (res) => {
+        this.currentVersionProgress = res;
+      },
+      error: (err) => console.error('Failed to load version progress', err)
+    });
+  }
+
+  onTesterSelectionChange() {
+    this.selectedModuleIds = [];
+    if (this.currentVersionProgress && this.currentVersionProgress.testers) {
+      const tester = this.currentVersionProgress.testers.find((t: any) => t.testerId === this.selectedTesterId);
+      if (tester && tester.modules) {
+        this.selectedModuleIds = tester.modules.map((m: any) => m.moduleId);
+      }
+    }
+  }
+
+  closeAssignTesterModal() {
+    this.showAssignTesterModal = false;
+  }
+
+  toggleModuleSelection(moduleId: string) {
+    const idx = this.selectedModuleIds.indexOf(moduleId);
+    if (idx > -1) {
+      this.selectedModuleIds.splice(idx, 1);
+    } else {
+      this.selectedModuleIds.push(moduleId);
+    }
+  }
+
+  submitAssignTester() {
+    if (!this.selectedTesterId || this.selectedModuleIds.length === 0 || !this.assigningVersionId) {
+      Dialog.alert('الرجاء اختيار المختبر وموديول واحد على الأقل', 'تنبيه', 'info');
+      return;
+    }
+
+    this.isSubmitting = true;
+    this.adminService.assignTesterToVersion(this.assigningVersionId, this.selectedTesterId, this.selectedModuleIds).subscribe({
+      next: () => {
+        Dialog.alert('تم إسناد المختبر للنسخة بنجاح', 'نجاح', 'success');
+        this.isSubmitting = false;
+        this.closeAssignTesterModal();
+        this.loadVersions(); // Refresh table counts
+      },
+      error: (err) => {
+        Dialog.alert('حدث خطأ أثناء الإسناد', 'خطأ', 'error');
+        this.isSubmitting = false;
+      }
+    });
   }
 }

@@ -38,7 +38,7 @@
               <td>{{ v.assignedModulesCount }}</td>
               <td class="text-left">
                 <div class="d-flex gap-2 justify-end">
-                  <button class="btn-primary" style="padding: 4px 8px; font-size: 11px;" [routerLink]="['/admin/versions', v.id]">إسناد وتفاصيل</button>
+                  <button class="btn-primary" style="padding: 4px 8px; font-size: 11px;" (click)="openAssignTesterModal(v)">إسناد وتفاصيل</button>
                   <app-admin-action-icon action="edit" (clicked)="editVersion(v)"></app-admin-action-icon>
                   <app-admin-action-icon action="delete" (clicked)="deleteVersion(v)"></app-admin-action-icon>
                 </div>
@@ -157,6 +157,50 @@
   <div class="form-group mb-3">
     <label class="form-label text-secondary text-sm mb-2 d-block">اسم الإصدار / النسخة</label>
     <input type="text" class="form-control" [(ngModel)]="newVersionLabel" placeholder="مثال: v2.1.4-beta (أحدث نسخة تجريبية)">
+  </div>
+
+</app-admin-modal>
+
+<!-- Assign Tester Modal -->
+<app-admin-modal
+  [show]="showAssignTesterModal"
+  title="إسناد النسخة للمختبرين"
+  subtitle="اختر المختبر وحدد الموديولات التي سيقوم باختبارها لهذه النسخة"
+  confirmLabel="حفظ الإسناد"
+  [loading]="isSubmitting"
+  (closed)="closeAssignTesterModal()"
+  (confirmed)="submitAssignTester()">
+
+  <svg modal-icon width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+    <circle cx="9" cy="7" r="4"></circle>
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+  </svg>
+
+  <div class="form-group mb-3">
+    <label class="form-label text-secondary text-sm mb-2 d-block">اختر المختبر</label>
+    <div class="custom-select-wrapper">
+      <select class="form-control" [(ngModel)]="selectedTesterId" (change)="onTesterSelectionChange()" style="color: var(--color-navy); background-color: #fff;">
+        <option value="" disabled selected>قائمة المختبرين...</option>
+        <option *ngFor="let t of availableTesters" [value]="t.userId" style="color: #000; background-color: #fff;">{{ t.name }}</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-group mb-3">
+    <label class="form-label text-secondary text-sm mb-2 d-block">تحديد الموديولات للاختبار</label>
+    <div class="modules-checkbox-list" style="max-height: 150px; overflow-y: auto; border: 1px solid var(--color-border); border-radius: 8px; padding: 10px;">
+      <div class="form-check mb-2" *ngFor="let m of modules">
+        <input class="form-check-input" type="checkbox" [id]="'mod_' + m.id" 
+               [checked]="selectedModuleIds.includes(m.id)"
+               (change)="toggleModuleSelection(m.id)">
+        <label class="form-check-label text-sm ms-2 me-2" [for]="'mod_' + m.id" style="cursor: pointer;">
+          {{ m.name }}
+        </label>
+      </div>
+      <div *ngIf="modules.length === 0" class="text-secondary text-sm text-center py-2">لا توجد موديولات متوفرة</div>
+    </div>
   </div>
 
 </app-admin-modal>
