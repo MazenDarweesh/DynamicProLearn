@@ -65,65 +65,6 @@
   gap: 30px;
 }
 
-/* Sidebar */
-.viewer-sidebar {
-  width: 320px;
-  background: white;
-  border-radius: 12px;
-  border: 1px solid var(--color-border);
-  padding: 20px;
-  height: calc(100vh - 150px);
-  overflow-y: auto;
-}
-
-.unit {
-  margin-bottom: 25px;
-}
-.unit h4 {
-  font-size: 15px;
-  color: var(--color-text-secondary);
-  margin: 0 0 10px 0;
-  font-weight: 600;
-  border-bottom: 1px solid var(--color-border);
-  padding-bottom: 8px;
-}
-
-.lesson-item {
-  padding: 12px 15px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 5px;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  transition: 0.2s;
-  color: var(--color-navy);
-}
-.lesson-item:hover { background-color: var(--color-bg-page); }
-.lesson-item.active { 
-  background-color: var(--color-primary-light); 
-  color: var(--color-primary); 
-  font-weight: 600; 
-}
-.lesson-status {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid #ccc;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.lesson-status.completed {
-  border-color: #28a745;
-  background: #28a745;
-  color: white;
-}
-.lesson-status svg {
-  width: 12px;
-  height: 12px;
-}
 
 /* Main Area */
 .viewer-main { 

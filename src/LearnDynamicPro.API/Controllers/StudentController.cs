@@ -95,4 +95,20 @@ public class StudentController : ControllerBase
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok(result.Value);
     }
+
+    [HttpGet("unified-curriculum")]
+    public async Task<IActionResult> GetUnifiedCurriculum()
+    {
+        var result = await _studentService.GetUnifiedStudentCurriculumAsync(_currentUserService.UserId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("next-lesson")]
+    public async Task<IActionResult> GetNextLesson()
+    {
+        var result = await _studentService.GetNextLessonToLearnAsync(_currentUserService.UserId);
+        if (!result.IsSuccess) return NotFound(result.Error);
+        return Ok(result.Value);
+    }
 }

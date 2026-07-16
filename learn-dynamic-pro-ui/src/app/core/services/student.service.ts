@@ -72,4 +72,12 @@ export class StudentService {
   getLessonsByLevel(moduleId: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.apiUrl}/modules/${moduleId}/levels`);
   }
+
+  getUnifiedCurriculum(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/unified-curriculum`);
+  }
+
+  getNextLesson(): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/next-lesson`);
+  }
 }

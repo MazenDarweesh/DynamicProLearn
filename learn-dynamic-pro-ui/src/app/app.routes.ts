@@ -16,6 +16,11 @@ export const routes: Routes = [
     loadComponent: () => import('./features/student/dashboard/dashboard').then(m => m.DashboardComponent)
   },
   {
+    path: 'student/continue-learning',
+    canActivate: [roleGuard(['Student', 'Admin'])],
+    loadComponent: () => import('./features/student/continue-learning/continue-learning.component').then(m => m.ContinueLearningComponent)
+  },
+  {
     path: 'student/lesson/:id',
     canActivate: [roleGuard(['Student', 'Admin'])],
     loadComponent: () => import('./features/student/lesson-viewer/lesson-viewer').then(m => m.LessonViewer)

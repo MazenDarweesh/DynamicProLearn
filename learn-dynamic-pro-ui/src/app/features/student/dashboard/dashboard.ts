@@ -14,11 +14,12 @@ export interface DashboardModule extends ModuleDto {
 
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
+import { ContinueLearningComponent } from '../continue-learning/continue-learning.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, AdminHeaderComponent, ProgressBarComponent],
+  imports: [CommonModule, AdminHeaderComponent, ProgressBarComponent, ContinueLearningComponent],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.css'
 })

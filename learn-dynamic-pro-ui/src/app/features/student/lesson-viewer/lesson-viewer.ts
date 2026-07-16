@@ -5,6 +5,7 @@ import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StudentService, UnitDto, LessonDto, LessonDetailDto } from '../../../core/services/student.service';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { LessonSidebarComponent } from '../../../shared/components/lesson-sidebar/lesson-sidebar.component';
 
 export interface UnitWithLessons extends UnitDto {
   lessons: LessonDto[];
@@ -13,7 +14,7 @@ export interface UnitWithLessons extends UnitDto {
 @Component({
   selector: 'app-lesson-viewer',
   standalone: true,
-  imports: [CommonModule, AdminHeaderComponent],
+  imports: [CommonModule, AdminHeaderComponent, LessonSidebarComponent],
   templateUrl: './lesson-viewer.html',
   styleUrl: './lesson-viewer.css'
 })

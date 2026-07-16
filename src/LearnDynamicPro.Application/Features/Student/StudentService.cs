@@ -388,4 +388,158 @@ public class StudentService : IStudentService
 
         return Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>.Success(grouped);
     }
+
+    public async Task<Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>> GetUnifiedStudentCurriculumAsync(Guid userId)
+    {
+        var userInfo = await _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.DepartmentId, u.Role })
+            .FirstOrDefaultAsync();
+            
+        if (userInfo == null)
+            return Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>.Failure(AppErrors.Authentication.UserNotFound);
+
+        IQueryable<Lesson> accessibleLessonsQuery;
+
+        if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+        {
+            var assignedModuleIds = await _unitOfWork.Repository<TestCycle>().Query()
+                .AsNoTracking()
+                .Where(tc => tc.TesterId == userId)
+                .SelectMany(tc => tc.AssignedModules)
+                .Select(am => am.ModuleId)
+                .ToListAsync();
+
+            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Where(l => assignedModuleIds.Contains(l.Unit!.ModuleId));
+        }
+        else
+        {
+            var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+                .Where(a => a.DepartmentId == userInfo.DepartmentId);
+
+            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Where(l => assignments.Any(a =>
+                    a.ModuleId == l.Unit!.ModuleId &&
+                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))
+                ));
+        }
+
+        var lessonProjections = await accessibleLessonsQuery
+            .Select(l => new 
+            {
+                l.Id,
+                l.UnitId,
+                ModuleId = l.Unit!.ModuleId,
+                l.Title,
+                l.Description,
+                l.LevelId,
+                LevelLabel = l.Level!.Label,
+                LevelSortOrder = l.Level.SortOrder,
+                l.TypeId,
+                TypeLabel = l.Type!.Label,
+                l.OrderIndex,
+                l.LevelOrderIndex,
+                l.PdfUrl,
+                l.ExternalLink
+            })
+            .ToListAsync();
+
+        if (!lessonProjections.Any())
+            return Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>.Success(new List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>());
+
+        var lessonIds = lessonProjections.Select(l => l.Id).ToList();
+        var completedLessonIds = await _unitOfWork.Repository<LessonProgress>().Query()
+            .AsNoTracking()
+            .Where(lp => lp.UserId == userId && lessonIds.Contains(lp.LessonId) && lp.IsCompleted)
+            .Select(lp => lp.LessonId)
+            .ToHashSetAsync();
+
+        var dtos = lessonProjections.Select(l => new LessonDto
+        {
+            Id          = l.Id,
+            UnitId      = l.UnitId,
+            Title       = l.Title,
+            Description = l.Description,
+            LevelId     = l.LevelId,
+            LevelLabel  = l.LevelLabel ?? string.Empty,
+            TypeId      = l.TypeId,
+            TypeLabel   = l.TypeLabel ?? string.Empty,
+            OrderIndex  = l.OrderIndex,
+            LevelOrderIndex = l.LevelOrderIndex,
+            IsCompleted = completedLessonIds.Contains(l.Id),
+            PdfUrl      = l.PdfUrl,
+            ExternalLink = l.ExternalLink
+        }).ToList();
+
+        var grouped = dtos.GroupBy(d => new { d.LevelId, d.LevelLabel })
+            .Select(g => new LearnDynamicPro.Application.Dtos.Student.LevelGroupDto
+            {
+                LevelId = g.Key.LevelId,
+                LevelLabel = g.Key.LevelLabel,
+                SortOrder = lessonProjections.FirstOrDefault(l => l.LevelId == g.Key.LevelId)?.LevelSortOrder ?? 0,
+                TotalLessons = g.Count(),
+                Completed = g.Count(l => l.IsCompleted),
+                Lessons = g.OrderBy(l => l.LevelOrderIndex).ToList()
+            })
+            .OrderBy(g => g.SortOrder)
+            .ToList();
+
+        return Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>.Success(grouped);
+    }
+
+    public async Task<Result<LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto>> GetNextLessonToLearnAsync(Guid userId)
+    {
+        var unifiedCurriculumResult = await GetUnifiedStudentCurriculumAsync(userId);
+        if (!unifiedCurriculumResult.IsSuccess)
+            return Result<LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto>.Failure(unifiedCurriculumResult.Error);
+            
+        var allLevels = unifiedCurriculumResult.Value;
+        if (allLevels == null || !allLevels.Any())
+            return Result<LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto>.Failure(AppErrors.General.NotFound);
+            
+        // Find the first uncompleted lesson across all levels
+        foreach (var level in allLevels)
+        {
+            var nextLesson = level.Lessons.FirstOrDefault(l => !l.IsCompleted);
+            if (nextLesson != null)
+            {
+                // We need to fetch the ModuleId since it's not in LessonDto, but wait, LessonDto has UnitId. Let's just return a generic DTO or query ModuleId.
+                // We can query ModuleId from DB quickly for this single lesson.
+                var moduleId = await _unitOfWork.Repository<Lesson>().Query()
+                    .AsNoTracking()
+                    .Where(l => l.Id == nextLesson.Id)
+                    .Select(l => l.Unit!.ModuleId)
+                    .FirstOrDefaultAsync();
+
+                return Result<LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto>.Success(new LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto
+                {
+                    LessonId = nextLesson.Id,
+                    ModuleId = moduleId,
+                    LessonTitle = nextLesson.Title
+                });
+            }
+        }
+        
+        // If all are completed, return the very last lesson in the curriculum
+        var lastLevel = allLevels.Last();
+        var lastLesson = lastLevel.Lessons.Last();
+        
+        var lastModuleId = await _unitOfWork.Repository<Lesson>().Query()
+            .AsNoTracking()
+            .Where(l => l.Id == lastLesson.Id)
+            .Select(l => l.Unit!.ModuleId)
+            .FirstOrDefaultAsync();
+
+        return Result<LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto>.Success(new LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto
+        {
+            LessonId = lastLesson.Id,
+            ModuleId = lastModuleId,
+            LessonTitle = lastLesson.Title
+        });
+    }
 }
