@@ -47,15 +47,15 @@ export class AdminHeaderComponent {
 
   isStudentTabActive(tab: 'resume' | 'browse'): boolean {
     if (tab === 'resume') {
-      return this.currentRoute.includes('tab=resume') || this.currentRoute.includes('/student/lesson/');
+      return this.currentRoute.includes('tab=resume') || this.currentRoute === '/student';
     } else {
-      return this.currentRoute.includes('tab=browse') || (!this.currentRoute.includes('tab=resume') && this.currentRoute === '/student');
+      return this.currentRoute.includes('tab=browse') || this.currentRoute.includes('/student/lesson/');
     }
   }
 
   goBack() {
     if (this.backUrl) {
-      this.router.navigate([this.backUrl]);
+      this.router.navigateByUrl(this.backUrl);
     } else {
       this.location.back();
     }
