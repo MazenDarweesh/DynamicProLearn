@@ -569,13 +569,13 @@ public class CompanyService : ICompanyService
 
         var rawAssignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == user.DepartmentId && !a.IsDeleted)
+            .Where(a => a.DepartmentId == user.DepartmentId)
             .Select(a => new 
             {
                 ModuleId = a.ModuleId,
                 ModuleName = a.Module!.Name,
-                FilterLevelIds = a.LevelFilters.Where(lf => !lf.IsDeleted).Select(lf => lf.LevelId).ToList(),
-                FilterTypeIds = a.TypeFilters.Where(tf => !tf.IsDeleted).Select(tf => tf.TypeId).ToList(),
+                FilterLevelIds = a.LevelFilters.Select(lf => lf.LevelId).ToList(),
+                FilterTypeIds = a.TypeFilters.Select(tf => tf.TypeId).ToList(),
                 Units = a.Module.Units!.OrderBy(u => u.OrderIndex).Select(u => new 
                 {
                     UnitId = u.Id,
@@ -819,7 +819,7 @@ public class CompanyService : ICompanyService
 
         var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == departmentId && !a.IsDeleted)
+            .Where(a => a.DepartmentId == departmentId)
             .Select(a => new 
             {
                 ModuleName = a.Module != null ? a.Module.Name : ""
@@ -880,7 +880,7 @@ public class CompanyService : ICompanyService
 
         var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => depIds.Contains(a.DepartmentId) && !a.IsDeleted)
+            .Where(a => depIds.Contains(a.DepartmentId))
             .Select(a => new 
             {
                 DepartmentId = a.DepartmentId,

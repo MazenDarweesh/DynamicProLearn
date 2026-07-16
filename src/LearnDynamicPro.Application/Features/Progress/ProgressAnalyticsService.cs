@@ -33,11 +33,17 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
 
         var departmentLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => departmentIds.Contains(a.DepartmentId) && !a.IsDeleted && a.Module != null && a.Module.Units != null)
+            .Where(a => departmentIds.Contains(a.DepartmentId) && a.Module != null && a.Module.Units != null)
             .Select(a => new 
             {
                 DepartmentId = a.DepartmentId,
-                LessonIds = a.Module!.Units.Where(u => u.Lessons != null).SelectMany(u => u.Lessons).Select(l => l.Id).ToList()
+                LessonIds = a.Module!.Units.Where(u => u.Lessons != null)
+                    .SelectMany(u => u.Lessons)
+                    .Where(l => 
+                        (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                        (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId)))
+                    .Select(l => l.Id)
+                    .ToList()
             })
             .ToListAsync();
 
@@ -121,10 +127,14 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
                 Id = d.Id,
                 UserIds = d.Users.Select(u => u.Id).ToList(),
                 AssignedLessonIds = d.Assignments
-                    .Where(a => !a.IsDeleted && a.Module != null && a.Module.Units != null)
+                    .Where(a => a.Module != null && a.Module.Units != null)
                     .SelectMany(a => a.Module!.Units)
                     .Where(u => u.Lessons != null)
                     .SelectMany(u => u.Lessons)
+                    .Where(l => d.Assignments.Any(a => 
+                        a.ModuleId == l.Unit!.ModuleId &&
+                        (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                        (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))))
                     .Select(l => l.Id)
                     .ToList()
             })
@@ -207,8 +217,11 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
     {
         var totalPossibleLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => !a.IsDeleted && a.Department != null && a.Module != null)
-            .Select(a => a.Department!.Users.Count * a.Module!.Units.SelectMany(u => u.Lessons).Count())
+            .Where(a => a.Department != null && a.Module != null)
+            .Select(a => a.Department!.Users.Count * a.Module!.Units.SelectMany(u => u.Lessons)
+                .Count(l => 
+                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))))
             .SumAsync();
 
         int totalCompleted = await _unitOfWork.Repository<LessonProgress>().Query()

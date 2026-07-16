@@ -58,7 +58,7 @@ public class StudentService : IStudentService
 
         var modules = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == userInfo.DepartmentId && !a.IsDeleted)
+            .Where(a => a.DepartmentId == userInfo.DepartmentId)
             .Select(a => new ModuleDto
             {
                 Id          = a.Module!.Id,
@@ -142,13 +142,13 @@ public class StudentService : IStudentService
         else
         {
             var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-                .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId && !a.IsDeleted);
+                .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId);
 
             accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
                 .AsNoTracking()
                 .Where(l => l.UnitId == unitId && assignments.Any(a =>
-                    (!a.LevelFilters.Any(lf => !lf.IsDeleted) || a.LevelFilters.Any(lf => !lf.IsDeleted && lf.LevelId == l.LevelId)) &&
-                    (!a.TypeFilters.Any(tf => !tf.IsDeleted) || a.TypeFilters.Any(tf => !tf.IsDeleted && tf.TypeId == l.TypeId))
+                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))
                 ));
         }
 
@@ -314,13 +314,13 @@ public class StudentService : IStudentService
         else
         {
             var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-                .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId && !a.IsDeleted);
+                .Where(a => a.DepartmentId == userInfo.DepartmentId && a.ModuleId == moduleId);
 
             accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
                 .AsNoTracking()
                 .Where(l => l.Unit!.ModuleId == moduleId && assignments.Any(a =>
-                    (!a.LevelFilters.Any(lf => !lf.IsDeleted) || a.LevelFilters.Any(lf => !lf.IsDeleted && lf.LevelId == l.LevelId)) &&
-                    (!a.TypeFilters.Any(tf => !tf.IsDeleted) || a.TypeFilters.Any(tf => !tf.IsDeleted && tf.TypeId == l.TypeId))
+                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))
                 ));
         }
 
