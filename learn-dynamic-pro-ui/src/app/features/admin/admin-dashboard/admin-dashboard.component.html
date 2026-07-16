@@ -212,53 +212,7 @@
       </div>
     </div>
 
-    <!-- PANEL 4: Testers -->
-    <div class="panel mt-4 mb-4">
-      <div class="panel-header d-flex justify-between align-center">
-        <h3 class="panel-title m-0">🧪 فريق الاختبار (Testers)</h3>
-        <button class="btn-accent" (click)="openAddTesterModal()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-left: 4px; vertical-align: middle;">
-            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="8.5" cy="7" r="4"></circle>
-            <line x1="20" y1="8" x2="20" y2="14"></line>
-            <line x1="23" y1="11" x2="17" y2="11"></line>
-          </svg>
-          إضافة مختبر
-        </button>
-      </div>
-      <div class="panel-content">
-        <table class="data-table mt-2">
-          <thead>
-            <tr>
-              <th>المختبر</th>
-              <th>الموديولات المتاحة</th>
-              <th>دروس مكتملة</th>
-              <th class="text-right">التقدم</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let t of (showAllTesters ? testersProgress : (testersProgress | slice:0:3))">
-              <td class="fw-500">{{ t.name }}</td>
-              <td class="text-secondary">{{ t.assignedModules }}</td>
-              <td class="text-secondary">{{ t.completed }} / {{ t.totalLessons }}</td>
-              <td class="progress-cell">
-                <div class="progress-track">
-                  <div class="progress-fill" [style.width]="t.progressValue + '%'"></div>
-                </div>
-              </td>
-            </tr>
-            <tr *ngIf="testersProgress.length === 0">
-              <td colspan="4" style="text-align: center; color: var(--color-text-secondary);">لا يوجد مختبرين حتى الآن</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="text-center mt-3" *ngIf="testersProgress.length > 3">
-          <button class="btn-back" (click)="showAllTesters = !showAllTesters" style="margin: 0 auto; color: var(--color-primary); font-weight: 500;">
-            {{ showAllTesters ? 'عرض أقل ⬆️' : 'عرض المزيد (' + (testersProgress.length - 3) + ') ⬇️' }}
-          </button>
-        </div>
-      </div>
-    </div>
+
   </div>
 </div>
 
