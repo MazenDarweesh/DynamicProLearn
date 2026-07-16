@@ -2,7 +2,7 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { AuthService } from '../../../core/services/auth.service';
 import { StudentService, ModuleDto, LessonDetailDto } from '../../../core/services/student.service';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Dialog } from '../../../core/utils/dialog';
 
@@ -27,6 +27,7 @@ export class DashboardComponent implements OnInit {
   private auth = inject(AuthService);
   private studentService = inject(StudentService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   modules: DashboardModule[] = [];
   isLoading = true;
@@ -39,6 +40,12 @@ export class DashboardComponent implements OnInit {
   isSubmitting = false;
 
   ngOnInit() {
+    this.route.queryParams.subscribe(params => {
+      if (params['tab']) {
+        this.activeTab = params['tab'] as 'resume' | 'browse';
+      }
+    });
+
     // Fetch modules and progress concurrently
     Promise.all([
       this.studentService.getAssignedModules().toPromise(),

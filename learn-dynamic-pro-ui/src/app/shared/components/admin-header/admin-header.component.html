@@ -44,6 +44,11 @@
         (click)="goTo('/admin/testers')">المختبرون <span class="icon">🧪</span></button>
     </nav>
 
+    <div class="tabs-header d-flex gap-3 pt-3" *ngIf="userRole() === 'Student' || userRole() === 'Tester'">
+      <button class="btn-tab" [class.active]="isStudentTabActive('resume')" (click)="goToStudentTab('resume')">متابعة التعلم</button>
+      <button class="btn-tab" [class.active]="isStudentTabActive('browse')" (click)="goToStudentTab('browse')">تصفح الموديولات</button>
+    </div>
+
     <ng-content></ng-content>
   </div>
 </header>

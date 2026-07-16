@@ -41,6 +41,18 @@ export class AdminHeaderComponent {
     this.router.navigate([path]);
   }
 
+  goToStudentTab(tab: 'resume' | 'browse') {
+    this.router.navigate(['/student'], { queryParams: { tab } });
+  }
+
+  isStudentTabActive(tab: 'resume' | 'browse'): boolean {
+    if (tab === 'resume') {
+      return this.currentRoute.includes('tab=resume') || this.currentRoute.includes('/student/lesson/');
+    } else {
+      return this.currentRoute.includes('tab=browse') || (!this.currentRoute.includes('tab=resume') && this.currentRoute === '/student');
+    }
+  }
+
   goBack() {
     if (this.backUrl) {
       this.router.navigate([this.backUrl]);

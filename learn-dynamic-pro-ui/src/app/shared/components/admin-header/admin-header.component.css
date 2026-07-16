@@ -107,6 +107,37 @@
   font-size: 14px;
 }
 
+/* Tabs Header for Students/Testers */
+.tabs-header {
+  display: flex;
+}
+
+.btn-tab {
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 500;
+  padding: 0 0 15px 0;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.btn-tab:hover {
+  color: white;
+}
+
+.btn-tab.active {
+  color: white;
+  border-bottom-color: var(--color-accent);
+}
+
+.pt-3 {
+  padding-top: 15px;
+}
+
 .d-flex {
   display: flex;
 }
