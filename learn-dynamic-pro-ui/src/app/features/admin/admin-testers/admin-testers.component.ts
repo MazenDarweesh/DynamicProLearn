@@ -74,7 +74,7 @@ export class AdminTestersComponent implements OnInit {
           progressValue: t.totalLessons ? Math.round((t.completedLessons / t.totalLessons) * 100) : 0
         }));
         // Store raw list for version-tester linking
-        this.availableTesters = testers;
+        this.availableTesters = this.testersProgress;
       },
       error: (err) => console.error('Error fetching testers', err)
     });
