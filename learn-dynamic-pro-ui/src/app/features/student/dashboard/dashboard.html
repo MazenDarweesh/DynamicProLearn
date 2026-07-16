@@ -1,11 +1,12 @@
 <div class="console-container" dir="rtl">
-  <app-admin-header title="بوابة المتدرب" subtitle="DynamicProLearn"></app-admin-header>
-
-  <div class="console-body">
-    <div class="tabs-header mb-4 d-flex gap-3 border-bottom pb-2">
+  <app-admin-header title="بوابة المتدرب" subtitle="DynamicProLearn">
+    <div class="tabs-header d-flex gap-3 pt-3">
       <button class="btn-tab" [class.active]="activeTab === 'resume'" (click)="switchTab('resume')">متابعة التعلم</button>
       <button class="btn-tab" [class.active]="activeTab === 'browse'" (click)="switchTab('browse')">تصفح الموديولات</button>
     </div>
+  </app-admin-header>
+
+  <div class="console-body">
 
     <!-- RESUME TAB -->
     <div class="panel" *ngIf="activeTab === 'resume'" style="background: transparent; border: none; padding: 0;">
@@ -37,10 +38,7 @@
 
             <div class="mt-auto pt-3 border-top" style="border-top: 1px solid var(--color-border); margin-top: 15px;">
               <div style="margin-bottom: 12px; margin-top: 8px;">
-                <app-progress-bar 
-                  [completed]="mod.completedLessons" 
-                  [total]="mod.totalLessons" 
-                  width="100%">
+                <app-progress-bar [completed]="mod.completedLessons" [total]="mod.totalLessons" width="100%">
                 </app-progress-bar>
               </div>
 

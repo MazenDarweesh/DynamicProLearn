@@ -1,10 +1,6 @@
 <div class="continue-learning-wrapper" style="display: flex; gap: 30px; height: calc(100vh - 200px);">
   <!-- Sidebar -->
-  <app-lesson-sidebar 
-    [data]="levels" 
-    type="levels"
-    [isLoading]="isLoading"
-    [activeLessonId]="activeLesson?.id"
+  <app-lesson-sidebar [data]="levels" type="levels" [isLoading]="isLoading" [activeLessonId]="activeLesson?.id"
     (lessonSelected)="loadLesson($event)">
   </app-lesson-sidebar>
 
@@ -73,4 +69,4 @@
         </div>
       </div>
     </div>
-</div>
+  </div>

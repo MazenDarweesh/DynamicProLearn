@@ -15,7 +15,7 @@ export class AdminHeaderComponent {
   private router = inject(Router);
   private authService = inject(AuthService);
   private location = inject(Location);
-  
+
   @Input() title?: string;
   @Input() subtitle?: string;
   @Input() showBackBtn = false;
