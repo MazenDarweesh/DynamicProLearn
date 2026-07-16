@@ -9,11 +9,12 @@ import { AdminHeaderComponent } from '../../../shared/components/admin-header/ad
 import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
 
 import { AssignModulesModalComponent } from '../../../shared/components/assign-modules-modal/assign-modules-modal.component';
+import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionIconComponent, AssignModulesModalComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminActionIconComponent, AssignModulesModalComponent, AdminModalComponent],
   templateUrl: './admin-dashboard.component.html',
   styleUrl: './admin-dashboard.component.css'
 })
@@ -39,6 +40,12 @@ export class AdminDashboardComponent implements OnInit {
 
   // Assign Modules state
   pendingAssignedModuleIds = new Set<string>();
+
+  // Add/Edit User Modal State
+  showUserModal = false;
+  isUserEditMode = false;
+  userFormData: any = {};
+  filteredDepartmentsForUserForm: any[] = [];
 
   // Add Company Modal State
   showAddCompanyModal = false;
@@ -162,6 +169,7 @@ export class AdminDashboardComponent implements OnInit {
     if (!this.selectedDepartmentId) return;
     this.adminService.getUsersProgress(this.selectedDepartmentId).subscribe(usersProgress => {
       this.progressUsers = usersProgress.map(u => ({
+        userId: u.userId,
         name: u.userName,
         role: u.role,
         assignedModules: u.assignedModules,
@@ -474,60 +482,128 @@ export class AdminDashboardComponent implements OnInit {
     }
   }
 
-  // --- Add User Modal Logic ---
-  showAddUserModal = false;
-  newUser = { username: '', password: '', companyId: '', departmentId: '' };
-  newUserDepartments: any[] = [];
-
+  // --- User Editing Logic ---
   openAddUserModal() {
-    this.showAddUserModal = true;
-    this.newUser = { 
-      username: '', 
-      password: '', 
-      companyId: this.selectedCompanyId || '', 
-      departmentId: this.selectedDepartmentId || '' 
+    this.isUserEditMode = false;
+    this.userFormData = {
+      username: '',
+      password: '',
+      companyId: this.selectedCompanyId || null,
+      departmentId: this.selectedDepartmentId || null
+    };
+
+    if (this.userFormData.companyId) {
+      this.adminService.getDepartments(this.userFormData.companyId, 1, 100).subscribe(res => {
+        this.filteredDepartmentsForUserForm = res;
+      });
+    } else {
+      this.filteredDepartmentsForUserForm = [];
+    }
+
+    this.showUserModal = true;
+  }
+
+  openEditUserModal(u: any) {
+    this.isUserEditMode = true;
+    this.userFormData = {
+      userId: u.userId,
+      username: u.name,
+      password: '',
+      // Since u is filtered by current selected company/dept, we can use them
+      companyId: this.selectedCompanyId,
+      departmentId: this.selectedDepartmentId
     };
     
-    if (this.newUser.companyId) {
-      this.onUserCompanyChange();
+    if (this.selectedCompanyId) {
+      this.adminService.getDepartments(this.selectedCompanyId, 1, 100).subscribe(res => {
+        this.filteredDepartmentsForUserForm = res;
+        this.showUserModal = true;
+      });
     } else {
-      this.newUserDepartments = [];
+      this.showUserModal = true;
     }
   }
 
-  closeAddUserModal() {
-    this.showAddUserModal = false;
+  onUserFormCompanyChange() {
+    this.userFormData.departmentId = null;
+    if (this.userFormData.companyId) {
+      this.adminService.getDepartments(this.userFormData.companyId, 1, 100).subscribe(res => {
+        this.filteredDepartmentsForUserForm = res;
+      });
+    } else {
+      this.filteredDepartmentsForUserForm = [];
+    }
   }
 
-  onUserCompanyChange() {
-    if (!this.newUser.companyId) return;
-    this.adminService.getDepartments(this.newUser.companyId).subscribe(depts => {
-      this.newUserDepartments = depts;
-      // If the currently selected department is not in the new list, clear it
-      if (!depts.find(d => d.id === this.newUser.departmentId)) {
-        this.newUser.departmentId = '';
-      }
-    });
+  closeUserModal() {
+    this.showUserModal = false;
   }
 
   saveUser() {
-    if (this.isSubmitting) return;
-    if (!this.newUser.username || !this.newUser.password || !this.newUser.companyId || !this.newUser.departmentId) {
-      Dialog.alert('الرجاء تعبئة جميع الحقول المطلوبة', 'تنبيه', 'info');
+    if (!this.userFormData.username || !this.userFormData.companyId || !this.userFormData.departmentId) {
+      Dialog.alert('يرجى ملء جميع الحقول المطلوبة', 'خطأ', 'error');
       return;
     }
     
     this.isSubmitting = true;
-    this.adminService.createUser(this.newUser.companyId, this.newUser.departmentId, this.newUser.username, this.newUser.password).subscribe({
-      next: () => {
+
+    if (this.isUserEditMode) {
+      const payload = {
+        username: this.userFormData.username,
+        password: this.userFormData.password,
+        companyId: this.userFormData.companyId,
+        departmentId: this.userFormData.departmentId
+      };
+
+      this.adminService.updateUser(this.userFormData.userId, payload).subscribe({
+        next: () => {
+          this.isSubmitting = false;
+          Dialog.alert('تم تعديل بيانات المستخدم بنجاح', 'نجاح', 'success');
+          this.closeUserModal();
+          this.onDepartmentChange();
+        },
+        error: () => {
+          this.isSubmitting = false;
+          Dialog.alert('حدث خطأ أثناء حفظ التعديلات', 'خطأ', 'error');
+        }
+      });
+    } else {
+      if (!this.userFormData.password) {
         this.isSubmitting = false;
-        this.closeAddUserModal();
-        this.refreshAllData();
-      },
-      error: (err) => {
-        this.isSubmitting = false;
-        console.error('Error creating user', err);
-        Dialog.alert('حدث خطأ أثناء إضافة المستخدم.', 'خطأ', 'error');
+        Dialog.alert('كلمة المرور مطلوبة', 'خطأ', 'error');
+        return;
+      }
+      this.adminService.createUser(this.userFormData.companyId, this.userFormData.departmentId, this.userFormData.username, this.userFormData.password).subscribe({
+        next: () => {
+          this.isSubmitting = false;
+          Dialog.alert('تمت إضافة المستخدم بنجاح', 'نجاح', 'success');
+          this.closeUserModal();
+          this.onDepartmentChange();
+        },
+        error: (err) => {
+          this.isSubmitting = false;
+          Dialog.alert(err?.error?.message || 'حدث خطأ', 'خطأ', 'error');
+        }
+      });
+    }
+  }
+
+  deleteUser(userId: string) {
+    if(!userId) {
+      Dialog.alert('معرف المستخدم غير متوفر.', 'خطأ', 'error');
+      return;
+    }
+    Dialog.confirm('هل أنت متأكد من حذف هذا المستخدم؟', 'تأكيد الحذف').then(confirmed => {
+      if (confirmed) {
+        this.adminService.deleteUser(userId).subscribe({
+          next: () => {
+            Dialog.alert('تم حذف المستخدم بنجاح', 'نجاح', 'success');
+            this.onDepartmentChange();
+          },
+          error: (err) => {
+            Dialog.alert('حدث خطأ أثناء الحذف', 'خطأ', 'error');
+          }
+        });
       }
     });
   }
