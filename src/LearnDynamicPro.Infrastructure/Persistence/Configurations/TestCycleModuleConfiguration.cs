@@ -10,6 +10,9 @@ public class TestCycleModuleConfiguration : IEntityTypeConfiguration<TestCycleMo
     {
         builder.HasKey(tcm => new { tcm.TestCycleId, tcm.ModuleId });
 
+        // Global Query Filter
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
         builder.HasOne(tcm => tcm.TestCycle)
                .WithMany(tc => tc.AssignedModules)
                .HasForeignKey(tcm => tcm.TestCycleId)

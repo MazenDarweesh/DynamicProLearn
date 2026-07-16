@@ -43,6 +43,11 @@ public class ModuleService : IModuleService
         var module = await _unitOfWork.Repository<Module>().GetByIdAsync(id);
         if (module != null)
         {
+            var testCycleModules = await _unitOfWork.Repository<TestCycleModule>().Query()
+                .Where(tcm => tcm.ModuleId == id).ToListAsync();
+            foreach (var tcm in testCycleModules)
+                _unitOfWork.Repository<TestCycleModule>().Remove(tcm);
+
             _unitOfWork.Repository<Module>().Remove(module);
             await _unitOfWork.SaveChangesAsync();
         }
@@ -211,6 +216,11 @@ public class ModuleService : IModuleService
         var lesson = await _unitOfWork.Repository<Lesson>().GetByIdAsync(id);
         if (lesson != null)
         {
+            var progresses = await _unitOfWork.Repository<LessonProgress>().Query()
+                .Where(lp => lp.LessonId == id).ToListAsync();
+            foreach (var p in progresses)
+                _unitOfWork.Repository<LessonProgress>().Remove(p);
+
             _unitOfWork.Repository<Lesson>().Remove(lesson);
             await _unitOfWork.SaveChangesAsync();
         }

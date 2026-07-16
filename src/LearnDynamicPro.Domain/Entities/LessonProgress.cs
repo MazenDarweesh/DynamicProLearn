@@ -1,8 +1,10 @@
 using LearnDynamicPro.Domain.Enums;
 
+using LearnDynamicPro.Domain.Common;
+
 namespace LearnDynamicPro.Domain.Entities;
 
-public class LessonProgress
+public class LessonProgress : ISoftDeletable
 {
     public Guid UserId { get; set; }
     public Guid LessonId { get; set; }
@@ -11,6 +13,7 @@ public class LessonProgress
     public CompletionSource CompletionSource { get; set; }
     public Guid? MarkedByUserId { get; set; }
     public DateTime LastAccessedAt { get; set; } = DateTime.UtcNow;
+    public bool IsDeleted { get; set; } = false;
 
     // Navigation
     public User? User { get; set; }

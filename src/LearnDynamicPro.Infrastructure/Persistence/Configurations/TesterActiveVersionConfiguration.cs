@@ -11,6 +11,9 @@ public class TesterActiveVersionConfiguration : IEntityTypeConfiguration<TesterA
         // PK = UserId (one active version per tester at a time — 1:1)
         builder.HasKey(tv => tv.UserId);
 
+        // Global Query Filter
+        builder.HasQueryFilter(e => !e.IsDeleted);
+
         builder.HasOne(tv => tv.User)
                .WithOne(u => u.ActiveVersion)
                .HasForeignKey<TesterActiveVersion>(tv => tv.UserId)

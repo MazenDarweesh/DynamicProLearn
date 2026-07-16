@@ -19,6 +19,9 @@ public class LessonProgressConfiguration : IEntityTypeConfiguration<LessonProgre
         builder.Property(lp => lp.CompletedAt)
                .IsRequired(false);
 
+        // Global Query Filter
+        builder.HasQueryFilter(lp => !lp.IsDeleted);
+
         // ── Relationships ─────────────────────────────────────────────
         builder.HasOne(lp => lp.User)
                .WithMany(u => u.CompletedProgresses)

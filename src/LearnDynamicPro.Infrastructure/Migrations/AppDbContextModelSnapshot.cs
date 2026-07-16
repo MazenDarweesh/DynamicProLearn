@@ -374,6 +374,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Property<bool>("IsCompleted")
                         .HasColumnType("bit");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<DateTime>("LastAccessedAt")
                         .HasColumnType("datetime2");
 
@@ -508,6 +511,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Property<Guid>("ModuleId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.HasKey("TestCycleId", "ModuleId");
 
                     b.HasIndex("ModuleId");
@@ -525,6 +531,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
 
                     b.Property<Guid>("ErpVersionId")
                         .HasColumnType("uniqueidentifier");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
 
                     b.HasKey("UserId");
 

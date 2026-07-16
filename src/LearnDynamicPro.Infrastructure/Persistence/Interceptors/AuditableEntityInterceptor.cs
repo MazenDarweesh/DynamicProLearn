@@ -46,13 +46,21 @@ public class AuditableEntityInterceptor : SaveChangesInterceptor
                     entry.Entity.LastModifiedAt = utcNow;
                     entry.Entity.LastModifiedBy = userId;
                     break;
-                    
-                case EntityState.Deleted:
-                    entry.State = EntityState.Modified;
-                    entry.Entity.IsDeleted = true;
-                    entry.Entity.LastModifiedAt = utcNow;
-                    entry.Entity.LastModifiedBy = userId;
-                    break;
+            }
+        }
+
+        foreach (var entry in context.ChangeTracker.Entries<ISoftDeletable>())
+        {
+            if (entry.State == EntityState.Deleted)
+            {
+                entry.State = EntityState.Modified;
+                entry.Entity.IsDeleted = true;
+                
+                if (entry.Entity is BaseEntity baseEntity)
+                {
+                    baseEntity.LastModifiedAt = utcNow;
+                    baseEntity.LastModifiedBy = userId;
+                }
             }
         }
     }
