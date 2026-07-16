@@ -567,25 +567,62 @@ public class CompanyService : ICompanyService
         if (user == null)
             return Result<UserDetailsDto>.Failure(AppErrors.General.NotFound);
 
-        var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+        var rawAssignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == user.DepartmentId)
+            .Where(a => a.DepartmentId == user.DepartmentId && !a.IsDeleted)
             .Select(a => new 
             {
                 ModuleId = a.ModuleId,
                 ModuleName = a.Module!.Name,
-                Units = a.Module.Units!.Select(u => new 
+                FilterLevelIds = a.LevelFilters.Where(lf => !lf.IsDeleted).Select(lf => lf.LevelId).ToList(),
+                FilterTypeIds = a.TypeFilters.Where(tf => !tf.IsDeleted).Select(tf => tf.TypeId).ToList(),
+                Units = a.Module.Units!.OrderBy(u => u.OrderIndex).Select(u => new 
                 {
                     UnitId = u.Id,
                     UnitName = u.Name,
-                    Lessons = u.Lessons!.Select(l => new 
+                    UnitOrderIndex = u.OrderIndex,
+                    Lessons = u.Lessons!.OrderBy(l => l.OrderIndex).Select(l => new 
                     {
                         LessonId = l.Id,
-                        LessonName = l.Title
+                        LessonName = l.Title,
+                        LevelId = l.LevelId,
+                        TypeId = l.TypeId
                     }).ToList()
                 }).ToList()
             })
             .ToListAsync();
+
+        var assignments = rawAssignments
+            .GroupBy(a => a.ModuleId)
+            .Select(g => g.Last())
+            .Select(a =>
+            {
+                bool hasLevelFilter = a.FilterLevelIds.Any();
+                bool hasTypeFilter = a.FilterTypeIds.Any();
+
+                var filteredUnits = a.Units.Select(u => new
+                {
+                    u.UnitId,
+                    u.UnitName,
+                    Lessons = u.Lessons.Where(l =>
+                    {
+                        bool levelMatch = !hasLevelFilter || a.FilterLevelIds.Contains(l.LevelId);
+                        bool typeMatch = !hasTypeFilter || a.FilterTypeIds.Contains(l.TypeId);
+                        return levelMatch && typeMatch;
+                    }).Select(l => new 
+                    {
+                        l.LessonId,
+                        l.LessonName
+                    }).ToList()
+                }).Where(u => u.Lessons.Any()).ToList();
+
+                return new
+                {
+                    a.ModuleId,
+                    a.ModuleName,
+                    Units = filteredUnits
+                };
+            }).Where(m => m.Units.Any()).ToList();
 
         var assignedLessonIds = assignments.SelectMany(m => m.Units.SelectMany(u => u.Lessons.Select(l => l.LessonId))).ToList();
 
@@ -782,7 +819,7 @@ public class CompanyService : ICompanyService
 
         var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.DepartmentId == departmentId)
+            .Where(a => a.DepartmentId == departmentId && !a.IsDeleted)
             .Select(a => new 
             {
                 ModuleName = a.Module != null ? a.Module.Name : ""
@@ -843,7 +880,7 @@ public class CompanyService : ICompanyService
 
         var assignments = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => depIds.Contains(a.DepartmentId))
+            .Where(a => depIds.Contains(a.DepartmentId) && !a.IsDeleted)
             .Select(a => new 
             {
                 DepartmentId = a.DepartmentId,

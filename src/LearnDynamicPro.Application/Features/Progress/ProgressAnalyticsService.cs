@@ -33,7 +33,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
 
         var departmentLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => departmentIds.Contains(a.DepartmentId) && a.Module != null && a.Module.Units != null)
+            .Where(a => departmentIds.Contains(a.DepartmentId) && !a.IsDeleted && a.Module != null && a.Module.Units != null)
             .Select(a => new 
             {
                 DepartmentId = a.DepartmentId,
@@ -121,7 +121,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
                 Id = d.Id,
                 UserIds = d.Users.Select(u => u.Id).ToList(),
                 AssignedLessonIds = d.Assignments
-                    .Where(a => a.Module != null && a.Module.Units != null)
+                    .Where(a => !a.IsDeleted && a.Module != null && a.Module.Units != null)
                     .SelectMany(a => a.Module!.Units)
                     .Where(u => u.Lessons != null)
                     .SelectMany(u => u.Lessons)
@@ -207,7 +207,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
     {
         var totalPossibleLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
             .AsNoTracking()
-            .Where(a => a.Department != null && a.Module != null)
+            .Where(a => !a.IsDeleted && a.Department != null && a.Module != null)
             .Select(a => a.Department!.Users.Count * a.Module!.Units.SelectMany(u => u.Lessons).Count())
             .SumAsync();
 

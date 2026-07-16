@@ -48,6 +48,21 @@ public class AppDbContext : DbContext, IApplicationDbContext
     {
         // Automatically picks up all IEntityTypeConfiguration<T> classes in this assembly
         modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);
+        
+        // Apply Global Query Filter for Soft Delete
+        foreach (var entityType in modelBuilder.Model.GetEntityTypes())
+        {
+            if (typeof(BaseEntity).IsAssignableFrom(entityType.ClrType))
+            {
+                var parameter = System.Linq.Expressions.Expression.Parameter(entityType.ClrType, "e");
+                var property = System.Linq.Expressions.Expression.Property(parameter, nameof(BaseEntity.IsDeleted));
+                var condition = System.Linq.Expressions.Expression.Equal(property, System.Linq.Expressions.Expression.Constant(false));
+                var lambda = System.Linq.Expressions.Expression.Lambda(condition, parameter);
+
+                modelBuilder.Entity(entityType.ClrType).HasQueryFilter(lambda);
+            }
+        }
+
         base.OnModelCreating(modelBuilder);
     }
 }

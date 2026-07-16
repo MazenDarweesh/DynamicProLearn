@@ -49,7 +49,22 @@ export class DepartmentDetailsComponent implements OnInit {
       next: (res) => {
         this.departmentName = res.departmentName;
         this.totalUsers = res.totalUsers;
-        this.modules = res.modules;
+        this.modules = res.modules || [];
+        
+        // Compute properties that might be missing or need client-side logic
+        this.modules.forEach((m: any) => {
+          m.totalLessons = m.totalLessons || 0;
+          m.completedLessons = m.completedLessons || 0;
+          
+          m.units.forEach((u: any) => {
+            u.lessons.forEach((l: any) => {
+              l.totalUsersCount = l.totalUsersCount || 0;
+              l.completedUsersCount = l.completedUsersCount || 0;
+              l.isFullyCompletedByAll = this.totalUsers > 0 && l.completedUsersCount === this.totalUsers;
+            });
+          });
+        });
+        
         this.isLoading = false;
       },
       error: () => {

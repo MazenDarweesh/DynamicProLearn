@@ -120,13 +120,13 @@ public class ProgressService : IProgressService
         else
         {
             var deptAssignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-                .Where(a => a.DepartmentId == user.DepartmentId);
+                .Where(a => a.DepartmentId == user.DepartmentId && !a.IsDeleted);
 
             accessibleLessons = _unitOfWork.Repository<Lesson>().Query()
                 .Where(lesson => deptAssignments.Any(a =>
                     a.ModuleId == lesson.Unit!.ModuleId &&
-                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == lesson.LevelId)) &&
-                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == lesson.TypeId))));
+                    (!a.LevelFilters.Any(lf => !lf.IsDeleted) || a.LevelFilters.Any(lf => !lf.IsDeleted && lf.LevelId == lesson.LevelId)) &&
+                    (!a.TypeFilters.Any(tf => !tf.IsDeleted) || a.TypeFilters.Any(tf => !tf.IsDeleted && tf.TypeId == lesson.TypeId))));
         }
 
         var modulesProgress = await accessibleLessons
