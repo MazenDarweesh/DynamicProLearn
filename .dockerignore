@@ -1,0 +1,21 @@
+# Ignore UI build artifacts and packages
+**/learn-dynamic-pro-ui/node_modules/
+**/learn-dynamic-pro-ui/.angular/
+**/learn-dynamic-pro-ui/dist/
+**/learn-dynamic-pro-ui/.vscode/
+
+# Ignore C# build outputs and configurations
+**/bin/
+**/obj/
+**/logs/
+**/.vs/
+**/*.user
+**/*.suo
+
+# Ignore Git files and local Docker configs
+.git/
+.gitignore
+.dockerignore
+deployment/docker-compose.yml
+deployment/DOCKER_MAINTENANCE.md
+Passwords

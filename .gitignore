@@ -486,3 +486,6 @@ $RECYCLE.BIN/
 # PDFs and Uploads
 *.pdf
 wwwroot/uploads/
+
+# Docker Deployment Folder
+deployment/
