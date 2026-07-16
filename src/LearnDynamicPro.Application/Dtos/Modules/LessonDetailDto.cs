@@ -12,6 +12,7 @@ public class LessonDetailDto
     public string? ErpKey { get; set; }
     public Guid LevelId { get; set; }
     public string LevelLabel { get; set; } = string.Empty;
+    public int LevelSortOrder { get; set; }
     public Guid TypeId { get; set; }
     public string TypeLabel { get; set; } = string.Empty;
     public int OrderIndex { get; set; }

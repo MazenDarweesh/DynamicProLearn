@@ -168,6 +168,7 @@ public class StudentService : IStudentService
                 TypeLabel = l.Type!.Label,
                 l.OrderIndex,
                 l.LevelOrderIndex,
+                LevelSortOrder = l.Level!.SortOrder,
                 l.PdfUrl,
                 l.ExternalLink
             })
@@ -191,6 +192,7 @@ public class StudentService : IStudentService
             Description = l.Description,
             LevelId     = l.LevelId,
             LevelLabel  = l.LevelLabel ?? string.Empty,
+            LevelSortOrder = l.LevelSortOrder,
             TypeId      = l.TypeId,
             TypeLabel   = l.TypeLabel ?? string.Empty,
             OrderIndex  = l.OrderIndex,
@@ -255,6 +257,7 @@ public class StudentService : IStudentService
             VideoUrl    = lesson.VideoUrl,
             LevelId     = lesson.LevelId,
             LevelLabel  = lesson.Level?.Label ?? string.Empty,
+            LevelSortOrder = lesson.Level?.SortOrder ?? 0,
             TypeId      = lesson.TypeId,
             TypeLabel   = lesson.Type?.Label ?? string.Empty,
             OrderIndex  = lesson.OrderIndex,

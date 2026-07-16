@@ -102,11 +102,32 @@ export class ContinueLearningComponent implements OnInit {
           if (l) l.isCompleted = newStatus;
         }
         this.isSubmitting = false;
+
+        if (newStatus) {
+          this.navigateToNextIncompleteLesson();
+        }
       },
       error: (err: any) => {
         Dialog.alert('فشل في تحديث حالة الدرس.', 'خطأ', 'error');
         this.isSubmitting = false;
       }
     });
+  }
+
+  navigateToNextIncompleteLesson() {
+    let foundCurrent = false;
+    for (let lvl of this.levels) {
+      for (let lesson of lvl.lessons) {
+        if (lesson.id === this.activeLesson?.id) {
+          foundCurrent = true;
+          continue;
+        }
+        if (foundCurrent && !lesson.isCompleted) {
+          this.loadLesson(lesson.id);
+          return;
+        }
+      }
+    }
+    Dialog.alert('تهانينا! لقد أكملت جميع الدروس المتاحة لك.', 'نجاح', 'success');
   }
 }

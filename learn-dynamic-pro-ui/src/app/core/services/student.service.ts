@@ -22,6 +22,7 @@ export interface LessonDto {
   typeLabel: string;
   orderIndex: number;
   levelOrderIndex: number;
+  levelSortOrder: number;
   isCompleted: boolean;
   pdfUrl?: string;
   externalLink?: string;

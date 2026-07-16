@@ -8,6 +8,7 @@ public class LessonDto
     public string Description { get; set; } = string.Empty;
     public Guid LevelId { get; set; }
     public string LevelLabel { get; set; } = string.Empty;
+    public int LevelSortOrder { get; set; }
     public Guid TypeId { get; set; }
     public string TypeLabel { get; set; } = string.Empty;
     public string VideoUrl { get; set; } = string.Empty;

@@ -99,7 +99,12 @@ export class ContentBuilderComponent implements OnInit {
               if (loadedUnits === unitsData.length) {
                 // sort units
                 this.units.sort((a, b) => a.orderIndex - b.orderIndex);
-                this.units.forEach(un => un.lessons.sort((a: any, b: any) => a.orderIndex - b.orderIndex));
+                this.units.forEach(un => un.lessons.sort((a: any, b: any) => {
+                  if (a.levelSortOrder !== b.levelSortOrder) {
+                    return a.levelSortOrder - b.levelSortOrder;
+                  }
+                  return a.levelOrderIndex - b.levelOrderIndex;
+                }));
                 this.isLoadingTree = false;
               }
             },
