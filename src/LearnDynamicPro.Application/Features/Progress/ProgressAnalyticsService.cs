@@ -215,22 +215,23 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
 
     public async Task<ProgressResult> GetOverallSystemProgressAsync()
     {
-        var totalPossibleLessons = await _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+        // To avoid double-counting, ghost progress, and tester inclusion, 
+        // the most accurate way is to aggregate the progress of all active students.
+        var studentIds = await _unitOfWork.Repository<User>().Query()
             .AsNoTracking()
-            .Where(a => a.Department != null && a.Module != null)
-            .Select(a => a.Department!.Users.Count * a.Module!.Units.SelectMany(u => u.Lessons)
-                .Count(l => 
-                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
-                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))))
-            .SumAsync();
+            .Where(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+            .Select(u => u.Id)
+            .ToListAsync();
 
-        int totalCompleted = await _unitOfWork.Repository<LessonProgress>().Query()
-            .CountAsync(p => p.IsCompleted);
+        var progresses = await GetUsersProgressAsync(studentIds);
+
+        int totalCompleted = progresses.Values.Sum(p => p.Completed);
+        int totalPossible = progresses.Values.Sum(p => p.Total);
 
         return new ProgressResult 
         { 
             Completed = totalCompleted, 
-            Total = totalPossibleLessons 
+            Total = totalPossible 
         };
     }
 }

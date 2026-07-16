@@ -4,13 +4,12 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { StudentService, LessonDetailDto } from '../../../core/services/student.service';
 import { Dialog } from '../../../core/utils/dialog';
-import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { LessonSidebarComponent } from '../../../shared/components/lesson-sidebar/lesson-sidebar.component';
 
 @Component({
   selector: 'app-continue-learning',
   standalone: true,
-  imports: [CommonModule, AdminHeaderComponent, LessonSidebarComponent],
+  imports: [CommonModule, LessonSidebarComponent],
   templateUrl: './continue-learning.component.html',
   styleUrls: ['../lesson-viewer/lesson-viewer.css']
 })
