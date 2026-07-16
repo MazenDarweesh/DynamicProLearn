@@ -188,22 +188,12 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Property<string>("LastModifiedBy")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<Guid?>("LevelOptionId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<Guid>("ModuleId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("TypeOptionId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("LevelOptionId");
-
                     b.HasIndex("ModuleId");
-
-                    b.HasIndex("TypeOptionId");
 
                     b.HasIndex("DepartmentId", "ModuleId");
 
@@ -850,19 +840,11 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("LearnDynamicPro.Domain.Entities.LevelOption", null)
-                        .WithMany("Assignments")
-                        .HasForeignKey("LevelOptionId");
-
                     b.HasOne("LearnDynamicPro.Domain.Entities.Module", "Module")
                         .WithMany("Assignments")
                         .HasForeignKey("ModuleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.HasOne("LearnDynamicPro.Domain.Entities.TypeOption", null)
-                        .WithMany("Assignments")
-                        .HasForeignKey("TypeOptionId");
 
                     b.Navigation("Department");
 
@@ -1157,8 +1139,6 @@ namespace LearnDynamicPro.Infrastructure.Migrations
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LevelOption", b =>
                 {
-                    b.Navigation("Assignments");
-
                     b.Navigation("Lessons");
                 });
 
@@ -1178,8 +1158,6 @@ namespace LearnDynamicPro.Infrastructure.Migrations
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TypeOption", b =>
                 {
-                    b.Navigation("Assignments");
-
                     b.Navigation("Lessons");
                 });
 

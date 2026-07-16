@@ -11,5 +11,4 @@ public class LevelOption : BaseEntity
     // Navigation
     public User? CreatedByAdmin { get; set; }
     public ICollection<Lesson> Lessons { get; set; } = new List<Lesson>();
-    public ICollection<DepartmentModuleAssignment> Assignments { get; set; } = new List<DepartmentModuleAssignment>();
 }
