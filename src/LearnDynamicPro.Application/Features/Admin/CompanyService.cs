@@ -104,6 +104,15 @@ public class CompanyService : ICompanyService
 
     public async Task<Result<UserDto>> CreateUserAsync(CreateUserRequest request)
     {
+        // Check for duplicate username — ignore soft-deleted users so username can be reused
+        var existingUser = await _unitOfWork.Repository<User>().Query()
+            .IgnoreQueryFilters()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Username == request.Username && !u.IsDeleted);
+            
+        if (existingUser != null)
+            return Result<UserDto>.Failure("اسم المستخدم موجود مسبقاً. يرجى اختيار اسم آخر.");
+
         Department? department = null;
 
         if (request.DepartmentId.HasValue)

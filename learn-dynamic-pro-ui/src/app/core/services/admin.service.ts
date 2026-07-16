@@ -217,11 +217,36 @@ export class AdminService {
 
   // ── Versions & Testers (New Architecture) ─────────────────────────────────
   getVersionSummaries(): Observable<any[]> {
-    return this.http.get<any[]>(`${this.apiUrl}/versions/summary`);
+    return this.http.get<any[]>(`${this.apiUrl}/versions/summary`).pipe(
+      map(items => (items || []).map(v => ({
+        id: v.versionId,
+        versionLabel: v.versionLabel,
+        testersCount: v.testersCount || 0,
+        assignedModulesCount: v.totalModulesAssigned ?? v.assignedModulesCount ?? 0
+      })))
+    );
+  }
+
+  createVersion(versionLabel: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/versions`, { versionLabel });
+  }
+
+  updateVersion(versionId: string, versionLabel: string): Observable<any> {
+    return this.http.put(`${this.apiUrl}/versions/${versionId}`, { versionLabel });
+  }
+
+  deleteVersion(versionId: string): Observable<any> {
+    return this.http.delete(`${this.apiUrl}/versions/${versionId}`);
   }
 
   getVersionProgress(versionId: string): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/versions/${versionId}/progress`);
+  }
+
+  getTesters(): Observable<any[]> {
+    return this.http.get<any>(`${this.apiUrl}/testers-progress?page=1&pageSize=100`).pipe(
+      map(res => res.items ? res.items : res)
+    );
   }
 
   assignTesterToVersion(versionId: string, testerId: string, moduleIds: string[]): Observable<any> {

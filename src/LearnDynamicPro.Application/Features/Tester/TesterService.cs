@@ -37,6 +37,29 @@ public class TesterService : ITesterService
         return Result<List<ErpVersionDto>>.Success(versions);
     }
 
+    public async Task<Result> UpdateErpVersionAsync(Guid versionId, UpdateErpVersionRequest request)
+    {
+        var version = await _unitOfWork.Repository<ErpVersion>().GetByIdAsync(versionId);
+        if (version == null) return Result.Failure("الإصدار غير موجود.");
+
+        version.VersionLabel = request.VersionLabel;
+        _unitOfWork.Repository<ErpVersion>().Update(version);
+        await _unitOfWork.SaveChangesAsync();
+
+        return Result.Success();
+    }
+
+    public async Task<Result> DeleteErpVersionAsync(Guid versionId)
+    {
+        var version = await _unitOfWork.Repository<ErpVersion>().GetByIdAsync(versionId);
+        if (version == null) return Result.Failure("الإصدار غير موجود.");
+
+        _unitOfWork.Repository<ErpVersion>().Remove(version);
+        await _unitOfWork.SaveChangesAsync();
+
+        return Result.Success();
+    }
+
     public async Task<Result> SetActiveVersionAsync(SetActiveVersionRequest request)
     {
         var userId = _currentUserService.UserId;

@@ -1,2 +1,0 @@
-Invalid column name 'LevelOptionId'.
-Invalid column name 'TypeOptionId'.

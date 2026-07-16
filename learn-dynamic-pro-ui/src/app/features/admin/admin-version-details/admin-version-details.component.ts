@@ -61,7 +61,10 @@ export class AdminVersionDetailsComponent implements OnInit {
     // Load testers if not loaded
     if (this.allTesters.length === 0) {
       this.adminService.getTestersProgress(1, 100).subscribe(t => {
-        this.allTesters = t;
+        this.allTesters = t.map((tester: any) => ({
+          userId: tester.userId,
+          name: tester.username || tester.userName
+        }));
       });
     }
 

@@ -9,6 +9,8 @@ public interface ITesterService
     // ERP Version management (Admin)
     Task<Result<ErpVersionDto>> CreateErpVersionAsync(CreateErpVersionRequest request);
     Task<Result<List<ErpVersionDto>>> GetAllErpVersionsAsync();
+    Task<Result> UpdateErpVersionAsync(Guid versionId, UpdateErpVersionRequest request);
+    Task<Result> DeleteErpVersionAsync(Guid versionId);
 
     // Tester Active Version configuration
     Task<Result> SetActiveVersionAsync(SetActiveVersionRequest request);

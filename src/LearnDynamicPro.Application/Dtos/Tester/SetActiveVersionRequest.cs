@@ -11,6 +11,11 @@ public class CreateErpVersionRequest
     public string VersionLabel { get; set; } = string.Empty;
 }
 
+public class UpdateErpVersionRequest
+{
+    public string VersionLabel { get; set; } = string.Empty;
+}
+
 public class ErpVersionDto
 {
     public Guid Id { get; set; }

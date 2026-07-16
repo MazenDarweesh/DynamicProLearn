@@ -440,6 +440,20 @@ public class AdminController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpPut("versions/{versionId}")]
+    public async Task<IActionResult> UpdateVersion(Guid versionId, [FromBody] UpdateErpVersionRequest request)
+    {
+        var result = await _testerService.UpdateErpVersionAsync(versionId, request);
+        return result.IsSuccess ? Ok(result) : BadRequest(result.Error);
+    }
+
+    [HttpDelete("versions/{versionId}")]
+    public async Task<IActionResult> DeleteVersion(Guid versionId)
+    {
+        var result = await _testerService.DeleteErpVersionAsync(versionId);
+        return result.IsSuccess ? Ok(result) : BadRequest(result.Error);
+    }
+
     [HttpGet("versions/{versionId}/progress")]
     public async Task<IActionResult> GetVersionProgress(Guid versionId)
     {

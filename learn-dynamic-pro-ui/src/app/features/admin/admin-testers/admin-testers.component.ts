@@ -1,18 +1,15 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
 import { AuthService } from '../../../core/services/auth.service';
 import { AdminService } from '../../../core/services/admin.service';
-import { Router } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { AdminActionButtonComponent } from '../../../shared/components/admin-action-button/admin-action-button.component';
 import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
 import { AdminActionIconComponent } from '../../../shared/components/admin-action-icon/admin-action-icon.component';
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
-
-import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-admin-testers',
@@ -27,33 +24,25 @@ export class AdminTestersComponent implements OnInit {
   private adminService = inject(AdminService);
 
   testersProgress: any[] = [];
-  showAllTesters = false;
   showAddTesterModal = false;
   showAddVersionModal = false;
   isSubmitting = false;
 
   newVersionLabel = '';
-  testerIdForVersion = '';
   editingVersionId: string | null = null;
   erpVersions: any[] = [];
   modules: any[] = [];
-  selectedModules: string[] = [];
-  
-  // Progress Viewer
-  showProgressModal = false;
-  selectedVersionProgress: any = null;
-  
-  private http = inject(HttpClient);
 
+  // Tester form
   newTesterUsername = '';
   newTesterPassword = '';
   editingTesterId: string | null = null;
-  
-  companies: any[] = [];
+
+  // Available testers for version linking
+  availableTesters: any[] = [];
 
   ngOnInit() {
     this.loadTestersProgress();
-    this.loadCompanies();
     this.loadVersions();
     this.loadModules();
   }
@@ -67,31 +56,20 @@ export class AdminTestersComponent implements OnInit {
     this.router.navigate(['/login']);
   }
 
-  loadCompanies() {
-    this.adminService.getCompanies().subscribe({
-      next: (data) => {
-        this.companies = data;
-        this.companies.forEach(c => {
-          this.adminService.getDepartments(c.id).subscribe(depts => {
-            c.departments = depts;
-          });
-        });
-      }
-    });
-  }
-
   loadTestersProgress() {
     this.adminService.getTestersProgress(1, 100).subscribe({
       next: (testers) => {
         this.testersProgress = testers.map((t: any) => ({
           userId: t.userId,
-          name: t.userName,
+          name: t.username || t.userName,
           role: 'مختبر نظام',
           assignedModules: t.assignedModules,
           completed: t.completedLessons,
           totalLessons: t.totalLessons,
           progressValue: t.totalLessons ? Math.round((t.completedLessons / t.totalLessons) * 100) : 0
         }));
+        // Store raw list for version-tester linking
+        this.availableTesters = testers;
       },
       error: (err) => console.error('Error fetching testers', err)
     });
@@ -99,12 +77,11 @@ export class AdminTestersComponent implements OnInit {
 
   loadModules() {
     this.adminService.getModules(1, 100).subscribe({
-      next: (data) => {
-        this.modules = data;
-      }
+      next: (data) => { this.modules = data; }
     });
   }
 
+  // ── Tester CRUD ──────────────────────────────────────────────────────────
   openAddTesterModal() {
     this.editingTesterId = null;
     this.newTesterUsername = '';
@@ -136,10 +113,51 @@ export class AdminTestersComponent implements OnInit {
     this.showAddTesterModal = false;
   }
 
+  submitTester() {
+    if (!this.newTesterUsername || (!this.editingTesterId && !this.newTesterPassword)) {
+      Dialog.alert('الرجاء إدخال اسم المستخدم وكلمة المرور.', 'حقول مفقودة', 'info');
+      return;
+    }
+
+    this.isSubmitting = true;
+
+    if (this.editingTesterId) {
+      const payload: any = { username: this.newTesterUsername, role: 2 };
+      if (this.newTesterPassword) payload.password = this.newTesterPassword;
+
+      this.adminService.updateUser(this.editingTesterId, payload).subscribe({
+        next: () => {
+          this.isSubmitting = false;
+          Dialog.alert('تم تعديل حساب المختبر بنجاح!', 'نجاح', 'success');
+          this.closeAddTesterModal();
+          this.loadTestersProgress();
+        },
+        error: (err) => {
+          this.isSubmitting = false;
+          Dialog.alert('حدث خطأ: ' + (err.error?.message || err.error?.detail || 'خطأ غير معروف'), 'خطأ', 'error');
+        }
+      });
+    } else {
+      this.adminService.createUser(null, null, this.newTesterUsername, this.newTesterPassword, 2).subscribe({
+        next: () => {
+          this.isSubmitting = false;
+          Dialog.alert('تمت إضافة المختبر بنجاح!', 'نجاح', 'success');
+          this.closeAddTesterModal();
+          this.loadTestersProgress();
+        },
+        error: (err) => {
+          this.isSubmitting = false;
+          Dialog.alert('حدث خطأ: ' + (err.error?.message || err.error?.detail || 'خطأ غير معروف'), 'خطأ', 'error');
+        }
+      });
+    }
+  }
+
+  // ── Version CRUD ──────────────────────────────────────────────────────────
   loadVersions() {
     this.adminService.getVersionSummaries().subscribe({
       next: (data) => this.erpVersions = data,
-      error: (err) => console.error(err)
+      error: (err) => console.error('Error loading versions', err)
     });
   }
 
@@ -158,18 +176,15 @@ export class AdminTestersComponent implements OnInit {
   async deleteVersion(version: any) {
     const ok = await Dialog.confirm('هل أنت متأكد من حذف هذا الإصدار؟', 'تأكيد الحذف');
     if (ok) {
-      this.http.delete(`http://localhost:5115/api/admin/versions/${version.id}`).subscribe({
+      this.adminService.deleteVersion(version.id).subscribe({
         next: () => {
           Dialog.alert('تم حذف الإصدار بنجاح.', 'نجاح', 'success');
           this.loadVersions();
         },
-        error: () => {
-          Dialog.alert('حدث خطأ أثناء الحذف.', 'خطأ', 'error');
-        }
+        error: () => Dialog.alert('حدث خطأ أثناء الحذف.', 'خطأ', 'error')
       });
     }
   }
-
 
   closeAddVersionModal() {
     this.showAddVersionModal = false;
@@ -180,14 +195,11 @@ export class AdminTestersComponent implements OnInit {
       Dialog.alert('الرجاء إدخال اسم الإصدار.', 'خطأ', 'info');
       return;
     }
-    
+
     this.isSubmitting = true;
-    const payload = {
-      versionLabel: this.newVersionLabel.trim()
-    };
 
     if (this.editingVersionId) {
-      this.http.put(`http://localhost:5115/api/admin/versions/${this.editingVersionId}`, payload).subscribe({
+      this.adminService.updateVersion(this.editingVersionId, this.newVersionLabel.trim()).subscribe({
         next: () => {
           this.isSubmitting = false;
           Dialog.alert('تم تعديل الإصدار بنجاح!', 'نجاح', 'success');
@@ -200,57 +212,16 @@ export class AdminTestersComponent implements OnInit {
         }
       });
     } else {
-      this.http.post<any>('http://localhost:5115/api/admin/versions', payload).subscribe({
-        next: (res) => {
+      this.adminService.createVersion(this.newVersionLabel.trim()).subscribe({
+        next: () => {
           this.isSubmitting = false;
-          Dialog.alert('تمت إضافة الدورة بنجاح!', 'نجاح', 'success');
+          Dialog.alert('تمت إضافة الإصدار بنجاح!', 'نجاح', 'success');
           this.closeAddVersionModal();
           this.loadVersions();
         },
-        error: (err) => {
+        error: () => {
           this.isSubmitting = false;
           Dialog.alert('حدث خطأ أثناء إضافة الإصدار.', 'خطأ', 'error');
-        }
-      });
-    }
-  }
-
-  submitTester() {
-    if (!this.newTesterUsername || (!this.editingTesterId && !this.newTesterPassword)) {
-      Dialog.alert('الرجاء إدخال اسم المستخدم وكلمة المرور.', 'حقول مفقودة', 'info');
-      return;
-    }
-
-    this.isSubmitting = true;
-
-    if (this.editingTesterId) {
-      const payload: any = { username: this.newTesterUsername, role: 2 };
-      if (this.newTesterPassword) {
-         payload.password = this.newTesterPassword;
-      }
-      this.adminService.updateUser(this.editingTesterId, payload).subscribe({
-        next: () => {
-          this.isSubmitting = false;
-          Dialog.alert('تم تعديل حساب المختبر بنجاح!', 'نجاح', 'success');
-          this.closeAddTesterModal();
-          this.loadTestersProgress();
-        },
-        error: (err) => {
-          this.isSubmitting = false;
-          Dialog.alert('حدث خطأ أثناء التعديل: ' + (err.error?.detail || err.message), 'خطأ', 'error');
-        }
-      });
-    } else {
-      this.adminService.createUser(null, null, this.newTesterUsername, this.newTesterPassword, 2).subscribe({
-        next: () => {
-          this.isSubmitting = false;
-          Dialog.alert('تمت إضافة المختبر بنجاح!', 'نجاح', 'success');
-          this.closeAddTesterModal();
-          this.loadTestersProgress();
-        },
-        error: (err) => {
-          this.isSubmitting = false;
-          Dialog.alert('حدث خطأ أثناء الإضافة: ' + (err.error?.detail || err.message), 'خطأ', 'error');
         }
       });
     }

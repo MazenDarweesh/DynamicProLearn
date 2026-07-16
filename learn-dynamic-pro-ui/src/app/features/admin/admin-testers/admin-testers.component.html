@@ -22,7 +22,7 @@
           <thead>
             <tr>
               <th>رقم الإصدار / النسخة</th>
-              <th>المختبر المخصص</th>
+              <th>عدد المختبرين</th>
               <th>عدد الموديولات المربوطة</th>
               <th width="100" class="text-left">إجراءات</th>
             </tr>
@@ -34,7 +34,7 @@
                   {{ v.versionLabel }}
                 </a>
               </td>
-              <td>{{ v.testerName || 'غير محدد' }}</td>
+              <td>{{ v.testersCount }} مختبرين</td>
               <td>{{ v.assignedModulesCount }}</td>
               <td class="text-left">
                 <div class="d-flex gap-2 justify-end">
