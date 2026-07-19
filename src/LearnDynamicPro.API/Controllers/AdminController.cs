@@ -3,6 +3,7 @@ using LearnDynamicPro.Application.Dtos.Companies;
 using LearnDynamicPro.Application.Dtos.Modules;
 using LearnDynamicPro.Application.Dtos.Tester;
 using LearnDynamicPro.Application.Features.Admin;
+using LearnDynamicPro.Application.Features.Progress;
 using LearnDynamicPro.Application.Features.Tester;
 using LearnDynamicPro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
@@ -20,6 +21,7 @@ public class AdminController : ControllerBase
     private readonly IModuleService _moduleService;
     private readonly IAssignmentService _assignmentService;
     private readonly ITesterService _testerService;
+    private readonly IProgressAnalyticsService _progressAnalyticsService;
     private readonly IApplicationDbContext _context;
 
     public AdminController(
@@ -27,12 +29,14 @@ public class AdminController : ControllerBase
         IModuleService moduleService,
         IAssignmentService assignmentService,
         ITesterService testerService,
+        IProgressAnalyticsService progressAnalyticsService,
         IApplicationDbContext context)
     {
         _companyService = companyService;
         _moduleService = moduleService;
         _assignmentService = assignmentService;
         _testerService = testerService;
+        _progressAnalyticsService = progressAnalyticsService;
         _context = context;
     }
 
@@ -481,5 +485,27 @@ public class AdminController : ControllerBase
 
         var fileUrl = $"/uploads/{fileName}";
         return Ok(new { fileUrl });
+    }
+
+    // ── Analytics ─────────────────────────────────────────────────────────────
+    [HttpGet("analytics/curriculum")]
+    public async Task<IActionResult> GetCurriculumAnalytics()
+    {
+        var result = await _progressAnalyticsService.GetCurriculumAnalyticsAsync();
+        return result.IsSuccess ? Ok(result.Value) : BadRequest(result.Error);
+    }
+
+    [HttpGet("analytics/lessons/{lessonId}")]
+    public async Task<IActionResult> GetLessonAnalytics(Guid lessonId)
+    {
+        var result = await _progressAnalyticsService.GetLessonAnalyticsAsync(lessonId);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(result.Error);
+    }
+
+    [HttpPost("analytics/lessons/{lessonId}/complete/{targetType}/{targetId}")]
+    public async Task<IActionResult> CompleteLessonForTarget(Guid lessonId, string targetType, Guid targetId)
+    {
+        var result = await _progressAnalyticsService.CompleteLessonForTargetAsync(lessonId, targetType, targetId);
+        return result.IsSuccess ? Ok() : BadRequest(result.Error);
     }
 }
