@@ -84,6 +84,16 @@
 .badge-success { background: #E6F4EA; color: #137333; }
 .badge-secondary { background: #f1f5f9; color: #64748b; }
 
+.form-control {
+  padding: 10px 15px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background-color: var(--color-bg-page);
+  color: var(--color-text-primary);
+  font-family: inherit;
+  width: 100%;
+}
+
 /* Stats Grid */
 .stats-grid {
   display: grid;

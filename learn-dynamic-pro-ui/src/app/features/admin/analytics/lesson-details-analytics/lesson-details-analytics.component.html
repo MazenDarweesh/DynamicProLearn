@@ -43,14 +43,34 @@
 
   <!-- Companies / Departments Tree -->
   <div class="card p-0">
-    <h3 class="p-4 m-0 text-navy" style="border-bottom: 1px solid var(--color-border);">حالة الإنجاز التفصيلية</h3>
+    <div class="d-flex justify-between w-100 align-center p-4" style="border-bottom: 1px solid var(--color-border); background-color: white; border-radius: 12px 12px 0 0;">
+      <h3 class="m-0 text-navy">حالة الإنجاز التفصيلية</h3>
+      
+      <div class="d-flex align-center gap-3">
+        <input type="text" class="form-control" placeholder="بحث باسم الموظف، القسم أو الشركة..." [(ngModel)]="searchQuery" style="width: 250px;">
+        
+        <select class="form-control" [(ngModel)]="selectedCompanyId" style="width: 200px;">
+          <option [ngValue]="null">كل الشركات</option>
+          <option *ngFor="let comp of allCompanies" [ngValue]="comp.companyId">{{ comp.companyName }}</option>
+        </select>
+        
+        <select class="form-control" [(ngModel)]="selectedDepartmentId" style="width: 200px;">
+          <option [ngValue]="null">كل الأقسام</option>
+          <option *ngFor="let dept of availableDepartments" [ngValue]="dept.departmentId">{{ dept.departmentName }}</option>
+        </select>
+      </div>
+    </div>
     
     <div *ngIf="details.companies.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
       لا يوجد طلاب أو شركات مستهدفة لهذا الدرس بعد.
     </div>
 
     <div class="tree-container">
-      <div *ngFor="let company of details.companies" class="tree-company">
+      <div *ngIf="filteredCompanies.length === 0" class="p-4 text-center text-secondary">
+        لا توجد نتائج مطابقة لبحثك
+      </div>
+      
+      <div *ngFor="let company of filteredCompanies" class="tree-company">
         <!-- Company Header -->
         <div class="tree-header" (click)="toggleCompany(company.companyId)">
           <div class="d-flex align-center gap-3">

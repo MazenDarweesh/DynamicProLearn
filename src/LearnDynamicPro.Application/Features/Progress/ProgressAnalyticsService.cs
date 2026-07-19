@@ -22,7 +22,6 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
     {
         var modules = await _unitOfWork.Repository<Module>().Query()
             .AsNoTracking()
-            .AsSplitQuery()
             .Select(m => new ModuleAnalyticsDto
             {
                 ModuleId = m.Id,
@@ -74,7 +73,6 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
     {
         var lessonDto = await _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
-            .AsSplitQuery()
             .Where(l => l.Id == lessonId)
             .Select(l => new LessonDetailsAnalyticsDto
             {

@@ -6,10 +6,12 @@ import { AdminHeaderComponent } from '../../../../shared/components/admin-header
 import { LessonDetailsAnalyticsDto } from '../../../../core/models/analytics.models';
 import { Dialog } from '../../../../core/utils/dialog';
 
+import { FormsModule } from '@angular/forms';
+
 @Component({
   selector: 'app-lesson-details-analytics',
   standalone: true,
-  imports: [CommonModule, AdminHeaderComponent],
+  imports: [CommonModule, AdminHeaderComponent, FormsModule],
   templateUrl: './lesson-details-analytics.component.html',
   styleUrls: ['./lesson-details-analytics.component.css']
 })
@@ -23,6 +25,10 @@ export class LessonDetailsAnalyticsComponent implements OnInit {
   isLoading = true;
   expandedCompanies = new Set<string>();
   expandedDepartments = new Set<string>();
+
+  searchQuery = '';
+  selectedCompanyId: string | null = null;
+  selectedDepartmentId: string | null = null;
 
   ngOnInit(): void {
     this.lessonId = this.route.snapshot.paramMap.get('id') || '';
@@ -110,5 +116,55 @@ export class LessonDetailsAnalyticsComponent implements OnInit {
   getTotalUsers(company: any): number {
     if (!company || !company.departments) return 0;
     return company.departments.reduce((acc: number, dept: any) => acc + (dept.users ? dept.users.length : 0), 0);
+  }
+
+  get allCompanies() {
+    return this.details?.companies || [];
+  }
+
+  get availableDepartments() {
+    if (!this.details) return [];
+    let companies = this.details.companies;
+    if (this.selectedCompanyId) {
+      companies = companies.filter(c => c.companyId === this.selectedCompanyId);
+    }
+    return companies.flatMap(c => c.departments);
+  }
+
+  get filteredCompanies() {
+    if (!this.details) return [];
+
+    let companies = this.details.companies;
+
+    if (this.selectedCompanyId) {
+      companies = companies.filter(c => c.companyId === this.selectedCompanyId);
+    }
+
+    return companies.map(company => {
+      let depts = company.departments;
+
+      if (this.selectedDepartmentId) {
+        depts = depts.filter(d => d.departmentId === this.selectedDepartmentId);
+      }
+
+      if (this.searchQuery && this.searchQuery.trim() !== '') {
+        const query = this.searchQuery.toLowerCase().trim();
+        depts = depts.map(dept => {
+          return {
+            ...dept,
+            users: dept.users.filter(u => u.userName.toLowerCase().includes(query))
+          };
+        }).filter(dept => dept.users.length > 0 || dept.departmentName.toLowerCase().includes(query));
+      }
+
+      return {
+        ...company,
+        departments: depts
+      };
+    }).filter(company => 
+      company.departments.length > 0 || 
+      (this.searchQuery && company.companyName.toLowerCase().includes(this.searchQuery.toLowerCase().trim())) ||
+      (this.selectedDepartmentId === null && this.searchQuery.trim() === '') // Show empty companies if no specific dept/search is selected
+    );
   }
 }
