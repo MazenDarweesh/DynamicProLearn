@@ -60,6 +60,43 @@ public class TesterService : ITesterService
         return Result.Success();
     }
 
+    public async Task<Result<List<ErpVersionDto>>> GetMyVersionsAsync()
+    {
+        var userId = _currentUserService.UserId;
+        var versions = await _unitOfWork.Repository<VersionTester>().Query()
+            .AsNoTracking()
+            .Where(vt => vt.TesterId == userId)
+            .Select(vt => new ErpVersionDto { Id = vt.Version!.Id, VersionLabel = vt.Version.VersionLabel })
+            .ToListAsync();
+            
+        return Result<List<ErpVersionDto>>.Success(versions);
+    }
+
+    public async Task<Result<List<LearnDynamicPro.Application.Dtos.Modules.ModuleDto>>> GetMyModulesAsync()
+    {
+        var userId = _currentUserService.UserId;
+        
+        var activeVersion = await _unitOfWork.Repository<TesterActiveVersion>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(t => t.UserId == userId);
+
+        if (activeVersion == null)
+            return Result<List<LearnDynamicPro.Application.Dtos.Modules.ModuleDto>>.Success(new List<LearnDynamicPro.Application.Dtos.Modules.ModuleDto>());
+
+        var modules = await _unitOfWork.Repository<VersionTesterModule>().Query()
+            .AsNoTracking()
+            .Where(vtm => vtm.VersionTester!.TesterId == userId && vtm.VersionTester.VersionId == activeVersion.ErpVersionId)
+            .Select(vtm => new LearnDynamicPro.Application.Dtos.Modules.ModuleDto 
+            { 
+                Id = vtm.Module!.Id, 
+                Name = vtm.Module.Name, 
+                Description = vtm.Module.Description 
+            })
+            .ToListAsync();
+
+        return Result<List<LearnDynamicPro.Application.Dtos.Modules.ModuleDto>>.Success(modules);
+    }
+
     public async Task<Result> SetActiveVersionAsync(SetActiveVersionRequest request)
     {
         var userId = _currentUserService.UserId;

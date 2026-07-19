@@ -4,8 +4,7 @@ import { Observable } from 'rxjs';
 
 export interface ErpVersionDto {
   id: string;
-  versionNumber: string;
-  releaseDate: string;
+  versionLabel: string;
 }
 
 export interface FeedbackRequest {
@@ -27,7 +26,11 @@ export class TesterService {
   private apiUrl = 'http://localhost:5115/api/tester';
 
   getVersions(): Observable<ErpVersionDto[]> {
-    return this.http.get<ErpVersionDto[]>(`${this.apiUrl}/versions`);
+    return this.http.get<ErpVersionDto[]>(`${this.apiUrl}/my-versions`);
+  }
+
+  getMyModules(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/my-modules`);
   }
 
   getConditions(): Observable<LookupDto[]> {

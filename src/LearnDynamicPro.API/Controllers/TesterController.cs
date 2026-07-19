@@ -25,6 +25,22 @@ public class TesterController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpGet("my-versions")]
+    public async Task<IActionResult> GetMyVersions()
+    {
+        var result = await _testerService.GetMyVersionsAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("my-modules")]
+    public async Task<IActionResult> GetMyModules()
+    {
+        var result = await _testerService.GetMyModulesAsync();
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     [HttpPost("versions")]
     [Authorize(Policy = "AdminOnly")]
     public async Task<IActionResult> CreateVersion([FromBody] CreateErpVersionRequest request)

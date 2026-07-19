@@ -13,6 +13,10 @@ public interface ITesterService
     Task<Result> DeleteErpVersionAsync(Guid versionId);
 
     // Tester Active Version configuration
+    Task<Result<List<ErpVersionDto>>> GetMyVersionsAsync();
+    Task<Result<List<LearnDynamicPro.Application.Dtos.Modules.ModuleDto>>> GetMyModulesAsync();
+
+    // Tester Active Version configuration
     Task<Result> SetActiveVersionAsync(SetActiveVersionRequest request);
 
     // Feedback submission & retrieval

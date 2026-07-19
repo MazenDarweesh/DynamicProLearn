@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Dialog } from '../../../core/utils/dialog';
+import { TesterService } from '../../../core/services/tester.service';
 
 @Component({
   selector: 'app-tester-setup',
@@ -15,6 +16,7 @@ import { Dialog } from '../../../core/utils/dialog';
 export class TesterSetupComponent implements OnInit {
   private http = inject(HttpClient);
   private router = inject(Router);
+  private testerService = inject(TesterService);
   private apiUrl = 'http://localhost:5115/api';
 
   versions: any[] = [];
@@ -23,7 +25,7 @@ export class TesterSetupComponent implements OnInit {
   isSubmitting = false;
 
   ngOnInit() {
-    this.http.get<any[]>(`${this.apiUrl}/Tester/versions`).subscribe({
+    this.testerService.getVersions().subscribe({
       next: (data) => {
         this.versions = data;
         if (data.length > 0) {
