@@ -1,15 +1,18 @@
 <div class="viewer-sidebar">
   <div *ngIf="isLoading" class="loading">جاري التحميل...</div>
   
-  <div *ngIf="!isLoading && uniqueLevels.length > 0" class="filter-container">
-    <select class="form-control" [(ngModel)]="selectedLevel" (change)="applyFilters()">
-      <option value="">كل المستويات</option>
-      <option *ngFor="let lvl of uniqueLevels" [value]="lvl">{{ lvl }}</option>
-    </select>
-    <select class="form-control" [(ngModel)]="selectedType" (change)="applyFilters()">
-      <option value="">كل الأنواع</option>
-      <option *ngFor="let t of uniqueTypes" [value]="t">{{ t }}</option>
-    </select>
+  <div *ngIf="!isLoading && uniqueLevels.length > 0" class="filter-container" style="margin-bottom: 20px;">
+    <input type="text" class="form-control" style="background-image: none; padding-left: 15px; margin-bottom: 10px;" placeholder="ابحث باسم الدرس..." [(ngModel)]="searchQuery" (input)="applyFilters()" />
+    <div style="display: flex; gap: 10px;">
+      <select class="form-control" [(ngModel)]="selectedLevel" (change)="applyFilters()">
+        <option value="">كل المستويات</option>
+        <option *ngFor="let lvl of uniqueLevels" [value]="lvl">{{ lvl }}</option>
+      </select>
+      <select class="form-control" [(ngModel)]="selectedType" (change)="applyFilters()">
+        <option value="">كل الأنواع</option>
+        <option *ngFor="let t of uniqueTypes" [value]="t">{{ t }}</option>
+      </select>
+    </div>
   </div>
 
   <div *ngIf="!isLoading && filteredData.length === 0" class="empty-state">لا يوجد محتوى.</div>
@@ -20,7 +23,7 @@
 
     <div *ngIf="group.lessons && group.lessons.length === 0" class="text-secondary text-sm"
       style="padding-right: 15px;">
-      لا توجد دروس
+      لا توجد دروس مطابقة للبحث
     </div>
 
     <div class="lesson-item" *ngFor="let lesson of group.lessons; let lIndex = index"

@@ -24,6 +24,7 @@ export class LessonSidebarComponent implements OnChanges {
   
   selectedLevel: string = '';
   selectedType: string = '';
+  searchQuery: string = '';
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['data'] && this.data) {
@@ -50,7 +51,7 @@ export class LessonSidebarComponent implements OnChanges {
   }
 
   applyFilters() {
-    if (!this.selectedLevel && !this.selectedType) {
+    if (!this.selectedLevel && !this.selectedType && !this.searchQuery) {
       this.filteredData = this.data;
       return;
     }
@@ -61,7 +62,8 @@ export class LessonSidebarComponent implements OnChanges {
       const filteredLessons = group.lessons.filter((l: any) => {
         const matchLevel = this.selectedLevel ? l.levelLabel === this.selectedLevel : true;
         const matchType = this.selectedType ? l.typeLabel === this.selectedType : true;
-        return matchLevel && matchType;
+        const matchSearch = this.searchQuery ? l.title.toLowerCase().includes(this.searchQuery.toLowerCase()) : true;
+        return matchLevel && matchType && matchSearch;
       });
 
       return {
