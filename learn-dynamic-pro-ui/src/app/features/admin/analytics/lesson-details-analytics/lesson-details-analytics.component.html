@@ -59,9 +59,13 @@
             <span class="fw-500">{{ company.companyName }}</span>
           </div>
           <div class="d-flex align-center gap-3" (click)="$event.stopPropagation()">
-            <span *ngIf="company.isFullyCompleted" class="badge badge-success">مكتمل</span>
-            <button *ngIf="company.isFullyCompleted" class="btn-primary btn-sm" style="background: var(--color-danger);" (click)="unmarkComplete('company', company.companyId, company.companyName)">إلغاء</button>
-            <button *ngIf="!company.isFullyCompleted" class="btn-blue btn-sm" (click)="markComplete('company', company.companyId, company.companyName)">إكمال للشركة</button>
+            <span *ngIf="getTotalUsers(company) === 0" class="badge badge-secondary" style="background: #fff3cd; color: #856404; font-weight: 500;">⚠️ الشركة ليس بها مستهدفين</span>
+            
+            <ng-container *ngIf="getTotalUsers(company) > 0">
+              <span *ngIf="company.isFullyCompleted" class="badge badge-success">مكتمل</span>
+              <button *ngIf="company.isFullyCompleted" class="btn-blue btn-sm" style="background-color: var(--color-danger);" (click)="unmarkComplete('company', company.companyId, company.companyName)">إلغاء</button>
+              <button *ngIf="!company.isFullyCompleted" class="btn-blue btn-sm" (click)="markComplete('company', company.companyId, company.companyName)">إكمال للشركة</button>
+            </ng-container>
           </div>
         </div>
 
@@ -76,9 +80,13 @@
                 <span class="fw-500">{{ dept.departmentName }}</span>
               </div>
               <div class="d-flex align-center gap-3" (click)="$event.stopPropagation()">
-                <span *ngIf="dept.isFullyCompleted" class="badge badge-success">مكتمل</span>
-                <button *ngIf="dept.isFullyCompleted" class="btn-primary btn-sm" style="background: var(--color-danger);" (click)="unmarkComplete('department', dept.departmentId, dept.departmentName)">إلغاء</button>
-                <button *ngIf="!dept.isFullyCompleted" class="btn-primary btn-sm" (click)="markComplete('department', dept.departmentId, dept.departmentName)">إكمال للقسم</button>
+                <span *ngIf="!dept.users || dept.users.length === 0" class="badge badge-secondary" style="background: #fff3cd; color: #856404; font-weight: 500;">⚠️ لا يوجد موظفين</span>
+
+                <ng-container *ngIf="dept.users && dept.users.length > 0">
+                  <span *ngIf="dept.isFullyCompleted" class="badge badge-success">مكتمل</span>
+                  <button *ngIf="dept.isFullyCompleted" class="btn-blue btn-sm" style="background-color: var(--color-danger);" (click)="unmarkComplete('department', dept.departmentId, dept.departmentName)">إلغاء</button>
+                  <button *ngIf="!dept.isFullyCompleted" class="btn-blue btn-sm" (click)="markComplete('department', dept.departmentId, dept.departmentName)">إكمال للقسم</button>
+                </ng-container>
               </div>
             </div>
 
@@ -91,9 +99,10 @@
                 </div>
                 <div class="d-flex align-center gap-3">
                   <span *ngIf="user.isCompleted" class="badge badge-success">مكتمل</span>
-                  <button *ngIf="user.isCompleted" class="btn-text" style="color: var(--color-danger);" (click)="unmarkComplete('user', user.userId, user.userName)">إلغاء</button>
+                  <button *ngIf="user.isCompleted" class="btn-blue btn-sm" style="background-color: var(--color-danger);" (click)="unmarkComplete('user', user.userId, user.userName)">إلغاء</button>
+                  
                   <span *ngIf="!user.isCompleted" class="badge badge-secondary" style="background: #f1f5f9; color: #64748b;">قيد الانتظار</span>
-                  <button *ngIf="!user.isCompleted" class="btn-text" (click)="markComplete('user', user.userId, user.userName)">إكمال</button>
+                  <button *ngIf="!user.isCompleted" class="btn-blue btn-sm" (click)="markComplete('user', user.userId, user.userName)">إكمال</button>
                 </div>
               </div>
               <div *ngIf="dept.users.length === 0" class="p-3 text-center text-sm text-secondary">لا يوجد طلاب في هذا القسم</div>

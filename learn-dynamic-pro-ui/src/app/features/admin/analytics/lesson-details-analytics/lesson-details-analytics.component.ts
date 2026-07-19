@@ -106,4 +106,9 @@ export class LessonDetailsAnalyticsComponent implements OnInit {
     if (!this.details || this.details.totalEnrolledStudents === 0) return 0;
     return Math.round((this.details.totalCompletedStudents / this.details.totalEnrolledStudents) * 100);
   }
+
+  getTotalUsers(company: any): number {
+    if (!company || !company.departments) return 0;
+    return company.departments.reduce((acc: number, dept: any) => acc + (dept.users ? dept.users.length : 0), 0);
+  }
 }
