@@ -9,6 +9,8 @@ public class DepartmentModuleAssignmentConfiguration : IEntityTypeConfiguration<
     public void Configure(EntityTypeBuilder<DepartmentModuleAssignment> builder)
     {
         builder.HasKey(a => a.Id);
+        
+        builder.HasQueryFilter(a => !a.IsDeleted);
 
         // ── Performance Index ──────────────────────────────────────────
         builder.HasIndex(a => new { a.DepartmentId, a.ModuleId });

@@ -9,6 +9,8 @@ public class LevelOptionConfiguration : IEntityTypeConfiguration<LevelOption>
     public void Configure(EntityTypeBuilder<LevelOption> builder)
     {
         builder.HasKey(l => l.Id);
+        
+        builder.HasQueryFilter(l => !l.IsDeleted);
 
         builder.Property(l => l.Label)
                .IsRequired()

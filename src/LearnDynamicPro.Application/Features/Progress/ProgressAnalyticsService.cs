@@ -22,6 +22,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
     {
         var modules = await _unitOfWork.Repository<Module>().Query()
             .AsNoTracking()
+            .AsSplitQuery()
             .Select(m => new ModuleAnalyticsDto
             {
                 ModuleId = m.Id,
@@ -41,13 +42,26 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
                         TypeId = l.TypeId,
                         TypeLabel = l.Type != null ? l.Type.Label : "",
                         OrderIndex = l.OrderIndex,
-                        CompletedStudentsCount = l.Progresses.Count(p => p.IsCompleted && p.User.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester),
                         EnrolledStudentsCount = m.Assignments
+                            .Where(a => a.Department != null && a.Department.Company != null)
                             .Where(a => 
                                 (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
                                 (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId)))
                             .SelectMany(a => a.Department!.Users)
-                            .Count(user => user.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+                            .Where(user => user.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+                            .Select(u => u.Id)
+                            .Distinct()
+                            .Count(),
+                        CompletedStudentsCount = m.Assignments
+                            .Where(a => a.Department != null && a.Department.Company != null)
+                            .Where(a => 
+                                (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                                (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId)))
+                            .SelectMany(a => a.Department!.Users)
+                            .Where(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+                            .Select(u => u.Id)
+                            .Distinct()
+                            .Count(uid => l.Progresses.Any(p => p.UserId == uid && p.IsCompleted))
                     }).ToList()
                 }).ToList()
             })
@@ -60,6 +74,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
     {
         var lessonDto = await _unitOfWork.Repository<Lesson>().Query()
             .AsNoTracking()
+            .AsSplitQuery()
             .Where(l => l.Id == lessonId)
             .Select(l => new LessonDetailsAnalyticsDto
             {
@@ -69,6 +84,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
                 UnitName = l.Unit != null ? l.Unit.Name : "",
                 
                 TotalCompanies = l.Unit!.Module!.Assignments
+                    .Where(a => a.Department != null && a.Department.Company != null)
                     .Where(a => 
                         (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
                         (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId)))
@@ -77,6 +93,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
                     .Count(),
                     
                 TotalDepartments = l.Unit!.Module!.Assignments
+                    .Where(a => a.Department != null && a.Department.Company != null)
                     .Where(a => 
                         (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
                         (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId)))
@@ -85,13 +102,26 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
                     .Count(),
                     
                 TotalEnrolledStudents = l.Unit!.Module!.Assignments
+                    .Where(a => a.Department != null && a.Department.Company != null)
                     .Where(a => 
                         (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
                         (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId)))
                     .SelectMany(a => a.Department!.Users)
-                    .Count(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester),
+                    .Where(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+                    .Select(u => u.Id)
+                    .Distinct()
+                    .Count(),
 
-                TotalCompletedStudents = l.Progresses.Count(p => p.IsCompleted && p.User.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester),
+                TotalCompletedStudents = l.Unit!.Module!.Assignments
+                    .Where(a => a.Department != null && a.Department.Company != null)
+                    .Where(a => 
+                        (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                        (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId)))
+                    .SelectMany(a => a.Department!.Users)
+                    .Where(u => u.Role != LearnDynamicPro.Domain.Enums.UserRole.Tester)
+                    .Select(u => u.Id)
+                    .Distinct()
+                    .Count(uid => l.Progresses.Any(p => p.UserId == uid && p.IsCompleted)),
 
                 Companies = l.Unit!.Module!.Assignments
                     .Where(a => 

@@ -9,6 +9,8 @@ public class TypeOptionConfiguration : IEntityTypeConfiguration<TypeOption>
     public void Configure(EntityTypeBuilder<TypeOption> builder)
     {
         builder.HasKey(t => t.Id);
+        
+        builder.HasQueryFilter(t => !t.IsDeleted);
 
         builder.Property(t => t.Label)
                .IsRequired()
