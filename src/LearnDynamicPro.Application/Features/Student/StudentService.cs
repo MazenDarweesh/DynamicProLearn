@@ -129,8 +129,14 @@ public class StudentService : IStudentService
 
         if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
         {
-            var hasAccess = await _unitOfWork.Repository<TestCycle>().Query()
-                .AnyAsync(tc => tc.TesterId == userId && tc.AssignedModules.Any(am => am.ModuleId == moduleId));
+            var activeVersion = await _unitOfWork.Repository<TesterActiveVersion>().Query()
+                .FirstOrDefaultAsync(t => t.UserId == userId);
+
+            if (activeVersion == null)
+                return Result<List<LessonDto>>.Success(new List<LessonDto>());
+
+            var hasAccess = await _unitOfWork.Repository<VersionTester>().Query()
+                .AnyAsync(vt => vt.TesterId == userId && vt.VersionId == activeVersion.ErpVersionId && vt.AssignedModules.Any(am => am.ModuleId == moduleId));
 
             if (!hasAccess)
                 return Result<List<LessonDto>>.Success(new List<LessonDto>());

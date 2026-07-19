@@ -427,6 +427,9 @@ export class FeedbackPanel implements OnInit {
       this.notes = '';
       this.selectedConditionId = '';
       setTimeout(() => this.successMessage = '', 4000);
+
+      // Auto-navigate to next uncompleted lesson
+      this.selectNextUncompletedLesson();
     }).catch(err => {
       this.isSubmitting = false;
       this.errorMessage = err.error?.detail || 'فشل في إرسال التقييم. تأكد من وجود إصدار نشط.';
@@ -435,5 +438,17 @@ export class FeedbackPanel implements OnInit {
 
   goBack() {
     this.router.navigate(['/tester/dashboard']);
+  }
+
+  selectNextUncompletedLesson() {
+    if (!this.module || !this.module.units) return;
+
+    for (const unit of this.module.units) {
+      const uncompleted = unit.lessons.find(l => !l.isCompleted);
+      if (uncompleted) {
+        this.selectLesson(uncompleted);
+        return;
+      }
+    }
   }
 }

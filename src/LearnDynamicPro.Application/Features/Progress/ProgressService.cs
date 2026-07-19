@@ -109,9 +109,18 @@ public class ProgressService : IProgressService
 
         if (user.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
         {
-            var assignedModuleIds = _unitOfWork.Repository<TestCycle>().Query()
-                .Where(tc => tc.TesterId == userId)
-                .SelectMany(tc => tc.AssignedModules)
+            var activeVersion = await _unitOfWork.Repository<TesterActiveVersion>().Query()
+                .FirstOrDefaultAsync(t => t.UserId == userId);
+
+            if (activeVersion == null)
+            {
+                var emptyResponse = new UserProgressDto { UserId = userId, Username = user.Username, ModulesProgress = new List<ModuleProgressDto>() };
+                return Result<UserProgressDto>.Success(emptyResponse);
+            }
+
+            var assignedModuleIds = _unitOfWork.Repository<VersionTester>().Query()
+                .Where(vt => vt.TesterId == userId && vt.VersionId == activeVersion.ErpVersionId)
+                .SelectMany(vt => vt.AssignedModules)
                 .Select(am => am.ModuleId);
 
             accessibleLessons = _unitOfWork.Repository<Lesson>().Query()
