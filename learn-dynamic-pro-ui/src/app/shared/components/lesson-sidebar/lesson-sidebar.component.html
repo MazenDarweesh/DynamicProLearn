@@ -1,8 +1,20 @@
 <div class="viewer-sidebar">
   <div *ngIf="isLoading" class="loading">جاري التحميل...</div>
-  <div *ngIf="!isLoading && data.length === 0" class="empty-state">لا يوجد محتوى.</div>
+  
+  <div *ngIf="!isLoading && uniqueLevels.length > 0" class="filter-container">
+    <select class="form-control" [(ngModel)]="selectedLevel" (change)="applyFilters()">
+      <option value="">كل المستويات</option>
+      <option *ngFor="let lvl of uniqueLevels" [value]="lvl">{{ lvl }}</option>
+    </select>
+    <select class="form-control" [(ngModel)]="selectedType" (change)="applyFilters()">
+      <option value="">كل الأنواع</option>
+      <option *ngFor="let t of uniqueTypes" [value]="t">{{ t }}</option>
+    </select>
+  </div>
 
-  <div class="unit" *ngFor="let group of data; let i = index">
+  <div *ngIf="!isLoading && filteredData.length === 0" class="empty-state">لا يوجد محتوى.</div>
+
+  <div class="unit" *ngFor="let group of filteredData; let i = index">
     <h4 *ngIf="type === 'units'">{{ i + 1 }}. {{ group.title }}</h4>
     <h4 *ngIf="type === 'levels'" style="color: var(--color-accent);"><i class="fi fi-rr-layer-group"></i> مستوى: {{ group.levelLabel }}</h4>
 
