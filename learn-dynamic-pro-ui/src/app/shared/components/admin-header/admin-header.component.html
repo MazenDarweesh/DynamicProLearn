@@ -38,6 +38,8 @@
         (click)="goTo('/admin/companies')">الشركات <span class="icon">🏢</span></button>
       <button class="nav-btn" [class.active]="currentRoute === '/admin/content'"
         (click)="goTo('/admin/content')">الموديولات <span class="icon">📚</span></button>
+      <button class="nav-btn" [class.active]="currentRoute.startsWith('/admin/analytics')"
+        (click)="goTo('/admin/analytics')">الدروس <span class="icon">📈</span></button>
       <button class="nav-btn" [class.active]="currentRoute === '/admin/employees'"
         (click)="goTo('/admin/employees')">الموظفون <span class="icon">👥</span></button>
       <button class="nav-btn" [class.active]="currentRoute === '/admin/testers'"

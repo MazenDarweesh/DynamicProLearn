@@ -508,4 +508,11 @@ public class AdminController : ControllerBase
         var result = await _progressAnalyticsService.CompleteLessonForTargetAsync(lessonId, targetType, targetId);
         return result.IsSuccess ? Ok() : BadRequest(result.Error);
     }
+
+    [HttpPost("analytics/lessons/{lessonId}/uncomplete/{targetType}/{targetId}")]
+    public async Task<IActionResult> UncompleteLessonForTarget(Guid lessonId, string targetType, Guid targetId)
+    {
+        var result = await _progressAnalyticsService.UncompleteLessonForTargetAsync(lessonId, targetType, targetId);
+        return result.IsSuccess ? Ok() : BadRequest(result.Error);
+    }
 }

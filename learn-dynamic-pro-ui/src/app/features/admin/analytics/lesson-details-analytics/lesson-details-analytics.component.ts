@@ -83,6 +83,25 @@ export class LessonDetailsAnalyticsComponent implements OnInit {
     });
   }
 
+  unmarkComplete(targetType: string, targetId: string, name: string): void {
+    let message = '';
+    if (targetType === 'company') message = `هل أنت متأكد من إلغاء اكتمال الدرس لجميع أفراد شركة (${name})؟`;
+    else if (targetType === 'department') message = `هل أنت متأكد من إلغاء اكتمال الدرس لجميع أفراد قسم (${name})؟`;
+    else message = `هل أنت متأكد من إلغاء إتمام الدرس للمستخدم (${name})؟`;
+
+    Dialog.confirm(message, 'تأكيد').then((confirmed) => {
+      if (confirmed) {
+        this.adminService.uncompleteLessonForTarget(this.lessonId, targetType, targetId).subscribe({
+          next: () => {
+            Dialog.alert('تم حفظ الإجراء بنجاح', 'نجاح', 'success');
+            this.loadDetails(); // refresh
+          },
+          error: () => Dialog.alert('حدث خطأ أثناء حفظ الإجراء', 'خطأ', 'error')
+        });
+      }
+    });
+  }
+
   get completionPercentage(): number {
     if (!this.details || this.details.totalEnrolledStudents === 0) return 0;
     return Math.round((this.details.totalCompletedStudents / this.details.totalEnrolledStudents) * 100);

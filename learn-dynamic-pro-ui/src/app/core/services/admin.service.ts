@@ -265,4 +265,8 @@ export class AdminService {
   completeLessonForTarget(lessonId: string, targetType: string, targetId: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/analytics/lessons/${lessonId}/complete/${targetType}/${targetId}`, {});
   }
+
+  uncompleteLessonForTarget(lessonId: string, targetType: string, targetId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/analytics/lessons/${lessonId}/uncomplete/${targetType}/${targetId}`, {});
+  }
 }
