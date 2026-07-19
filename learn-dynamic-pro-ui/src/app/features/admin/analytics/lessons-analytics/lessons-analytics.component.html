@@ -1,0 +1,39 @@
+<app-admin-header 
+  title="إحصائيات المناهج والدروس" 
+  subtitle="تحليل وتقييم نسب الإنجاز للدروس على مستوى النظام كاملاً">
+</app-admin-header>
+
+<div class="dashboard-container">
+  <div class="d-flex justify-between w-100 align-center mb-4">
+    <h2 class="m-0" style="color: var(--color-navy)">النظرة العامة للمحتوى</h2>
+    <div class="d-flex align-center gap-3">
+      <button (click)="toggleExpandAll()" 
+              style="background: rgba(67, 56, 202, 0.1); color: #4338ca; padding: 10px 15px; border-radius: 8px; font-weight: 500; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; font-size: 14px; transition: opacity 0.2s;"
+              onmouseover="this.style.opacity='0.8'"
+              onmouseout="this.style.opacity='1'">
+        <i class="fi" [ngClass]="isAllExpanded ? 'fi-rr-compress-alt' : 'fi-rr-expand-arrows-alt'" style="margin-top: 3px;"></i>
+        {{ isAllExpanded ? 'إخفاء الكل' : 'عرض الكل' }}
+      </button>
+    </div>
+  </div>
+
+  <div class="card p-0">
+    <div *ngIf="isLoading"><p class="text-center p-4">جاري التحميل...</p></div>
+
+    <div *ngIf="!isLoading && modules.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
+      <p class="mt-3">لا توجد مناهج مضافة بعد.</p>
+    </div>
+
+    <!-- MODULES TABLE -->
+    <app-curriculum-viewer 
+      [modules]="modules"
+      [isAllExpanded]="isAllExpanded"
+      [isLoading]="isLoading"
+      [isDepartmentView]="false"
+      [isStudentView]="false"
+      [isTesterView]="false"
+      [isAnalyticsView]="true"
+      (onLessonAnalyticsClick)="navigateToLessonDetails($event)">
+    </app-curriculum-viewer>
+  </div>
+</div>

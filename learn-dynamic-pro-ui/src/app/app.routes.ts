@@ -61,6 +61,16 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/content-builder/content-builder.component').then(m => m.ContentBuilderComponent)
   },
   {
+    path: 'admin/analytics',
+    canActivate: [roleGuard(['Admin'])],
+    loadComponent: () => import('./features/admin/analytics/lessons-analytics/lessons-analytics.component').then(m => m.LessonsAnalyticsComponent)
+  },
+  {
+    path: 'admin/analytics/lesson/:id',
+    canActivate: [roleGuard(['Admin'])],
+    loadComponent: () => import('./features/admin/analytics/lesson-details-analytics/lesson-details-analytics.component').then(m => m.LessonDetailsAnalyticsComponent)
+  },
+  {
     path: 'admin/employees',
     canActivate: [roleGuard(['Admin'])],
     children: [

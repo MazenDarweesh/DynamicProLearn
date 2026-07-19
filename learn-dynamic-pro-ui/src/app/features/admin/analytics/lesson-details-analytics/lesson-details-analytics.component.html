@@ -1,0 +1,108 @@
+<app-admin-header 
+  title="تفاصيل الدرس: {{ details?.lessonTitle || '' }}" 
+  subtitle="الموديول: {{ details?.moduleName }} ➔ الوحدة: {{ details?.unitName }}"
+  [showBackBtn]="true">
+</app-admin-header>
+
+<div class="dashboard-container" *ngIf="!isLoading && details">
+  
+  <!-- Stats Cards -->
+  <div class="stats-grid mb-4">
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(67, 56, 202, 0.1); color: #4338ca;">🏢</div>
+      <div class="stat-info">
+        <h3>الشركات</h3>
+        <p>{{ details.totalCompanies }}</p>
+      </div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(245, 130, 32, 0.1); color: var(--brand-orange);">📁</div>
+      <div class="stat-info">
+        <h3>الأقسام</h3>
+        <p>{{ details.totalDepartments }}</p>
+      </div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">👥</div>
+      <div class="stat-info">
+        <h3>المستهدفين</h3>
+        <p>{{ details.totalEnrolledStudents }}</p>
+      </div>
+    </div>
+    
+    <div class="stat-card">
+      <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">📈</div>
+      <div class="stat-info">
+        <h3>نسبة الإنجاز</h3>
+        <p>{{ completionPercentage }}%</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Companies / Departments Tree -->
+  <div class="card p-0">
+    <h3 class="p-4 m-0 text-navy" style="border-bottom: 1px solid var(--color-border);">حالة الإنجاز التفصيلية</h3>
+    
+    <div *ngIf="details.companies.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
+      لا يوجد طلاب أو شركات مستهدفة لهذا الدرس بعد.
+    </div>
+
+    <div class="tree-container">
+      <div *ngFor="let company of details.companies" class="tree-company">
+        <!-- Company Header -->
+        <div class="tree-header" (click)="toggleCompany(company.companyId)">
+          <div class="d-flex align-center gap-3">
+            <i class="fi" [ngClass]="expandedCompanies.has(company.companyId) ? 'fi-rr-angle-down' : 'fi-rr-angle-left'"></i>
+            <span class="icon">🏢</span>
+            <span class="fw-500">{{ company.companyName }}</span>
+          </div>
+          <div class="d-flex align-center gap-3" (click)="$event.stopPropagation()">
+            <span *ngIf="company.isFullyCompleted" class="badge badge-success">مكتمل</span>
+            <button *ngIf="!company.isFullyCompleted" class="btn-blue btn-sm" (click)="markComplete('company', company.companyId, company.companyName)">إكمال للشركة</button>
+          </div>
+        </div>
+
+        <!-- Departments List -->
+        <div class="tree-children" *ngIf="expandedCompanies.has(company.companyId)">
+          <div *ngFor="let dept of company.departments" class="tree-department">
+            <!-- Department Header -->
+            <div class="tree-header" (click)="toggleDepartment(dept.departmentId)">
+              <div class="d-flex align-center gap-3">
+                <i class="fi" [ngClass]="expandedDepartments.has(dept.departmentId) ? 'fi-rr-angle-down' : 'fi-rr-angle-left'"></i>
+                <span class="icon" style="color: var(--brand-orange)">📁</span>
+                <span class="fw-500">{{ dept.departmentName }}</span>
+              </div>
+              <div class="d-flex align-center gap-3" (click)="$event.stopPropagation()">
+                <span *ngIf="dept.isFullyCompleted" class="badge badge-success">مكتمل</span>
+                <button *ngIf="!dept.isFullyCompleted" class="btn-primary btn-sm" (click)="markComplete('department', dept.departmentId, dept.departmentName)">إكمال للقسم</button>
+              </div>
+            </div>
+
+            <!-- Users List -->
+            <div class="tree-children" *ngIf="expandedDepartments.has(dept.departmentId)">
+              <div *ngFor="let user of dept.users" class="tree-user d-flex justify-between align-center">
+                <div class="d-flex align-center gap-2">
+                  <span class="icon" style="color: #64748b; font-size: 13px;">👤</span>
+                  <span class="text-secondary">{{ user.userName }}</span>
+                </div>
+                <div class="d-flex align-center gap-3">
+                  <span *ngIf="user.isCompleted" class="badge badge-success">مكتمل</span>
+                  <span *ngIf="!user.isCompleted" class="badge badge-secondary" style="background: #f1f5f9; color: #64748b;">قيد الانتظار</span>
+                  <button *ngIf="!user.isCompleted" class="btn-text" (click)="markComplete('user', user.userId, user.userName)">إكمال</button>
+                </div>
+              </div>
+              <div *ngIf="dept.users.length === 0" class="p-3 text-center text-sm text-secondary">لا يوجد طلاب في هذا القسم</div>
+            </div>
+          </div>
+          <div *ngIf="company.departments.length === 0" class="p-3 text-center text-sm text-secondary">لا توجد أقسام في هذه الشركة</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="isLoading" class="dashboard-container d-flex align-center justify-center">
+  <p>جاري التحميل...</p>
+</div>

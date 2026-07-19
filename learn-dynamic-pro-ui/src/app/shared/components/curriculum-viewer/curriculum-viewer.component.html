@@ -47,11 +47,13 @@
                class="d-flex justify-between align-center" 
                [style.border-bottom]="last ? 'none' : '1px solid rgba(0,0,0,0.05)'"
                [style.padding-bottom]="last ? '0' : '12px'"
-               [style.margin-bottom]="last ? '0' : '12px'">
+               [style.margin-bottom]="last ? '0' : '12px'"
+               [class.analytics-row]="isAnalyticsView"
+               (click)="viewLessonAnalytics(lesson.lessonId)">
                
             <div class="fw-500 text-secondary d-flex align-center gap-2" style="flex: 1;">
               <span class="icon" style="font-size: 14px; color: var(--color-primary); opacity: 0.8;">📄</span>
-              {{ lesson.name }}
+              {{ lesson.name || lesson.title }}
             </div>
             
             <!-- STUDENT VIEW: SHOW STATUS -->
@@ -96,6 +98,21 @@
                 <div class="text-secondary text-sm" style="width: 100px; text-align: left;">
                   {{ lesson.evaluationDate ? (lesson.evaluationDate | date:'yyyy-MM-dd') : '-' }}
                 </div>
+              </div>
+            </ng-container>
+
+            <!-- ANALYTICS VIEW: SHOW ENROLLED/COMPLETED STATS -->
+            <ng-container *ngIf="isAnalyticsView">
+              <div class="d-flex gap-3 align-center" style="justify-content: flex-end; width: 300px;">
+                <span style="font-size: 13px; color: var(--color-text-secondary);">
+                  👥 التحق: <strong>{{ lesson.enrolledStudentsCount || 0 }}</strong>
+                </span>
+                <span style="font-size: 13px; color: var(--color-text-secondary);">
+                  ✅ أكمل: <strong class="text-success">{{ lesson.completedStudentsCount || 0 }}</strong>
+                </span>
+                <button class="btn-primary" style="padding: 4px 10px; font-size: 12px; border-radius: 6px;">
+                  التفاصيل ➔
+                </button>
               </div>
             </ng-container>
             

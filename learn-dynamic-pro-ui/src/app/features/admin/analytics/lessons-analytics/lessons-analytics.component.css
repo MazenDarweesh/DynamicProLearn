@@ -1,0 +1,31 @@
+/* Right to Left settings */
+.dashboard-container {
+  background-color: var(--color-bg-page);
+  min-height: 100vh;
+  padding: 40px;
+  max-width: 1400px;
+  margin: 0 auto;
+  font-family: 'Readex Pro', sans-serif;
+  text-align: right;
+  direction: rtl;
+}
+
+.d-flex { display: flex; }
+.justify-between { justify-content: space-between; }
+.align-center { align-items: center; }
+.w-100 { width: 100%; }
+.mb-4 { margin-bottom: 25px; }
+.p-0 { padding: 0 !important; }
+.p-4 { padding: 20px; }
+.p-5 { padding: 30px; }
+.m-0 { margin: 0; }
+.mt-3 { margin-top: 15px; }
+.gap-3 { gap: 15px; }
+.text-center { text-align: center; }
+
+.card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+}

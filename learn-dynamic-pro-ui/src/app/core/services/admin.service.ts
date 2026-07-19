@@ -252,4 +252,17 @@ export class AdminService {
   assignTesterToVersion(versionId: string, testerId: string, moduleIds: string[]): Observable<any> {
     return this.http.post(`${this.apiUrl}/versions/${versionId}/testers/${testerId}`, { moduleIds });
   }
+
+  // ── Analytics ─────────────────────────────────────────────────────────────
+  getCurriculumAnalytics(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.apiUrl}/analytics/curriculum`);
+  }
+
+  getLessonAnalytics(lessonId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/analytics/lessons/${lessonId}`);
+  }
+
+  completeLessonForTarget(lessonId: string, targetType: string, targetId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/analytics/lessons/${lessonId}/complete/${targetType}/${targetId}`, {});
+  }
 }

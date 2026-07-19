@@ -19,9 +19,11 @@ export class CurriculumViewerComponent {
   @Input() isDepartmentView: boolean = true;
   @Input() isStudentView: boolean = false;
   @Input() isTesterView: boolean = false;
+  @Input() isAnalyticsView: boolean = false;
 
   @Output() onMarkLessonComplete = new EventEmitter<string>();
   @Output() onUnmarkLessonComplete = new EventEmitter<string>();
+  @Output() onLessonAnalyticsClick = new EventEmitter<string>();
 
   markLessonComplete(lessonId: string): void {
     this.onMarkLessonComplete.emit(lessonId);
@@ -29,5 +31,11 @@ export class CurriculumViewerComponent {
 
   unmarkLessonComplete(lessonId: string): void {
     this.onUnmarkLessonComplete.emit(lessonId);
+  }
+
+  viewLessonAnalytics(lessonId: string): void {
+    if (this.isAnalyticsView) {
+      this.onLessonAnalyticsClick.emit(lessonId);
+    }
   }
 }
