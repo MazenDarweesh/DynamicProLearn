@@ -34,11 +34,25 @@ export interface ModuleOverview {
           <div *ngIf="isLoading" class="loading">جاري تحميل الوحدات...</div>
           <div *ngIf="!isLoading && module?.units?.length === 0" class="empty-state">لا يوجد وحدات في هذا الموديول.</div>
           
-          <div class="unit" *ngFor="let unit of module?.units; let i = index">
+          <div *ngIf="!isLoading && module?.units?.length" class="filter-container" style="margin-bottom: 20px;">
+            <input type="text" class="form-control" style="background-image: none; padding-left: 15px; margin-bottom: 10px;" placeholder="ابحث باسم الدرس..." [(ngModel)]="searchQuery" />
+            <div style="display: flex; gap: 10px;">
+              <select class="form-control" [(ngModel)]="selectedLevel">
+                <option value="">كل المستويات</option>
+                <option *ngFor="let lvl of uniqueLevels" [value]="lvl">{{ lvl }}</option>
+              </select>
+              <select class="form-control" [(ngModel)]="selectedType">
+                <option value="">كل الأنواع</option>
+                <option *ngFor="let typ of uniqueTypes" [value]="typ">{{ typ }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="unit" *ngFor="let unit of filteredUnits; let i = index">
             <h4>{{ i + 1 }}. {{ unit.title }}</h4>
             
             <div *ngIf="unit.lessons && unit.lessons.length === 0" class="text-secondary text-sm" style="padding-right: 15px;">
-              لا توجد دروس
+              لا توجد دروس مطابقة للبحث
             </div>
 
             <div class="lesson-item" 
@@ -207,6 +221,38 @@ export interface ModuleOverview {
       color: var(--color-primary); 
       font-weight: 600; 
     }
+    
+    .filter-container {
+      padding: 15px;
+      border-bottom: 1px solid var(--color-border);
+      background-color: var(--color-bg-page);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .form-control {
+      width: 100%;
+      padding: 10px 15px;
+      border-radius: 6px;
+      border: 1px solid var(--color-border);
+      background-color: var(--color-bg-card);
+      color: var(--color-text-primary);
+      font-family: inherit;
+      font-size: 14px;
+      outline: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238C8A93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+      background-repeat: no-repeat;
+      background-position: left 12px center;
+      background-size: 16px;
+      padding-left: 35px;
+    }
+
+    .form-control:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 2px rgba(46, 95, 217, 0.1);
+    }
     .lesson-status {
       width: 18px;
       height: 18px;
@@ -322,6 +368,12 @@ export class FeedbackPanel implements OnInit {
   selectedConditionId: string = '';
   notes: string = '';
   
+  searchQuery = '';
+  selectedLevel = '';
+  selectedType = '';
+  uniqueLevels: string[] = [];
+  uniqueTypes: string[] = [];
+  
   isLoading = true;
   isSubmitting = false;
   successMessage = '';
@@ -360,6 +412,10 @@ export class FeedbackPanel implements OnInit {
             units: units
           };
           this.isLoading = false;
+
+          const allLessons = units.flatMap(u => u.lessons);
+          this.uniqueLevels = Array.from(new Set(allLessons.map(l => l.levelLabel).filter(l => l))).sort();
+          this.uniqueTypes = Array.from(new Set(allLessons.map(l => l.typeLabel).filter(l => l))).sort();
 
           // Auto-select first uncompleted lesson
           if (this.module && this.module.units) {
@@ -434,6 +490,20 @@ export class FeedbackPanel implements OnInit {
       this.isSubmitting = false;
       this.errorMessage = err.error?.detail || 'فشل في إرسال التقييم. تأكد من وجود إصدار نشط.';
     });
+  }
+
+  get filteredUnits(): UnitWithLessons[] {
+    if (!this.module) return [];
+    
+    return this.module.units.map(unit => ({
+      ...unit,
+      lessons: unit.lessons.filter(l => {
+        const matchesSearch = !this.searchQuery || l.title.toLowerCase().includes(this.searchQuery.toLowerCase());
+        const matchesLevel = !this.selectedLevel || l.levelLabel === this.selectedLevel;
+        const matchesType = !this.selectedType || l.typeLabel === this.selectedType;
+        return matchesSearch && matchesLevel && matchesType;
+      })
+    })).filter(unit => unit.lessons.length > 0);
   }
 
   goBack() {
