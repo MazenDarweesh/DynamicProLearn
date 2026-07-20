@@ -378,46 +378,6 @@ public class AdminController : ControllerBase
         return Ok(result.Value);
     }
 
-    // ── Test Cycles ─────────────────────────────────────────────────────────
-    [HttpGet("test-cycles")]
-    public async Task<IActionResult> GetAllTestCycles()
-    {
-        var result = await _testerService.GetAllTestCyclesAsync();
-        if (!result.IsSuccess) return BadRequest(result.Error);
-        return Ok(result.Value);
-    }
-
-    [HttpPost("test-cycles")]
-    public async Task<IActionResult> CreateTestCycle([FromBody] CreateTestCycleRequest request)
-    {
-        var result = await _testerService.CreateTestCycleAsync(request);
-        if (!result.IsSuccess) return BadRequest(result.Error);
-        return Ok(result.Value);
-    }
-
-    [HttpPost("test-cycles/{testCycleId}/modules")]
-    public async Task<IActionResult> AssignModulesToTestCycle(Guid testCycleId, [FromBody] AssignModulesToTestCycleRequest request)
-    {
-        var result = await _testerService.AssignModulesToTestCycleAsync(testCycleId, request);
-        if (!result.IsSuccess) return BadRequest(result.Error);
-        return Ok();
-    }
-
-    [HttpPut("test-cycles/{testCycleId}")]
-    public async Task<IActionResult> UpdateTestCycle(Guid testCycleId, [FromBody] UpdateTestCycleRequest request)
-    {
-        var result = await _testerService.UpdateTestCycleAsync(testCycleId, request);
-        if (!result.IsSuccess) return BadRequest(result.Error);
-        return Ok();
-    }
-
-    [HttpDelete("test-cycles/{testCycleId}")]
-    public async Task<IActionResult> DeleteTestCycle(Guid testCycleId)
-    {
-        var result = await _testerService.DeleteTestCycleAsync(testCycleId);
-        if (!result.IsSuccess) return BadRequest(result.Error);
-        return NoContent();
-    }
 
     // ── Version Testers (New Structure) ─────────────────────────────────────
     [HttpPost("versions/{versionId}/testers/{testerId}")]

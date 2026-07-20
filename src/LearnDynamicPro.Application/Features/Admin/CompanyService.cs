@@ -946,7 +946,7 @@ public class CompanyService : ICompanyService
 
         var userIds = users.Select(u => u.Id).ToList();
 
-        var testCycles = await _unitOfWork.Repository<TestCycle>().Query()
+        var testCycles = await _unitOfWork.Repository<VersionTester>().Query()
             .AsNoTracking()
             .Where(tc => userIds.Contains(tc.TesterId))
             .Select(tc => new
@@ -1009,47 +1009,52 @@ public class CompanyService : ICompanyService
             return Result<LearnDynamicPro.Application.DTOs.Tester.TesterDetailsDto>.Failure(AppErrors.General.NotFound);
 
         // Optimize: Project only necessary hierarchy data to avoid large joins and cartesian explosion
-        var assignedHierarchy = await _unitOfWork.Repository<TestCycle>().Query()
+        var assignedHierarchy = await _unitOfWork.Repository<VersionTester>().Query()
             .AsNoTracking()
-            .Where(tc => tc.TesterId == testerId)
-            .SelectMany(tc => tc.AssignedModules)
-            .Where(am => am.Module != null)
-            .Select(am => new
+            .Where(vt => vt.TesterId == testerId)
+            .Select(vt => new
             {
-                ModuleName = am.Module!.Name,
-                Units = am.Module.Units!.Select(u => new
+                VersionId = vt.VersionId,
+                VersionName = vt.Version != null ? vt.Version.VersionLabel : "نسخة مجهولة",
+                Modules = vt.AssignedModules.Where(am => am.Module != null).Select(am => new
                 {
-                    UnitName = u.Name,
-                    Lessons = u.Lessons!.Select(l => new
+                    ModuleName = am.Module!.Name,
+                    Units = am.Module.Units!.Select(u => new
                     {
-                        LessonId = l.Id,
-                        LessonName = l.Title
+                        UnitName = u.Name,
+                        Lessons = u.Lessons!.Select(l => new
+                        {
+                            LessonId = l.Id,
+                            LessonName = l.Title
+                        }).ToList()
                     }).ToList()
                 }).ToList()
             })
             .ToListAsync();
 
-        var allLessonsCount = assignedHierarchy.SelectMany(m => m.Units).SelectMany(u => u.Lessons).Count();
+        var allLessonsCount = assignedHierarchy.SelectMany(v => v.Modules).SelectMany(m => m.Units).SelectMany(u => u.Lessons).Count();
 
         // Optimize: Fetch Progress and Feedback mapped by LessonId
-        // Dictionary lookup is O(1), preventing O(N*M) inside the loops
         var progressesDict = await _unitOfWork.Repository<LessonProgress>().Query()
             .AsNoTracking()
             .Where(p => p.UserId == testerId)
             .Select(p => new { p.LessonId, p.IsCompleted, p.CompletedAt })
             .ToDictionaryAsync(p => p.LessonId);
 
-        var feedbacksDict = await _unitOfWork.Repository<TesterFeedback>().Query()
+        var feedbacksList = await _unitOfWork.Repository<TesterFeedback>().Query()
             .AsNoTracking()
             .Where(f => f.UserId == testerId)
             .Select(f => new 
             { 
+                f.ErpVersionId,
                 f.LessonId, 
                 Label = f.ConditionOption != null ? f.ConditionOption.Label : "تم التقييم",
                 f.Notes,
                 f.CreatedAt
             })
-            .ToDictionaryAsync(f => f.LessonId);
+            .ToListAsync();
+
+        var feedbacksDict = feedbacksList.ToDictionary(f => $"{f.ErpVersionId}_{f.LessonId}");
 
         int completedCount = progressesDict.Values.Count(p => p.IsCompleted);
         int totalAssigned = allLessonsCount;
@@ -1057,28 +1062,32 @@ public class CompanyService : ICompanyService
 
         var feedbacksDto = new List<LearnDynamicPro.Application.DTOs.Tester.TesterLessonFeedbackDto>();
 
-        foreach (var module in assignedHierarchy)
+        foreach (var version in assignedHierarchy)
         {
-            foreach (var unit in module.Units)
+            foreach (var module in version.Modules)
             {
-                foreach (var lesson in unit.Lessons)
+                foreach (var unit in module.Units)
                 {
-                    progressesDict.TryGetValue(lesson.LessonId, out var progress);
-                    feedbacksDict.TryGetValue(lesson.LessonId, out var feedback);
-                    
-                    var status = "غير مختبر";
-                    if (progress != null && progress.IsCompleted) status = "مكتمل";
-                    if (feedback != null) status = feedback.Label;
-
-                    feedbacksDto.Add(new LearnDynamicPro.Application.DTOs.Tester.TesterLessonFeedbackDto
+                    foreach (var lesson in unit.Lessons)
                     {
-                        ModuleName = module.ModuleName,
-                        UnitName = unit.UnitName,
-                        LessonName = lesson.LessonName,
-                        Status = status,
-                        Comment = feedback?.Notes,
-                        EvaluationDate = feedback?.CreatedAt ?? progress?.CompletedAt
-                    });
+                        progressesDict.TryGetValue(lesson.LessonId, out var progress);
+                        feedbacksDict.TryGetValue($"{version.VersionId}_{lesson.LessonId}", out var feedback);
+                        
+                        var status = "غير مختبر";
+                        if (progress != null && progress.IsCompleted) status = "مكتمل";
+                        if (feedback != null) status = feedback.Label;
+
+                        feedbacksDto.Add(new LearnDynamicPro.Application.DTOs.Tester.TesterLessonFeedbackDto
+                        {
+                            VersionName = version.VersionName,
+                            ModuleName = module.ModuleName,
+                            UnitName = unit.UnitName,
+                            LessonName = lesson.LessonName,
+                            Status = status,
+                            Comment = feedback?.Notes,
+                            EvaluationDate = feedback?.CreatedAt ?? progress?.CompletedAt
+                        });
+                    }
                 }
             }
         }

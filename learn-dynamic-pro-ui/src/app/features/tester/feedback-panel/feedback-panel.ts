@@ -7,6 +7,7 @@ import { StudentService, UnitDto, LessonDto } from '../../../core/services/stude
 import { Router, ActivatedRoute } from '@angular/router';
 
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
+import { LessonSidebarComponent } from '../../../shared/components/lesson-sidebar/lesson-sidebar.component';
 
 export interface UnitWithLessons extends UnitDto {
   lessons: LessonDto[];
@@ -22,7 +23,7 @@ export interface ModuleOverview {
 @Component({
   selector: 'app-feedback-panel',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, LessonSidebarComponent],
   template: `
     <div class="console-container" dir="rtl">
       <!-- Header -->
@@ -30,51 +31,14 @@ export interface ModuleOverview {
 
       <div class="console-body">
         <!-- Sidebar -->
-        <div class="viewer-sidebar">
-          <div *ngIf="isLoading" class="loading">جاري تحميل الوحدات...</div>
-          <div *ngIf="!isLoading && module?.units?.length === 0" class="empty-state">لا يوجد وحدات في هذا الموديول.</div>
-          
-          <div *ngIf="!isLoading && module?.units?.length" class="filter-container" style="margin-bottom: 20px;">
-            <input type="text" class="form-control" style="background-image: none; padding-left: 15px; margin-bottom: 10px;" placeholder="ابحث باسم الدرس..." [(ngModel)]="searchQuery" />
-            <div style="display: flex; gap: 10px;">
-              <select class="form-control" [(ngModel)]="selectedLevel">
-                <option value="">كل المستويات</option>
-                <option *ngFor="let lvl of uniqueLevels" [value]="lvl">{{ lvl }}</option>
-              </select>
-              <select class="form-control" [(ngModel)]="selectedType">
-                <option value="">كل الأنواع</option>
-                <option *ngFor="let typ of uniqueTypes" [value]="typ">{{ typ }}</option>
-              </select>
-            </div>
-          </div>
-
-          <div class="unit" *ngFor="let unit of filteredUnits; let i = index">
-            <h4>{{ i + 1 }}. {{ unit.title }}</h4>
-            
-            <div *ngIf="unit.lessons && unit.lessons.length === 0" class="text-secondary text-sm" style="padding-right: 15px;">
-              لا توجد دروس مطابقة للبحث
-            </div>
-
-            <div class="lesson-item" 
-                 *ngFor="let lesson of unit.lessons; let lIndex = index"
-                 [class.active]="currentLesson?.id === lesson.id"
-                 (click)="selectLesson(lesson)">
-              
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <svg *ngIf="lesson.typeLabel === 'Video'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
-                <svg *ngIf="lesson.typeLabel !== 'Video'" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                
-                <span>{{ i + 1 }}.{{ lIndex + 1 }} {{ lesson.title }}</span>
-              </div>
-
-              <div class="lesson-status" [class.completed]="lesson.isCompleted">
-                <svg *ngIf="lesson.isCompleted" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-                  <polyline points="20 6 9 17 4 12"></polyline>
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
+        <app-lesson-sidebar 
+          *ngIf="module"
+          [data]="module.units" 
+          type="units" 
+          [isLoading]="isLoading"
+          [activeLessonId]="currentLesson?.id"
+          (lessonSelected)="onLessonSelectedFromSidebar($event)">
+        </app-lesson-sidebar>
 
         <!-- Main Content -->
         <div class="viewer-main">
@@ -180,98 +144,6 @@ export interface ModuleOverview {
       gap: 30px;
     }
 
-    /* Sidebar */
-    .viewer-sidebar {
-      width: 320px;
-      background: white;
-      border-radius: 12px;
-      border: 1px solid var(--color-border);
-      padding: 20px;
-      height: calc(100vh - 150px);
-      overflow-y: auto;
-    }
-
-    .unit {
-      margin-bottom: 25px;
-    }
-    .unit h4 {
-      font-size: 15px;
-      color: var(--color-text-secondary);
-      margin: 0 0 10px 0;
-      font-weight: 600;
-      border-bottom: 1px solid var(--color-border);
-      padding-bottom: 8px;
-    }
-
-    .lesson-item {
-      padding: 12px 15px;
-      border-radius: 8px;
-      cursor: pointer;
-      margin-bottom: 5px;
-      font-size: 14px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      transition: 0.2s;
-      color: var(--color-navy);
-    }
-    .lesson-item:hover { background-color: var(--color-bg-page); }
-    .lesson-item.active { 
-      background-color: var(--color-primary-light); 
-      color: var(--color-primary); 
-      font-weight: 600; 
-    }
-    
-    .filter-container {
-      padding: 15px;
-      border-bottom: 1px solid var(--color-border);
-      background-color: var(--color-bg-page);
-      border-radius: 12px;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .form-control {
-      width: 100%;
-      padding: 10px 15px;
-      border-radius: 6px;
-      border: 1px solid var(--color-border);
-      background-color: var(--color-bg-card);
-      color: var(--color-text-primary);
-      font-family: inherit;
-      font-size: 14px;
-      outline: none;
-      appearance: none;
-      background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238C8A93' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-      background-repeat: no-repeat;
-      background-position: left 12px center;
-      background-size: 16px;
-      padding-left: 35px;
-    }
-
-    .form-control:focus {
-      border-color: var(--color-primary);
-      box-shadow: 0 0 0 2px rgba(46, 95, 217, 0.1);
-    }
-    .lesson-status {
-      width: 18px;
-      height: 18px;
-      border-radius: 50%;
-      border: 2px solid #ccc;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .lesson-status.completed {
-      border-color: #28a745;
-      background: #28a745;
-      color: white;
-    }
-    .lesson-status svg {
-      width: 12px;
-      height: 12px;
-    }
-
     /* Main Area */
     .viewer-main { 
       flex: 1; 
@@ -368,12 +240,6 @@ export class FeedbackPanel implements OnInit {
   selectedConditionId: string = '';
   notes: string = '';
   
-  searchQuery = '';
-  selectedLevel = '';
-  selectedType = '';
-  uniqueLevels: string[] = [];
-  uniqueTypes: string[] = [];
-  
   isLoading = true;
   isSubmitting = false;
   successMessage = '';
@@ -413,10 +279,6 @@ export class FeedbackPanel implements OnInit {
           };
           this.isLoading = false;
 
-          const allLessons = units.flatMap(u => u.lessons);
-          this.uniqueLevels = Array.from(new Set(allLessons.map(l => l.levelLabel).filter(l => l))).sort();
-          this.uniqueTypes = Array.from(new Set(allLessons.map(l => l.typeLabel).filter(l => l))).sort();
-
           // Auto-select first uncompleted lesson
           if (this.module && this.module.units) {
             for (const unit of this.module.units) {
@@ -455,6 +317,17 @@ export class FeedbackPanel implements OnInit {
     this.errorMessage = '';
   }
 
+  onLessonSelectedFromSidebar(lessonId: string) {
+    if (!this.module || !this.module.units) return;
+    for (const unit of this.module.units) {
+      const lesson = unit.lessons.find(l => l.id === lessonId);
+      if (lesson) {
+        this.selectLesson(lesson);
+        return;
+      }
+    }
+  }
+
   submitFeedback() {
     if (!this.currentLesson || !this.selectedConditionId || !this.notes) return;
     
@@ -490,20 +363,6 @@ export class FeedbackPanel implements OnInit {
       this.isSubmitting = false;
       this.errorMessage = err.error?.detail || 'فشل في إرسال التقييم. تأكد من وجود إصدار نشط.';
     });
-  }
-
-  get filteredUnits(): UnitWithLessons[] {
-    if (!this.module) return [];
-    
-    return this.module.units.map(unit => ({
-      ...unit,
-      lessons: unit.lessons.filter(l => {
-        const matchesSearch = !this.searchQuery || l.title.toLowerCase().includes(this.searchQuery.toLowerCase());
-        const matchesLevel = !this.selectedLevel || l.levelLabel === this.selectedLevel;
-        const matchesType = !this.selectedType || l.typeLabel === this.selectedType;
-        return matchesSearch && matchesLevel && matchesType;
-      })
-    })).filter(unit => unit.lessons.length > 0);
   }
 
   goBack() {

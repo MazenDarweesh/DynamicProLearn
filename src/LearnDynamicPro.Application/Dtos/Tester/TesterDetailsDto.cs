@@ -17,6 +17,7 @@ namespace LearnDynamicPro.Application.DTOs.Tester
 
     public class TesterLessonFeedbackDto
     {
+        public string VersionName { get; set; } = null!;
         public string ModuleName { get; set; } = null!;
         public string UnitName { get; set; } = null!;
         public string LessonName { get; set; } = null!;

@@ -29,10 +29,4 @@ public interface ITesterService
     Task<Result<List<VersionSummaryDto>>> GetVersionSummariesAsync();
     Task<Result<VersionProgressDto>> GetVersionProgressAsync(Guid versionId);
 
-    // Test Cycles
-    Task<Result<List<TestCycleDto>>> GetAllTestCyclesAsync();
-    Task<Result<TestCycleDto>> CreateTestCycleAsync(CreateTestCycleRequest request);
-    Task<Result> AssignModulesToTestCycleAsync(Guid testCycleId, AssignModulesToTestCycleRequest request);
-    Task<Result> UpdateTestCycleAsync(Guid testCycleId, UpdateTestCycleRequest request);
-    Task<Result> DeleteTestCycleAsync(Guid testCycleId);
 }

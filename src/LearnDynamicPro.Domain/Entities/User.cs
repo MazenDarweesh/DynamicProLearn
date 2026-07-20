@@ -18,5 +18,4 @@ public class User : BaseEntity
     public ICollection<LessonProgress> CompletedProgresses { get; set; } = new List<LessonProgress>();
     public ICollection<LessonProgress> MarkedProgresses { get; set; } = new List<LessonProgress>();
     public ICollection<TesterFeedback> Feedbacks { get; set; } = new List<TesterFeedback>();
-    public ICollection<TestCycle> TestCycles { get; set; } = new List<TestCycle>();
 }

@@ -288,7 +288,7 @@ public class ProgressAnalyticsService : IProgressAnalyticsService
             })
             .ToListAsync();
 
-        var testerLessons = await _unitOfWork.Repository<TestCycle>().Query()
+        var testerLessons = await _unitOfWork.Repository<VersionTester>().Query()
             .AsNoTracking()
             .Where(tc => testerIds.Contains(tc.TesterId))
             .Select(tc => new 

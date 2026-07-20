@@ -26,7 +26,7 @@ export class TesterDetailsComponent implements OnInit {
   isLoading = true;
   isAllExpanded = false;
   
-  formattedModules: any[] = [];
+  formattedVersions: any[] = [];
 
   toggleExpandAll(): void {
     this.isAllExpanded = !this.isAllExpanded;
@@ -46,7 +46,7 @@ export class TesterDetailsComponent implements OnInit {
     this.adminService.getTesterDetails(this.testerId).subscribe({
       next: (res) => {
         this.testerDetails = res;
-        this.formatFeedbacksToModules();
+        this.formatFeedbacksToVersions();
         this.isLoading = false;
       },
       error: () => {
@@ -57,15 +57,31 @@ export class TesterDetailsComponent implements OnInit {
     });
   }
 
-  formatFeedbacksToModules(): void {
+  formatFeedbacksToVersions(): void {
     if (!this.testerDetails || !this.testerDetails.feedbacks) return;
     
-    const modulesMap = new Map<string, any>();
+    const versionsMap = new Map<string, any>();
     
     this.testerDetails.feedbacks.forEach((f: any, index: number) => {
-      if (!modulesMap.has(f.moduleName)) {
-        modulesMap.set(f.moduleName, {
-          moduleId: f.moduleName,
+      const versionName = f.versionName || 'نسخة مجهولة';
+      if (!versionsMap.has(versionName)) {
+        versionsMap.set(versionName, {
+          versionName: versionName,
+          totalLessons: 0,
+          completedLessons: 0,
+          modulesMap: new Map<string, any>()
+        });
+      }
+      
+      const versionObj = versionsMap.get(versionName);
+      versionObj.totalLessons++;
+      if (f.status !== 'غير مختبر') {
+          versionObj.completedLessons++;
+      }
+
+      if (!versionObj.modulesMap.has(f.moduleName)) {
+        versionObj.modulesMap.set(f.moduleName, {
+          moduleId: versionName + '_' + f.moduleName,
           name: f.moduleName,
           totalLessons: 0,
           completedLessons: 0,
@@ -73,15 +89,15 @@ export class TesterDetailsComponent implements OnInit {
         });
       }
       
-      const moduleObj = modulesMap.get(f.moduleName);
+      const moduleObj = versionObj.modulesMap.get(f.moduleName);
       moduleObj.totalLessons++;
-      if (f.status === 'مكتمل' || f.status === 'سليم 100%' || f.status === 'بها أخطاء') {
+      if (f.status !== 'غير مختبر') {
           moduleObj.completedLessons++;
       }
       
       if (!moduleObj.unitsMap.has(f.unitName)) {
         moduleObj.unitsMap.set(f.unitName, {
-          unitId: f.moduleName + '_' + f.unitName,
+          unitId: versionName + '_' + f.moduleName + '_' + f.unitName,
           name: f.unitName,
           lessons: []
         });
@@ -89,7 +105,7 @@ export class TesterDetailsComponent implements OnInit {
       
       const unitObj = moduleObj.unitsMap.get(f.unitName);
       unitObj.lessons.push({
-        lessonId: f.moduleName + '_' + f.unitName + '_' + f.lessonName + index,
+        lessonId: versionName + '_' + f.moduleName + '_' + f.unitName + '_' + f.lessonName + index,
         name: f.lessonName,
         status: f.status,
         comment: f.comment,
@@ -97,12 +113,17 @@ export class TesterDetailsComponent implements OnInit {
       });
     });
     
-    this.formattedModules = Array.from(modulesMap.values()).map(m => ({
-      moduleId: m.moduleId,
-      name: m.name,
-      totalLessons: m.totalLessons,
-      completedLessons: m.completedLessons,
-      units: Array.from((m.unitsMap as Map<string, any>).values())
+    this.formattedVersions = Array.from(versionsMap.values()).map(v => ({
+      versionName: v.versionName,
+      totalLessons: v.totalLessons,
+      completedLessons: v.completedLessons,
+      modules: Array.from((v.modulesMap as Map<string, any>).values()).map(m => ({
+        moduleId: m.moduleId,
+        name: m.name,
+        totalLessons: m.totalLessons,
+        completedLessons: m.completedLessons,
+        units: Array.from((m.unitsMap as Map<string, any>).values())
+      }))
     }));
   }
 
@@ -113,6 +134,7 @@ export class TesterDetailsComponent implements OnInit {
     }
 
     const dataToExport = this.testerDetails.feedbacks.map((f: any) => ({
+      'النسخة': f.versionName || 'نسخة مجهولة',
       'الموديول': f.moduleName,
       'الوحدة': f.unitName,
       'الدرس': f.lessonName,

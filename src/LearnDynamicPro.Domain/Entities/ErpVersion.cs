@@ -9,5 +9,5 @@ public class ErpVersion : BaseEntity
     // Navigation
     public ICollection<TesterActiveVersion> ActiveTesters { get; set; } = new List<TesterActiveVersion>();
     public ICollection<TesterFeedback> Feedbacks { get; set; } = new List<TesterFeedback>();
-    public ICollection<TestCycle> TestCycles { get; set; } = new List<TestCycle>();
+    public ICollection<VersionTester> AssignedTesters { get; set; } = new List<VersionTester>();
 }

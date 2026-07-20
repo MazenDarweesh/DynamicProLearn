@@ -35,7 +35,7 @@ public class StudentService : IStudentService
 
         if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
         {
-            var testerModules = await _unitOfWork.Repository<TestCycle>().Query()
+            var testerModules = await _unitOfWork.Repository<VersionTester>().Query()
                 .AsNoTracking()
                 .Where(tc => tc.TesterId == userId)
                 .SelectMany(tc => tc.AssignedModules)
@@ -310,7 +310,7 @@ public class StudentService : IStudentService
 
         if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
         {
-            var hasAccess = await _unitOfWork.Repository<TestCycle>().Query()
+            var hasAccess = await _unitOfWork.Repository<VersionTester>().Query()
                 .AnyAsync(tc => tc.TesterId == userId && tc.AssignedModules.Any(am => am.ModuleId == moduleId));
 
             if (!hasAccess)
@@ -413,7 +413,7 @@ public class StudentService : IStudentService
 
         if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
         {
-            var assignedModuleIds = await _unitOfWork.Repository<TestCycle>().Query()
+            var assignedModuleIds = await _unitOfWork.Repository<VersionTester>().Query()
                 .AsNoTracking()
                 .Where(tc => tc.TesterId == userId)
                 .SelectMany(tc => tc.AssignedModules)

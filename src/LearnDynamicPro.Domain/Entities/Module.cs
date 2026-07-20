@@ -10,5 +10,5 @@ public class Module : BaseEntity
     // Navigation
     public ICollection<Unit> Units { get; set; } = new List<Unit>();
     public ICollection<DepartmentModuleAssignment> Assignments { get; set; } = new List<DepartmentModuleAssignment>();
-    public ICollection<TestCycleModule> TestCycleModules { get; set; } = new List<TestCycleModule>();
+    public ICollection<VersionTesterModule> VersionTesterModules { get; set; } = new List<VersionTesterModule>();
 }

@@ -43,10 +43,10 @@ public class ModuleService : IModuleService
         var module = await _unitOfWork.Repository<Module>().GetByIdAsync(id);
         if (module != null)
         {
-            var testCycleModules = await _unitOfWork.Repository<TestCycleModule>().Query()
+            var versionTesterModules = await _unitOfWork.Repository<VersionTesterModule>().Query()
                 .Where(tcm => tcm.ModuleId == id).ToListAsync();
-            foreach (var tcm in testCycleModules)
-                _unitOfWork.Repository<TestCycleModule>().Remove(tcm);
+            foreach (var tcm in versionTesterModules)
+                _unitOfWork.Repository<VersionTesterModule>().Remove(tcm);
 
             _unitOfWork.Repository<Module>().Remove(module);
             await _unitOfWork.SaveChangesAsync();
