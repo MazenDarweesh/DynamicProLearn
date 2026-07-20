@@ -274,19 +274,19 @@ public class TesterService : ITesterService
 
         var versionTesters = await _unitOfWork.Repository<VersionTester>().Query()
             .AsNoTracking()
-            .Where(vt => versionIds.Contains(vt.VersionId))
+            .Where(vt => versionIds.Contains(vt.VersionId) && vt.Tester != null && !vt.Tester.IsDeleted)
             .Select(vt => new { vt.VersionId, vt.TesterId })
             .ToListAsync();
 
         var versionModules = await _unitOfWork.Repository<VersionTesterModule>().Query()
             .AsNoTracking()
-            .Where(vtm => vtm.VersionTester != null && versionIds.Contains(vtm.VersionTester.VersionId))
+            .Where(vtm => vtm.VersionTester != null && vtm.VersionTester.Tester != null && !vtm.VersionTester.Tester.IsDeleted && versionIds.Contains(vtm.VersionTester.VersionId))
             .Select(vtm => new { vtm.VersionTester!.VersionId, vtm.ModuleId })
             .ToListAsync();
 
         var feedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
             .AsNoTracking()
-            .Where(f => versionIds.Contains(f.ErpVersionId))
+            .Where(f => f.User != null && !f.User.IsDeleted && versionIds.Contains(f.ErpVersionId))
             .Select(f => f.ErpVersionId)
             .ToListAsync();
 
@@ -314,7 +314,7 @@ public class TesterService : ITesterService
 
         var testersData = await _unitOfWork.Repository<VersionTester>().Query()
             .AsNoTracking()
-            .Where(vt => vt.VersionId == versionId)
+            .Where(vt => vt.VersionId == versionId && vt.Tester != null && !vt.Tester.IsDeleted)
             .Select(vt => new 
             {
                 TesterId = vt.TesterId,
