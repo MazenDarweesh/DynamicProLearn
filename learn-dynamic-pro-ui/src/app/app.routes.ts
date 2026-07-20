@@ -93,7 +93,7 @@ export const routes: Routes = [
         loadComponent: () => import('./features/admin/admin-testers/admin-testers.component').then(m => m.AdminTestersComponent)
       },
       {
-        path: 'tester-details/:id',
+        path: ':id',
         loadComponent: () => import('./features/admin/tester-details/tester-details.component').then(m => m.TesterDetailsComponent)
       }
     ]
