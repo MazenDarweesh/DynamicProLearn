@@ -43,6 +43,7 @@ export class TesterDetailsComponent implements OnInit {
     this.isLoading = true;
     this.adminService.getTesterDetails(this.testerId).subscribe({
       next: (res) => {
+        console.log('Tester Details Response:', res);
         this.testerDetails = res;
         this.formatFeedbacksToVersions();
         this.isLoading = false;
@@ -56,12 +57,14 @@ export class TesterDetailsComponent implements OnInit {
   }
 
   formatFeedbacksToVersions(): void {
-    if (!this.testerDetails || !this.testerDetails.feedbacks) return;
+    if (!this.testerDetails) return;
+    const feedbacksList = this.testerDetails.feedbacks || this.testerDetails.Feedbacks;
+    if (!feedbacksList) return;
     
     const versionsMap = new Map<string, any>();
     
-    this.testerDetails.feedbacks.forEach((f: any, index: number) => {
-      const versionName = f.versionName || 'نسخة مجهولة';
+    feedbacksList.forEach((f: any, index: number) => {
+      const versionName = f.versionName || f.VersionName || 'نسخة مجهولة';
       if (!versionsMap.has(versionName)) {
         versionsMap.set(versionName, {
           versionName: versionName,
@@ -77,37 +80,44 @@ export class TesterDetailsComponent implements OnInit {
           versionObj.completedLessons++;
       }
 
-      if (!versionObj.modulesMap.has(f.moduleName)) {
-        versionObj.modulesMap.set(f.moduleName, {
-          moduleId: versionName + '_' + f.moduleName,
-          name: f.moduleName,
+      const fModuleName = f.moduleName || f.ModuleName;
+      const fUnitName = f.unitName || f.UnitName;
+      const fLessonName = f.lessonName || f.LessonName;
+      const fStatus = f.status || f.Status || 'غير مختبر';
+      const fComment = f.comment || f.Comment;
+      const fEvaluationDate = f.evaluationDate || f.EvaluationDate;
+
+      if (!versionObj.modulesMap.has(fModuleName)) {
+        versionObj.modulesMap.set(fModuleName, {
+          moduleId: versionName + '_' + fModuleName,
+          name: fModuleName,
           totalLessons: 0,
           completedLessons: 0,
           unitsMap: new Map<string, any>()
         });
       }
       
-      const moduleObj = versionObj.modulesMap.get(f.moduleName);
+      const moduleObj = versionObj.modulesMap.get(fModuleName);
       moduleObj.totalLessons++;
-      if (f.status !== 'غير مختبر') {
+      if (fStatus !== 'غير مختبر') {
           moduleObj.completedLessons++;
       }
       
-      if (!moduleObj.unitsMap.has(f.unitName)) {
-        moduleObj.unitsMap.set(f.unitName, {
-          unitId: versionName + '_' + f.moduleName + '_' + f.unitName,
-          name: f.unitName,
+      if (!moduleObj.unitsMap.has(fUnitName)) {
+        moduleObj.unitsMap.set(fUnitName, {
+          unitId: versionName + '_' + fModuleName + '_' + fUnitName,
+          name: fUnitName,
           lessons: []
         });
       }
       
-      const unitObj = moduleObj.unitsMap.get(f.unitName);
+      const unitObj = moduleObj.unitsMap.get(fUnitName);
       unitObj.lessons.push({
-        lessonId: versionName + '_' + f.moduleName + '_' + f.unitName + '_' + f.lessonName + index,
-        name: f.lessonName,
-        status: f.status,
-        comment: f.comment,
-        evaluationDate: f.evaluationDate
+        lessonId: versionName + '_' + fModuleName + '_' + fUnitName + '_' + fLessonName + index,
+        name: fLessonName,
+        status: fStatus,
+        comment: fComment,
+        evaluationDate: fEvaluationDate
       });
     });
     

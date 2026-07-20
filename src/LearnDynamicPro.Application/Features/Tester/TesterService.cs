@@ -312,35 +312,56 @@ public class TesterService : ITesterService
 
         if (version == null) return Result<VersionProgressDto>.Failure("Not found");
 
+        // Fetch the full assigned hierarchy (testers → modules → units → lessons)
         var testersData = await _unitOfWork.Repository<VersionTester>().Query()
             .AsNoTracking()
             .Where(vt => vt.VersionId == versionId && vt.Tester != null && !vt.Tester.IsDeleted)
-            .Select(vt => new 
+            .Select(vt => new
             {
                 TesterId = vt.TesterId,
                 TesterName = vt.Tester!.Username,
-                Modules = vt.AssignedModules.Select(am => new 
-                {
-                    ModuleId = am.ModuleId,
-                    ModuleName = am.Module!.Name
-                }).ToList()
+                Modules = vt.AssignedModules
+                    .Where(am => am.Module != null)
+                    .Select(am => new
+                    {
+                        ModuleId = am.ModuleId,
+                        ModuleName = am.Module!.Name,
+                        Units = am.Module.Units!
+                            .Where(u => !u.IsDeleted)
+                            .Select(u => new
+                            {
+                                UnitId = u.Id,
+                                UnitName = u.Name,
+                                Lessons = u.Lessons!
+                                    .Where(l => !l.IsDeleted)
+                                    .Select(l => new
+                                    {
+                                        LessonId = l.Id,
+                                        LessonTitle = l.Title
+                                    }).ToList()
+                            }).ToList()
+                    }).ToList()
             })
             .ToListAsync();
 
+        // Fetch all feedbacks for this version
         var allFeedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
             .AsNoTracking()
-            .Where(f => f.ErpVersionId == versionId && f.Lesson != null && f.Lesson.Unit != null)
-            .Select(f => new 
+            .Where(f => f.ErpVersionId == versionId)
+            .Select(f => new
             {
                 f.UserId,
-                ModuleId = f.Lesson!.Unit!.ModuleId,
                 f.LessonId,
-                LessonTitle = f.Lesson.Title,
                 ConditionLabel = f.ConditionOption != null ? f.ConditionOption.Label : null,
                 f.Notes,
                 f.CreatedAt
             })
             .ToListAsync();
+
+        // Build a quick lookup: (userId, lessonId) → feedback
+        var feedbackLookup = allFeedbacks.ToDictionary(
+            f => $"{f.UserId}_{f.LessonId}",
+            f => f);
 
         var dto = new VersionProgressDto
         {
@@ -367,23 +388,26 @@ public class TesterService : ITesterService
                     Lessons = new List<LessonFeedbackDto>()
                 };
 
-                var mFeedbacks = allFeedbacks.Where(f => 
-                    f.UserId == vt.TesterId && 
-                    f.ModuleId == am.ModuleId).ToList();
-
-                foreach (var f in mFeedbacks)
+                foreach (var unit in am.Units)
                 {
-                    mDto.Lessons.Add(new LessonFeedbackDto
+                    foreach (var lesson in unit.Lessons)
                     {
-                        LessonId = f.LessonId,
-                        LessonTitle = f.LessonTitle,
-                        ConditionLabel = f.ConditionLabel,
-                        Notes = f.Notes,
-                        FeedbackDate = f.CreatedAt
-                    });
+                        feedbackLookup.TryGetValue($"{vt.TesterId}_{lesson.LessonId}", out var fb);
+
+                        mDto.Lessons.Add(new LessonFeedbackDto
+                        {
+                            LessonId = lesson.LessonId,
+                            LessonTitle = lesson.LessonTitle,
+                            ConditionLabel = fb?.ConditionLabel,
+                            Notes = fb?.Notes,
+                            FeedbackDate = fb?.CreatedAt
+                        });
+                    }
                 }
+
                 tDto.Modules.Add(mDto);
             }
+
             dto.Testers.Add(tDto);
         }
 

@@ -11,8 +11,8 @@
   title="بيانات المختبر وتقييماته"
   [subtitle]="testerDetails.email"
   [name]="testerDetails.name"
-  [completedLessons]="testerDetails.completedLessons"
-  [totalAssignedLessons]="testerDetails.totalAssignedLessons"
+  [completedLessons]="testerDetails.completedLessons || 0"
+  [totalAssignedLessons]="testerDetails.totalAssignedLessons || 0"
   filterType="version"
   [filterOptions]="uniqueVersions"
   [dataGroups]="formattedVersions">

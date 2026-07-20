@@ -54,21 +54,28 @@ export class AdminVersionDetailsComponent implements OnInit {
   }
 
   formatProgressData(): void {
-    if (!this.versionDetails || !this.versionDetails.testers) return;
-    
+    const testers = this.versionDetails?.testers || this.versionDetails?.Testers;
+    if (!testers) return;
+
     this.totalLessonsCount = 0;
     this.completedLessonsCount = 0;
 
-    this.formattedTesters = this.versionDetails.testers.map((t: any) => {
+    this.formattedTesters = testers.map((t: any) => {
+      const testerName = t.testerName || t.TesterName || 'مختبر مجهول';
+      const modules = t.modules || t.Modules || [];
+
       return {
-        groupName: t.testerName,
-        modules: (t.modules || []).map((m: any) => {
-          
+        groupName: testerName,
+        modules: modules.map((m: any) => {
+          const moduleName = m.moduleName || m.ModuleName || 'موديول';
+          const lessons = m.lessons || m.Lessons || [];
+
           let mTotal = 0;
           let mCompleted = 0;
 
-          const lessons = (m.lessons || []).map((l: any) => {
-            const isCompleted = l.conditionLabel && l.conditionLabel !== 'غير مختبر';
+          const mappedLessons = lessons.map((l: any) => {
+            const conditionLabel = l.conditionLabel || l.ConditionLabel;
+            const isCompleted = conditionLabel && conditionLabel !== 'غير مختبر';
             this.totalLessonsCount++;
             mTotal++;
             if (isCompleted) {
@@ -77,28 +84,32 @@ export class AdminVersionDetailsComponent implements OnInit {
             }
 
             return {
-              title: l.lessonTitle,
-              status: l.conditionLabel || 'غير مختبر',
-              comment: l.notes,
-              evaluationDate: l.feedbackDate
+              lessonId: l.lessonId || l.LessonId,
+              name: l.lessonTitle || l.LessonTitle || l.title || l.Title || l.name || '',
+              title: l.lessonTitle || l.LessonTitle || l.title || l.Title || l.name || '',
+              status: conditionLabel || 'غير مختبر',
+              comment: l.notes || l.Notes,
+              evaluationDate: l.feedbackDate || l.FeedbackDate
             };
           });
 
           return {
-            name: m.moduleName,
+            moduleId: m.moduleId || m.ModuleId,
+            name: moduleName,
             totalLessons: mTotal,
             completedLessons: mCompleted,
             units: [
               {
-                name: 'دروس الموديول',
-                lessons: lessons
+                unitId: `unit_${moduleName}_${testerName}`,
+                name: moduleName,
+                lessons: mappedLessons
               }
             ]
           };
         })
       };
     });
-    
-    this.uniqueTesters = this.formattedTesters.map(t => t.groupName);
+
+    this.uniqueTesters = this.formattedTesters.map((t: any) => t.groupName);
   }
 }

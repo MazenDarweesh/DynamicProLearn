@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
   templateUrl: './evaluations-dashboard.component.html',
   styleUrls: ['./evaluations-dashboard.component.css']
 })
-export class EvaluationsDashboardComponent {
+export class EvaluationsDashboardComponent implements OnChanges {
   @Input() isLoading = false;
   @Input() title = '';
   @Input() subtitle = '';
@@ -24,7 +24,15 @@ export class EvaluationsDashboardComponent {
   @Input() filterType: 'version' | 'tester' = 'version'; // 'version' or 'tester'
   
   // Data array containing the versions/testers with their modules
-  @Input() dataGroups: any[] = [];
+  private _dataGroups: any[] = [];
+  @Input() 
+  set dataGroups(value: any[]) {
+    this._dataGroups = value || [];
+    this.applyFilters();
+  }
+  get dataGroups(): any[] {
+    return this._dataGroups;
+  }
   
   // Search state
   searchQuery = '';
@@ -32,10 +40,6 @@ export class EvaluationsDashboardComponent {
   isAllExpanded = false;
 
   filteredGroups: any[] = [];
-
-  ngOnChanges() {
-    this.applyFilters();
-  }
 
   toggleExpandAll() {
     this.isAllExpanded = !this.isAllExpanded;
