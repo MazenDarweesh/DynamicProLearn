@@ -1056,10 +1056,6 @@ public class CompanyService : ICompanyService
 
         var feedbacksDict = feedbacksList.ToDictionary(f => $"{f.ErpVersionId}_{f.LessonId}");
 
-        int completedCount = progressesDict.Values.Count(p => p.IsCompleted);
-        int totalAssigned = allLessonsCount;
-        int progressPercent = totalAssigned > 0 ? (int)Math.Round((double)completedCount / totalAssigned * 100) : 0;
-
         var feedbacksDto = new List<LearnDynamicPro.Application.DTOs.Tester.TesterLessonFeedbackDto>();
 
         foreach (var version in assignedHierarchy)
@@ -1091,6 +1087,10 @@ public class CompanyService : ICompanyService
                 }
             }
         }
+
+        int totalAssigned = feedbacksDto.Count;
+        int completedCount = feedbacksDto.Count(f => f.Status != "غير مختبر");
+        int progressPercent = totalAssigned > 0 ? (int)Math.Round((double)completedCount / totalAssigned * 100) : 0;
 
         var result = new LearnDynamicPro.Application.DTOs.Tester.TesterDetailsDto
         {

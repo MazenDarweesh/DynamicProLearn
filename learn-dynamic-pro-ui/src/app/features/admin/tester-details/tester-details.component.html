@@ -51,15 +51,29 @@
   </div>
 
   <div class="card p-0">
+    <!-- Filters -->
+    <div *ngIf="formattedVersions.length > 0" class="filter-container d-flex gap-3 align-center p-4" style="border-bottom: 1px solid rgba(0,0,0,0.05); background-color: #f8fafc; border-radius: 12px 12px 0 0;">
+      <div style="flex: 1; position: relative;">
+        <i class="fi fi-rr-search" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--color-primary);"></i>
+        <input type="text" class="form-control" style="padding-right: 40px; margin: 0; background-color: white;" placeholder="ابحث باسم الدرس..." [(ngModel)]="searchQuery" (input)="applyFilters()" />
+      </div>
+      <div style="width: 250px;">
+        <select class="form-control" style="margin: 0; background-color: white;" [(ngModel)]="selectedVersion" (change)="applyFilters()">
+          <option value="">كل النسخ</option>
+          <option *ngFor="let version of uniqueVersions" [value]="version">{{ version }}</option>
+        </select>
+      </div>
+    </div>
+
     <!-- Empty State -->
-    <div *ngIf="formattedVersions.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
+    <div *ngIf="filteredVersions.length === 0" class="empty-state p-5" style="text-align: center; color: #64748b;">
       <i class="fi fi-rr-folder-open mb-3" style="font-size: 40px; color: rgba(0,0,0,0.1);"></i>
       <h3 class="m-0">لا توجد تقييمات</h3>
-      <p class="mt-2">لم يقم هذا المختبر بتقييم أي دروس حتى الآن.</p>
+      <p class="mt-2">لم يتم العثور على أي بيانات مطابقة.</p>
     </div>
 
     <!-- Feedbacks Table -->
-    <div *ngFor="let version of formattedVersions" class="mb-5">
+    <div *ngFor="let version of filteredVersions" class="mb-5">
       <div style="background: rgba(67, 56, 202, 0.05); padding: 15px 20px; border-radius: 12px 12px 0 0; border-bottom: 1px solid rgba(0,0,0,0.05); margin-bottom: -1px; position: relative; z-index: 1;">
         <h3 class="m-0" style="color: var(--color-navy); display: flex; align-items: center; gap: 10px; font-size: 16px;">
           <i class="fi fi-rr-code-branch" style="color: var(--color-primary); font-size: 18px;"></i> {{ version.versionName }}

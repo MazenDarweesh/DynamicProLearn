@@ -457,60 +457,6 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.ToTable("Modules");
                 });
 
-            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TestCycle", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("CreatedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.Property<DateTime?>("LastModifiedAt")
-                        .HasColumnType("datetime2");
-
-                    b.Property<string>("LastModifiedBy")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<Guid>("TesterId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("VersionId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("TesterId");
-
-                    b.HasIndex("VersionId");
-
-                    b.ToTable("TestCycles");
-                });
-
-            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TestCycleModule", b =>
-                {
-                    b.Property<Guid>("TestCycleId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid>("ModuleId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("bit");
-
-                    b.HasKey("TestCycleId", "ModuleId");
-
-                    b.HasIndex("ModuleId");
-
-                    b.ToTable("TestCycleModules");
-                });
-
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TesterActiveVersion", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -926,44 +872,6 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Navigation("CreatedByAdmin");
                 });
 
-            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TestCycle", b =>
-                {
-                    b.HasOne("LearnDynamicPro.Domain.Entities.User", "Tester")
-                        .WithMany("TestCycles")
-                        .HasForeignKey("TesterId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("LearnDynamicPro.Domain.Entities.ErpVersion", "Version")
-                        .WithMany("TestCycles")
-                        .HasForeignKey("VersionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Tester");
-
-                    b.Navigation("Version");
-                });
-
-            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TestCycleModule", b =>
-                {
-                    b.HasOne("LearnDynamicPro.Domain.Entities.Module", "Module")
-                        .WithMany("TestCycleModules")
-                        .HasForeignKey("ModuleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("LearnDynamicPro.Domain.Entities.TestCycle", "TestCycle")
-                        .WithMany("AssignedModules")
-                        .HasForeignKey("TestCycleId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Module");
-
-                    b.Navigation("TestCycle");
-                });
-
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TesterActiveVersion", b =>
                 {
                     b.HasOne("LearnDynamicPro.Domain.Entities.ErpVersion", "ErpVersion")
@@ -1066,7 +974,7 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .IsRequired();
 
                     b.HasOne("LearnDynamicPro.Domain.Entities.ErpVersion", "Version")
-                        .WithMany()
+                        .WithMany("AssignedTesters")
                         .HasForeignKey("VersionId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1079,7 +987,7 @@ namespace LearnDynamicPro.Infrastructure.Migrations
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.VersionTesterModule", b =>
                 {
                     b.HasOne("LearnDynamicPro.Domain.Entities.Module", "Module")
-                        .WithMany()
+                        .WithMany("VersionTesterModules")
                         .HasForeignKey("ModuleId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
@@ -1120,9 +1028,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                 {
                     b.Navigation("ActiveTesters");
 
-                    b.Navigation("Feedbacks");
+                    b.Navigation("AssignedTesters");
 
-                    b.Navigation("TestCycles");
+                    b.Navigation("Feedbacks");
                 });
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.FeedbackConditionOption", b =>
@@ -1146,14 +1054,9 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                 {
                     b.Navigation("Assignments");
 
-                    b.Navigation("TestCycleModules");
-
                     b.Navigation("Units");
-                });
 
-            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TestCycle", b =>
-                {
-                    b.Navigation("AssignedModules");
+                    b.Navigation("VersionTesterModules");
                 });
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TypeOption", b =>
@@ -1175,8 +1078,6 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Navigation("Feedbacks");
 
                     b.Navigation("MarkedProgresses");
-
-                    b.Navigation("TestCycles");
                 });
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.VersionTester", b =>

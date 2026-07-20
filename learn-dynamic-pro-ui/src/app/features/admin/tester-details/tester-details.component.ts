@@ -1,5 +1,6 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
@@ -12,7 +13,7 @@ import { CurriculumViewerComponent } from '../../../shared/components/curriculum
 @Component({
   selector: 'app-tester-details',
   standalone: true,
-  imports: [CommonModule, AdminHeaderComponent, ProgressBarComponent, CurriculumViewerComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, CurriculumViewerComponent],
   templateUrl: './tester-details.component.html',
   styleUrls: ['./tester-details.component.css']
 })
@@ -27,6 +28,11 @@ export class TesterDetailsComponent implements OnInit {
   isAllExpanded = false;
   
   formattedVersions: any[] = [];
+  filteredVersions: any[] = [];
+
+  searchQuery = '';
+  selectedVersion = '';
+  uniqueVersions: string[] = [];
 
   toggleExpandAll(): void {
     this.isAllExpanded = !this.isAllExpanded;
@@ -125,6 +131,36 @@ export class TesterDetailsComponent implements OnInit {
         units: Array.from((m.unitsMap as Map<string, any>).values())
       }))
     }));
+    
+    this.uniqueVersions = Array.from(versionsMap.keys());
+    this.applyFilters();
+  }
+
+  applyFilters(): void {
+    let result = this.formattedVersions;
+
+    if (this.selectedVersion) {
+      result = result.filter(v => v.versionName === this.selectedVersion);
+    }
+
+    if (this.searchQuery) {
+      const q = this.searchQuery.toLowerCase();
+      
+      result = result.map(v => {
+        const filteredModules = v.modules.map((m: any) => {
+          const filteredUnits = m.units.map((u: any) => {
+            const filteredLessons = u.lessons.filter((l: any) => l.name.toLowerCase().includes(q));
+            return { ...u, lessons: filteredLessons };
+          }).filter((u: any) => u.lessons.length > 0);
+          
+          return { ...m, units: filteredUnits };
+        }).filter((m: any) => m.units.length > 0);
+        
+        return { ...v, modules: filteredModules };
+      }).filter(v => v.modules.length > 0);
+    }
+
+    this.filteredVersions = result;
   }
 
   exportToExcel(): void {
