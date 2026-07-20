@@ -1,26 +1,30 @@
-<app-admin-header 
-  *ngIf="versionDetails"
-  title="تفاصيل الإصدار: {{ versionDetails.versionLabel }}" 
-  subtitle="مراجعة التقييمات والتعليقات الخاصة بكل مختبر"
-  [showBackBtn]="true">
-</app-admin-header>
+<div class="console-container" dir="rtl">
+  <app-admin-header 
+    *ngIf="versionDetails"
+    title="تفاصيل الإصدار: {{ versionDetails.versionLabel }}" 
+    subtitle="مراجعة التقييمات والتعليقات الخاصة بكل مختبر"
+    [showBackBtn]="true">
+  </app-admin-header>
 
-<app-evaluations-dashboard
-  *ngIf="versionDetails"
-  [isLoading]="isLoading"
-  title="بيانات الإصدار وتقييماته"
-  subtitle="حالة الدروس بناءً على إسناد المختبرين"
-  [name]="versionDetails.versionLabel"
-  [completedLessons]="completedLessonsCount"
-  [totalAssignedLessons]="totalLessonsCount"
-  filterType="tester"
-  [filterOptions]="uniqueTesters"
-  [dataGroups]="formattedTesters">
-</app-evaluations-dashboard>
+  <div class="console-body">
+    <app-evaluations-dashboard
+      *ngIf="versionDetails"
+      [isLoading]="isLoading"
+      title="بيانات الإصدار وتقييماته"
+      subtitle="حالة الدروس بناءً على إسناد المختبرين"
+      [name]="versionDetails.versionLabel"
+      [completedLessons]="completedLessonsCount"
+      [totalAssignedLessons]="totalLessonsCount"
+      filterType="tester"
+      [filterOptions]="uniqueTesters"
+      [dataGroups]="formattedTesters">
+    </app-evaluations-dashboard>
 
-<div *ngIf="isLoading" class="d-flex align-center w-100" style="justify-content: center; height: 50vh;">
-  <div style="text-align: center;">
-    <i class="fi fi-rr-spinner" style="font-size: 32px; color: var(--color-primary); display: inline-block; animation: spin 1s linear infinite;"></i>
-    <p class="text-secondary mt-3" style="font-size: 18px; margin: 0;">جاري تحميل بيانات الإصدار...</p>
+    <div *ngIf="isLoading" class="d-flex align-center w-100" style="justify-content: center; height: 50vh;">
+      <div style="text-align: center;">
+        <i class="fi fi-rr-spinner" style="font-size: 32px; color: var(--color-primary); display: inline-block; animation: spin 1s linear infinite;"></i>
+        <p class="text-secondary mt-3" style="font-size: 18px; margin: 0;">جاري تحميل بيانات الإصدار...</p>
+      </div>
+    </div>
   </div>
 </div>

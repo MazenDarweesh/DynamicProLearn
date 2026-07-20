@@ -42,7 +42,7 @@
         (click)="goTo('/admin/analytics')">الدروس <span class="icon">📈</span></button>
       <button class="nav-btn" [class.active]="currentRoute === '/admin/employees'"
         (click)="goTo('/admin/employees')">الموظفون <span class="icon">👥</span></button>
-      <button class="nav-btn" [class.active]="currentRoute.startsWith('/admin/testers')"
+      <button class="nav-btn" [class.active]="currentRoute.startsWith('/admin/testers') || currentRoute.startsWith('/admin/versions')"
         (click)="goTo('/admin/testers')">المختبرون <span class="icon">🧪</span></button>
     </nav>
 

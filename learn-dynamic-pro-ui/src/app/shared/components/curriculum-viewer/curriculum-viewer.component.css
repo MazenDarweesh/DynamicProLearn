@@ -10,9 +10,7 @@
   direction: rtl;
 }
 
-.header {
-  margin-bottom: 30px;
-}
+.header { margin-bottom: 30px; }
 
 .btn-back {
   background: none;
@@ -26,9 +24,7 @@
   align-items: center;
   gap: 5px;
 }
-.btn-back:hover {
-  color: var(--color-primary);
-}
+.btn-back:hover { color: var(--color-primary); }
 
 .d-flex { display: flex; }
 .justify-between { justify-content: space-between; }
@@ -63,12 +59,12 @@
 }
 .btn-blue:hover { opacity: 0.9; }
 
-.text-primary { color: var(--color-primary); }
+.text-primary   { color: var(--color-primary); }
 .text-secondary { color: var(--color-text-secondary); }
-.text-danger { color: var(--color-danger); }
-.text-success { color: #137333; }
-.fw-500 { font-weight: 500; }
-.text-sm { font-size: 13px; }
+.text-danger    { color: var(--color-danger); }
+.text-success   { color: #137333; }
+.fw-500         { font-weight: 500; }
+.text-sm        { font-size: 13px; }
 
 .card {
   background: var(--color-bg-card);
@@ -78,10 +74,8 @@
   box-shadow: 0 4px 12px rgba(0,0,0,0.02);
 }
 
-.filters {
-  display: flex;
-  gap: 15px;
-}
+.filters { display: flex; gap: 15px; }
+
 .form-control {
   padding: 12px 15px;
   border: 1px solid var(--color-border);
@@ -92,53 +86,25 @@
   width: 100%;
 }
 
-
-
-.badge { padding: 4px 10px; border-radius: 6px; display: inline-block; font-size: 12px; font-weight: 600; }
-.badge-success { background: #E6F4EA; color: #137333; }
-
-.department-link {
-  color: var(--brand-blue);
-  text-decoration: none;
+/* ── Badge Variants ──────────────────────────────────────── */
+.badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  display: inline-block;
+  font-size: 11px;
   font-weight: 600;
-  transition: color 0.2s ease;
+  white-space: nowrap;
+  max-width: 210px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.department-link:hover {
-  color: var(--brand-orange);
-  text-decoration: underline;
-}
+.badge-success   { background: #E6F4EA; color: #137333; }
+.badge-danger    { background: #FCE8E6; color: #C5221F; }
+.badge-warning   { background: #FEF7E0; color: #B06000; }
+.badge-info      { background: #E8F0FE; color: #1A73E8; }
+.badge-secondary { background: #F1F3F4; color: #5F6368; }
 
-/* Modal Styles */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0; width: 100vw; height: 100vh;
-  background: rgba(0,0,0,0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal-content {
-  background: white;
-  width: 500px;
-  max-width: 90%;
-  border-radius: 12px;
-  padding: 25px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-  direction: rtl;
-}
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-}
-.modal-title { margin: 0; font-size: 18px; color: var(--color-navy); }
-.btn-close {
-  background: none; border: none; font-size: 24px; cursor: pointer; color: var(--color-text-secondary);
-}
-
-/* Pagination */
+/* ── Pagination ──────────────────────────────────────────── */
 .pagination {
   display: flex;
   justify-content: center;
@@ -154,8 +120,9 @@
   cursor: pointer;
 }
 .page-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.page-btn.active { background: var(--color-primary); color: white; border-color: var(--color-primary); }
+.page-btn.active   { background: var(--color-primary); color: white; border-color: var(--color-primary); }
 
+/* ── Module Checkbox ─────────────────────────────────────── */
 .module-checkbox-list {
   max-height: 300px;
   overflow-y: auto;
@@ -172,12 +139,11 @@
 }
 .checkbox-item:last-child { border-bottom: none; }
 
+/* ── Analytics Row ───────────────────────────────────────── */
 .analytics-row {
   cursor: pointer;
   transition: background-color 0.2s ease, transform 0.1s ease;
   padding: 12px 15px !important;
   border-radius: 8px;
 }
-.analytics-row:hover {
-  background-color: rgba(67, 56, 202, 0.04);
-}
+.analytics-row:hover { background-color: rgba(67, 56, 202, 0.04); }

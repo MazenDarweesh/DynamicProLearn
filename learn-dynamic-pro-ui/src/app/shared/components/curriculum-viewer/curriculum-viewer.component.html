@@ -5,8 +5,8 @@
                       [forceExpandAll]="isAllExpanded">
   <!-- HEADER -->
   <ng-template #header>
-    <th style="color: var(--color-primary)">الموديول</th>
-    <th style="text-align: right; width: 300px; color: var(--color-primary)">التقدم</th>
+    <th style="color: var(--color-primary); text-align: right; padding-right: 20px;">الموديول</th>
+    <th style="text-align: left; padding-left: 20px; width: 300px; color: var(--color-primary)">التقدم</th>
   </ng-template>
 
   <!-- ROW -->
@@ -51,9 +51,9 @@
                [class.analytics-row]="isAnalyticsView"
                (click)="viewLessonAnalytics(lesson.lessonId)">
                
-            <div class="fw-500 text-secondary d-flex align-center gap-2" style="flex: 1;">
+            <div class="fw-500 text-secondary d-flex align-center gap-2" style="flex: 1; text-align: right; direction: rtl;">
               <span class="icon" style="font-size: 14px; color: var(--color-primary); opacity: 0.8;">📄</span>
-              {{ lesson.name || lesson.title }}
+              {{ lesson.name || lesson.title || lesson.lessonTitle }}
             </div>
             
             <!-- STUDENT VIEW: SHOW STATUS -->
@@ -82,24 +82,27 @@
             <!-- TESTER VIEW: SHOW STATUS, COMMENT, DATE -->
             <ng-container *ngIf="isTesterView">
               <div class="d-flex align-center gap-3" style="flex: 2; justify-content: flex-end;">
-                <div style="width: 100px; text-align: center;">
+                <div style="width: 110px; text-align: center;">
                   <span class="badge" 
                         [ngClass]="{
-                          'badge-success': lesson.status === 'مكتمل' || lesson.status === 'سليم 100%',
-                          'badge-danger': lesson.status === 'بها أخطاء',
-                          'badge-secondary': lesson.status === 'غير مختبر'
+                          'badge-success': lesson.status && (lesson.status.includes('🟩') || lesson.status === 'مكتمل' || lesson.status === 'سليم 100%'),
+                          'badge-warning': lesson.status && (lesson.status.includes('🟨') || lesson.status.includes('خلل')),
+                          'badge-danger': lesson.status && (lesson.status.includes('🟥') || lesson.status.includes('☠️') || lesson.status.includes('بها أخطاء')),
+                          'badge-info': lesson.status && lesson.status.includes('⚙️'),
+                          'badge-secondary': !lesson.status || lesson.status === 'غير مختبر'
                         }">
-                    {{ lesson.status }}
+                    {{ lesson.status || 'غير مختبر' }}
                   </span>
                 </div>
                 <div style="width: 250px; text-align: right;">
                   <p class="m-0" style="font-size: 12px; color: #475569; white-space: pre-wrap; line-height: 1.4;">{{ lesson.comment || '-' }}</p>
                 </div>
-                <div class="text-secondary text-sm" style="width: 100px; text-align: left;">
+                <div class="text-secondary text-sm" style="width: 120px; text-align: left;">
                   {{ lesson.evaluationDate ? (lesson.evaluationDate | date:'yyyy-MM-dd') : '-' }}
                 </div>
               </div>
             </ng-container>
+
 
             <!-- ANALYTICS VIEW: SHOW ENROLLED/COMPLETED STATS -->
             <ng-container *ngIf="isAnalyticsView">

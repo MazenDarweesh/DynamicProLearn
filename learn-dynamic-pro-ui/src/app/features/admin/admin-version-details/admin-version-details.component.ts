@@ -10,7 +10,8 @@ import { Dialog } from '../../../core/utils/dialog';
   selector: 'app-admin-version-details',
   standalone: true,
   imports: [CommonModule, AdminHeaderComponent, EvaluationsDashboardComponent],
-  templateUrl: './admin-version-details.component.html'
+  templateUrl: './admin-version-details.component.html',
+  styleUrls: ['./admin-version-details.component.css']
 })
 export class AdminVersionDetailsComponent implements OnInit {
   private route = inject(ActivatedRoute);

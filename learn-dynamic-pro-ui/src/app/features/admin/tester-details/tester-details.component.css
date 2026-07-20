@@ -1,12 +1,15 @@
-.dashboard-container {
+.console-container {
     background-color: var(--color-bg-page);
     min-height: 100vh;
-    padding: 24px;
+    font-family: 'Readex Pro', sans-serif;
+}
+
+.console-body {
+    padding: 30px;
     max-width: 1400px;
     margin: 0 auto;
-    font-family: 'Readex Pro', sans-serif;
-    text-align: right;
     direction: rtl;
+    text-align: right;
 }
 
 .d-flex { display: flex; }
