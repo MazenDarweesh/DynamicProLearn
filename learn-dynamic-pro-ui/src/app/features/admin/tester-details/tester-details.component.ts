@@ -8,12 +8,12 @@ import { ProgressBarComponent } from '../../../shared/components/progress-bar/pr
 import { Dialog } from '../../../core/utils/dialog';
 import * as XLSX from 'xlsx';
 
-import { CurriculumViewerComponent } from '../../../shared/components/curriculum-viewer/curriculum-viewer.component';
+import { EvaluationsDashboardComponent } from '../../../shared/components/evaluations-dashboard/evaluations-dashboard.component';
 
 @Component({
   selector: 'app-tester-details',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, ProgressBarComponent, CurriculumViewerComponent],
+  imports: [CommonModule, FormsModule, AdminHeaderComponent, EvaluationsDashboardComponent],
   templateUrl: './tester-details.component.html',
   styleUrls: ['./tester-details.component.css']
 })
@@ -25,18 +25,10 @@ export class TesterDetailsComponent implements OnInit {
   testerId = '';
   testerDetails: any = null;
   isLoading = true;
-  isAllExpanded = false;
   
   formattedVersions: any[] = [];
-  filteredVersions: any[] = [];
-
-  searchQuery = '';
-  selectedVersion = '';
   uniqueVersions: string[] = [];
 
-  toggleExpandAll(): void {
-    this.isAllExpanded = !this.isAllExpanded;
-  }
 
   ngOnInit(): void {
     this.testerId = this.route.snapshot.paramMap.get('id') || '';
@@ -120,7 +112,7 @@ export class TesterDetailsComponent implements OnInit {
     });
     
     this.formattedVersions = Array.from(versionsMap.values()).map(v => ({
-      versionName: v.versionName,
+      groupName: v.versionName,
       totalLessons: v.totalLessons,
       completedLessons: v.completedLessons,
       modules: Array.from((v.modulesMap as Map<string, any>).values()).map(m => ({
@@ -133,60 +125,6 @@ export class TesterDetailsComponent implements OnInit {
     }));
     
     this.uniqueVersions = Array.from(versionsMap.keys());
-    this.applyFilters();
   }
 
-  applyFilters(): void {
-    let result = this.formattedVersions;
-
-    if (this.selectedVersion) {
-      result = result.filter(v => v.versionName === this.selectedVersion);
-    }
-
-    if (this.searchQuery) {
-      const q = this.searchQuery.toLowerCase();
-      
-      result = result.map(v => {
-        const filteredModules = v.modules.map((m: any) => {
-          const filteredUnits = m.units.map((u: any) => {
-            const filteredLessons = u.lessons.filter((l: any) => l.name.toLowerCase().includes(q));
-            return { ...u, lessons: filteredLessons };
-          }).filter((u: any) => u.lessons.length > 0);
-          
-          return { ...m, units: filteredUnits };
-        }).filter((m: any) => m.units.length > 0);
-        
-        return { ...v, modules: filteredModules };
-      }).filter(v => v.modules.length > 0);
-    }
-
-    this.filteredVersions = result;
-  }
-
-  exportToExcel(): void {
-    if (!this.testerDetails || !this.testerDetails.feedbacks || this.testerDetails.feedbacks.length === 0) {
-      Dialog.alert('لا توجد بيانات لتصديرها', 'تنبيه', 'info');
-      return;
-    }
-
-    const dataToExport = this.testerDetails.feedbacks.map((f: any) => ({
-      'النسخة': f.versionName || 'نسخة مجهولة',
-      'الموديول': f.moduleName,
-      'الوحدة': f.unitName,
-      'الدرس': f.lessonName,
-      'الحالة': f.status,
-      'تعليقات المختبر': f.comment || 'لا يوجد تعليق',
-      'تاريخ التقييم': f.evaluationDate ? new Date(f.evaluationDate).toLocaleDateString('ar-EG') : 'غير متوفر'
-    }));
-
-    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(dataToExport);
-    const wb: XLSX.WorkBook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'تقييمات المختبر');
-
-    // RTL direction for Excel sheet
-    if(!ws['!dir']) ws['!dir'] = 'rtl';
-
-    const fileName = `تقييمات_المختبر_${this.testerDetails.name}.xlsx`;
-    XLSX.writeFile(wb, fileName);
-  }
 }
