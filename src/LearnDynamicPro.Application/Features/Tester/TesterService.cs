@@ -112,7 +112,7 @@ public class TesterService : ITesterService
                 ErpVersionId = request.ErpVersionId,
                 BranchName = request.BranchName
             };
-            _unitOfWork.Repository<TesterActiveVersion>().AddAsync(activeVersion);
+            await _unitOfWork.Repository<TesterActiveVersion>().AddAsync(activeVersion);
         }
         else
         {

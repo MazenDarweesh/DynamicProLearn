@@ -948,20 +948,70 @@ public class CompanyService : ICompanyService
 
         var testCycles = await _unitOfWork.Repository<VersionTester>().Query()
             .AsNoTracking()
+            .Include(tc => tc.Version)
+            .Include(tc => tc.AssignedModules)
+                .ThenInclude(am => am.Module)
+                    .ThenInclude(m => m.Units)
+                        .ThenInclude(u => u.Lessons)
             .Where(tc => userIds.Contains(tc.TesterId))
-            .Select(tc => new
-            {
-                TesterId = tc.TesterId,
-                Modules = tc.AssignedModules.Select(am => am.Module != null ? am.Module.Name : "")
+            .ToListAsync();
+
+        var progressesList = await _unitOfWork.Repository<LessonProgress>().Query()
+            .AsNoTracking()
+            .Where(p => userIds.Contains(p.UserId))
+            .Select(p => new { p.UserId, p.LessonId, p.IsCompleted })
+            .ToListAsync();
+
+        var feedbacksList = await _unitOfWork.Repository<TesterFeedback>().Query()
+            .AsNoTracking()
+            .Where(f => userIds.Contains(f.UserId))
+            .Select(f => new 
+            { 
+                f.UserId,
+                f.ErpVersionId,
+                f.LessonId, 
+                Label = f.ConditionOption != null ? f.ConditionOption.Label : "تم التقييم"
             })
             .ToListAsync();
 
-        var progressMap = await _progressAnalytics.GetUsersProgressAsync(userIds);
-
         var progressList = users.Select(u => {
             var userCycles = testCycles.Where(tc => tc.TesterId == u.Id).ToList();
-            var assignedModulesNames = string.Join(", ", userCycles.SelectMany(tc => tc.Modules).Distinct());
-            var p = progressMap.ContainsKey(u.Id) ? progressMap[u.Id] : new ProgressResult();
+            var assignedModulesNames = string.Join(", ", userCycles.SelectMany(tc => tc.AssignedModules).Select(am => am.Module?.Name ?? "").Distinct());
+            var assignedVersionsNames = string.Join(", ", userCycles.Select(tc => tc.Version?.VersionLabel ?? "").Distinct());
+
+            int totalLessons = 0;
+            int completedLessons = 0;
+
+            var userProgresses = progressesList.Where(p => p.UserId == u.Id).ToDictionary(p => p.LessonId);
+            var userFeedbacks = feedbacksList.Where(f => f.UserId == u.Id).ToDictionary(f => $"{f.ErpVersionId}_{f.LessonId}");
+
+            foreach (var cycle in userCycles)
+            {
+                foreach (var am in cycle.AssignedModules)
+                {
+                    if (am.Module == null || am.Module.Units == null) continue;
+                    foreach (var unit in am.Module.Units)
+                    {
+                        if (unit.Lessons == null) continue;
+                        foreach (var lesson in unit.Lessons)
+                        {
+                            totalLessons++;
+                            
+                            userProgresses.TryGetValue(lesson.Id, out var progress);
+                            userFeedbacks.TryGetValue($"{cycle.VersionId}_{lesson.Id}", out var feedback);
+                            
+                            var status = "غير مختبر";
+                            if (progress != null && progress.IsCompleted) status = "مكتمل";
+                            if (feedback != null) status = feedback.Label;
+
+                            if (status != "غير مختبر")
+                            {
+                                completedLessons++;
+                            }
+                        }
+                    }
+                }
+            }
 
             return new UserProgressDto
             {
@@ -969,8 +1019,9 @@ public class CompanyService : ICompanyService
                 UserName = u.Username,
                 Role = u.Role.ToString(),
                 AssignedModules = string.IsNullOrEmpty(assignedModulesNames) ? "لا يوجد" : assignedModulesNames,
-                CompletedLessons = p.Completed,
-                TotalLessons = p.Total
+                AssignedVersions = string.IsNullOrEmpty(assignedVersionsNames) ? "لا يوجد" : assignedVersionsNames,
+                CompletedLessons = completedLessons,
+                TotalLessons = totalLessons
             };
         }).ToList();
 

@@ -68,6 +68,7 @@ export class AdminTestersComponent implements OnInit {
           userId: t.userId,
           name: t.username || t.userName,
           role: 'مختبر نظام',
+          assignedVersions: t.assignedVersions,
           assignedModules: t.assignedModules,
           completed: t.completedLessons,
           totalLessons: t.totalLessons,

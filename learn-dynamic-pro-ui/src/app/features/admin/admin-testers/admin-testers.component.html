@@ -75,6 +75,7 @@
           <thead>
             <tr>
               <th>المختبر</th>
+              <th>النسخ المسندة</th>
               <th>الموديولات المتاحة</th>
               <th>التقدم (الدروس المكتملة)</th>
               <th width="100" class="text-left">إجراءات</th>
@@ -87,6 +88,7 @@
                   {{ t.name }}
                 </a>
               </td>
+              <td class="text-secondary">{{ t.assignedVersions || 'لا يوجد' }}</td>
               <td class="text-secondary">{{ t.assignedModules }}</td>
               <td>
                 <app-progress-bar 

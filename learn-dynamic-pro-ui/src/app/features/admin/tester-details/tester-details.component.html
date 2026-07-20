@@ -55,7 +55,7 @@
     <div *ngIf="formattedVersions.length > 0" class="filter-container d-flex gap-3 align-center p-4" style="border-bottom: 1px solid rgba(0,0,0,0.05); background-color: #f8fafc; border-radius: 12px 12px 0 0;">
       <div style="flex: 1; position: relative;">
         <i class="fi fi-rr-search" style="position: absolute; right: 15px; top: 50%; transform: translateY(-50%); color: var(--color-primary);"></i>
-        <input type="text" class="form-control" style="padding-right: 40px; margin: 0; background-color: white;" placeholder="ابحث باسم الدرس..." [(ngModel)]="searchQuery" (input)="applyFilters()" />
+        <input type="text" class="form-control" style="background-image: none; padding-right: 40px; padding-left: 15px; margin: 0; background-color: white;" placeholder="ابحث باسم الدرس..." [(ngModel)]="searchQuery" (input)="applyFilters()" />
       </div>
       <div style="width: 250px;">
         <select class="form-control" style="margin: 0; background-color: white;" [(ngModel)]="selectedVersion" (change)="applyFilters()">

@@ -36,7 +36,7 @@ public class ProgressService : IProgressService
                 CompletedAt = request.IsCompleted ? DateTime.UtcNow : null,
                 CompletionSource = CompletionSource.Self
             };
-            _unitOfWork.Repository<LessonProgress>().AddAsync(progress);
+            await _unitOfWork.Repository<LessonProgress>().AddAsync(progress);
         }
         else
         {
@@ -75,7 +75,7 @@ public class ProgressService : IProgressService
                 CompletionSource = CompletionSource.AdminOverride,
                 MarkedByUserId = adminId
             };
-            _unitOfWork.Repository<LessonProgress>().AddAsync(progress);
+            await _unitOfWork.Repository<LessonProgress>().AddAsync(progress);
         }
         else
         {
