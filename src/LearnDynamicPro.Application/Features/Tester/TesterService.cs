@@ -344,24 +344,36 @@ public class TesterService : ITesterService
             })
             .ToListAsync();
 
+        var testerIds = testersData.Select(t => t.TesterId).Distinct().ToList();
+
+        // Fetch completed LessonProgress for these testers
+        var progresses = await _unitOfWork.Repository<LessonProgress>().Query()
+            .AsNoTracking()
+            .Where(p => testerIds.Contains(p.UserId) && p.IsCompleted)
+            .Select(p => new { p.UserId, p.LessonId, p.CompletedAt })
+            .ToListAsync();
+
+        var progressLookup = progresses
+            .GroupBy(p => $"{p.UserId}_{p.LessonId}")
+            .ToDictionary(g => g.Key, g => g.First());
+
         // Fetch all feedbacks for this version
         var allFeedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
             .AsNoTracking()
-            .Where(f => f.ErpVersionId == versionId)
+            .Where(f => f.ErpVersionId == versionId && testerIds.Contains(f.UserId))
             .Select(f => new
             {
                 f.UserId,
                 f.LessonId,
-                ConditionLabel = f.ConditionOption != null ? f.ConditionOption.Label : null,
+                ConditionLabel = f.ConditionOption != null ? f.ConditionOption.Label : "تم التقييم",
                 f.Notes,
                 f.CreatedAt
             })
             .ToListAsync();
 
-        // Build a quick lookup: (userId, lessonId) → feedback
-        var feedbackLookup = allFeedbacks.ToDictionary(
-            f => $"{f.UserId}_{f.LessonId}",
-            f => f);
+        var feedbackLookup = allFeedbacks
+            .GroupBy(f => $"{f.UserId}_{f.LessonId}")
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(x => x.CreatedAt).First());
 
         var dto = new VersionProgressDto
         {
@@ -392,15 +404,21 @@ public class TesterService : ITesterService
                 {
                     foreach (var lesson in unit.Lessons)
                     {
-                        feedbackLookup.TryGetValue($"{vt.TesterId}_{lesson.LessonId}", out var fb);
+                        var key = $"{vt.TesterId}_{lesson.LessonId}";
+                        feedbackLookup.TryGetValue(key, out var fb);
+                        progressLookup.TryGetValue(key, out var prog);
+
+                        var status = "غير مختبر";
+                        if (prog != null) status = "مكتمل";
+                        if (fb != null) status = !string.IsNullOrEmpty(fb.ConditionLabel) ? fb.ConditionLabel : "تم التقييم";
 
                         mDto.Lessons.Add(new LessonFeedbackDto
                         {
                             LessonId = lesson.LessonId,
                             LessonTitle = lesson.LessonTitle,
-                            ConditionLabel = fb?.ConditionLabel,
+                            ConditionLabel = status,
                             Notes = fb?.Notes,
-                            FeedbackDate = fb?.CreatedAt
+                            FeedbackDate = fb?.CreatedAt ?? prog?.CompletedAt
                         });
                     }
                 }

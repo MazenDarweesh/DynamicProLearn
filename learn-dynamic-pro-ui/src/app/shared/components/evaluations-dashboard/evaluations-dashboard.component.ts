@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, Output, OnChanges } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProgressBarComponent } from '../progress-bar/progress-bar.component';
@@ -12,7 +12,7 @@ import * as XLSX from 'xlsx';
   templateUrl: './evaluations-dashboard.component.html',
   styleUrls: ['./evaluations-dashboard.component.css']
 })
-export class EvaluationsDashboardComponent implements OnChanges {
+export class EvaluationsDashboardComponent {
   @Input() isLoading = false;
   @Input() title = '';
   @Input() subtitle = '';
