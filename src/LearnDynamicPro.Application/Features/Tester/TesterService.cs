@@ -215,6 +215,23 @@ public class TesterService : ITesterService
             .Include(x => x.AssignedModules)
             .FirstOrDefaultAsync(x => x.VersionId == versionId && x.TesterId == testerId);
 
+        if (moduleIds == null || moduleIds.Count == 0)
+        {
+            if (vt != null)
+            {
+                _unitOfWork.Repository<VersionTester>().Remove(vt);
+                await _unitOfWork.SaveChangesAsync();
+            }
+            return Result<VersionTesterDto>.Success(new VersionTesterDto
+            {
+                VersionId = versionId,
+                TesterId = testerId,
+                TesterName = tester.Username,
+                AssignedModulesCount = 0,
+                ModuleIds = new List<Guid>()
+            });
+        }
+
         if (vt == null)
         {
             vt = new VersionTester { VersionId = versionId, TesterId = testerId };
@@ -251,17 +268,38 @@ public class TesterService : ITesterService
     {
         var versions = await _unitOfWork.Repository<ErpVersion>().Query()
             .AsNoTracking()
-            .Select(v => new VersionSummaryDto
-            {
-                VersionId = v.Id,
-                VersionLabel = v.VersionLabel,
-                TestersCount = _unitOfWork.Repository<VersionTester>().Query().Count(vt => vt.VersionId == v.Id),
-                TotalModulesAssigned = _unitOfWork.Repository<VersionTesterModule>().Query().Count(vtm => vtm.VersionTester!.VersionId == v.Id),
-                TotalFeedbacks = _unitOfWork.Repository<TesterFeedback>().Query().Count(f => f.ErpVersionId == v.Id)
-            })
             .ToListAsync();
-            
-        return Result<List<VersionSummaryDto>>.Success(versions);
+
+        var versionIds = versions.Select(v => v.Id).ToList();
+
+        var versionTesters = await _unitOfWork.Repository<VersionTester>().Query()
+            .AsNoTracking()
+            .Where(vt => versionIds.Contains(vt.VersionId))
+            .Select(vt => new { vt.VersionId, vt.TesterId })
+            .ToListAsync();
+
+        var versionModules = await _unitOfWork.Repository<VersionTesterModule>().Query()
+            .AsNoTracking()
+            .Where(vtm => vtm.VersionTester != null && versionIds.Contains(vtm.VersionTester.VersionId))
+            .Select(vtm => new { vtm.VersionTester!.VersionId, vtm.ModuleId })
+            .ToListAsync();
+
+        var feedbacks = await _unitOfWork.Repository<TesterFeedback>().Query()
+            .AsNoTracking()
+            .Where(f => versionIds.Contains(f.ErpVersionId))
+            .Select(f => f.ErpVersionId)
+            .ToListAsync();
+
+        var result = versions.Select(v => new VersionSummaryDto
+        {
+            VersionId = v.Id,
+            VersionLabel = v.VersionLabel,
+            TestersCount = versionTesters.Where(vt => vt.VersionId == v.Id).Select(vt => vt.TesterId).Distinct().Count(),
+            TotalModulesAssigned = versionModules.Where(vtm => vtm.VersionId == v.Id).Select(vtm => vtm.ModuleId).Distinct().Count(),
+            TotalFeedbacks = feedbacks.Count(f => f == v.Id)
+        }).ToList();
+
+        return Result<List<VersionSummaryDto>>.Success(result);
     }
 
     public async Task<Result<VersionProgressDto>> GetVersionProgressAsync(Guid versionId)

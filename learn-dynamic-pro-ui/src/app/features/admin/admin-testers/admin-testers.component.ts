@@ -162,7 +162,16 @@ export class AdminTestersComponent implements OnInit {
   // ── Version CRUD ──────────────────────────────────────────────────────────
   loadVersions() {
     this.adminService.getVersionSummaries().subscribe({
-      next: (data) => this.erpVersions = data,
+      next: (data) => {
+        console.log('Version summaries response:', data);
+        this.erpVersions = data.map((v: any) => ({
+          id: v.versionId || v.id,
+          versionLabel: v.versionLabel || v.label || v.name,
+          testersCount: v.testersCount || 0,
+          assignedModulesCount: v.totalModulesAssigned || 0,
+          totalFeedbacks: v.totalFeedbacks || 0
+        }));
+      },
       error: (err) => console.error('Error loading versions', err)
     });
   }
@@ -245,6 +254,9 @@ export class AdminTestersComponent implements OnInit {
     this.adminService.getVersionProgress(version.id).subscribe({
       next: (res) => {
         this.currentVersionProgress = res;
+        if (this.selectedTesterId) {
+          this.onTesterSelectionChange();
+        }
       },
       error: (err) => console.error('Failed to load version progress', err)
     });
@@ -252,12 +264,20 @@ export class AdminTestersComponent implements OnInit {
 
   onTesterSelectionChange() {
     this.selectedModuleIds = [];
+    console.log('Selection changed. Selected tester ID:', this.selectedTesterId);
+    console.log('Current version progress:', this.currentVersionProgress);
     if (this.currentVersionProgress && this.currentVersionProgress.testers) {
-      const tester = this.currentVersionProgress.testers.find((t: any) => t.testerId === this.selectedTesterId);
+      const tester = this.currentVersionProgress.testers.find((t: any) => t.testerId === this.selectedTesterId || t.testerId.toLowerCase() === this.selectedTesterId.toLowerCase());
+      console.log('Found tester in progress:', tester);
       if (tester && tester.modules) {
-        this.selectedModuleIds = tester.modules.map((m: any) => m.moduleId);
+        this.selectedModuleIds = tester.modules.map((m: any) => m.moduleId.toLowerCase());
+        console.log('Selected modules populated:', this.selectedModuleIds);
       }
     }
+  }
+
+  isModuleSelected(moduleId: string): boolean {
+    return this.selectedModuleIds.includes(moduleId.toLowerCase());
   }
 
   closeAssignTesterModal() {
@@ -265,17 +285,18 @@ export class AdminTestersComponent implements OnInit {
   }
 
   toggleModuleSelection(moduleId: string) {
-    const idx = this.selectedModuleIds.indexOf(moduleId);
+    const idStr = moduleId.toLowerCase();
+    const idx = this.selectedModuleIds.indexOf(idStr);
     if (idx > -1) {
       this.selectedModuleIds.splice(idx, 1);
     } else {
-      this.selectedModuleIds.push(moduleId);
+      this.selectedModuleIds.push(idStr);
     }
   }
 
   submitAssignTester() {
-    if (!this.selectedTesterId || this.selectedModuleIds.length === 0 || !this.assigningVersionId) {
-      Dialog.alert('الرجاء اختيار المختبر وموديول واحد على الأقل', 'تنبيه', 'info');
+    if (!this.selectedTesterId || !this.assigningVersionId) {
+      Dialog.alert('الرجاء اختيار المختبر', 'تنبيه', 'info');
       return;
     }
 
@@ -286,6 +307,7 @@ export class AdminTestersComponent implements OnInit {
         this.isSubmitting = false;
         this.closeAssignTesterModal();
         this.loadVersions(); // Refresh table counts
+        this.loadTestersProgress(); // Refresh testers progress table
       },
       error: (err) => {
         Dialog.alert('حدث خطأ أثناء الإسناد', 'خطأ', 'error');
