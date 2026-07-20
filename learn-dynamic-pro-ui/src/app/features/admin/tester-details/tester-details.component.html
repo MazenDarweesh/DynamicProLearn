@@ -5,9 +5,10 @@
   [showBackBtn]="true">
 </app-admin-header>
 
-<div class="dashboard-container" *ngIf="!isLoading && testerDetails">
-  <div class="d-flex justify-between w-100 align-center mb-4">
-    <h2 class="m-0" style="color: var(--color-navy)">بيانات المختبر وتقييماته</h2>
+<div class="dashboard-container">
+  <div *ngIf="!isLoading && testerDetails">
+    <div class="d-flex justify-between w-100 align-center mb-4">
+      <h2 class="m-0" style="color: var(--color-navy)">بيانات المختبر وتقييماته</h2>
     <div class="d-flex align-center gap-3">
       <button (click)="toggleExpandAll()" 
               style="background: rgba(67, 56, 202, 0.1); color: #4338ca; padding: 10px 15px; border-radius: 8px; font-weight: 500; border: none; cursor: pointer; display: flex; align-items: center; gap: 8px; font-family: inherit; font-size: 14px; transition: opacity 0.2s;"
@@ -90,10 +91,13 @@
           [isTesterView]="true">
         </app-curriculum-viewer>
       </div>
+      </div>
     </div>
   </div>
-</div>
-
-<div *ngIf="isLoading" class="d-flex justify-center align-center" style="height: 50vh;">
-  <p class="text-secondary" style="font-size: 18px;">جاري تحميل بيانات المختبر...</p>
+    <div *ngIf="isLoading" class="d-flex align-center w-100" style="justify-content: center; height: 50vh;">
+      <div style="text-align: center;">
+        <i class="fi fi-rr-spinner" style="font-size: 32px; color: var(--color-primary); display: inline-block; animation: spin 1s linear infinite;"></i>
+        <p class="text-secondary mt-3" style="font-size: 18px; margin: 0;">جاري تحميل بيانات المختبر...</p>
+      </div>
+    </div>
 </div>
