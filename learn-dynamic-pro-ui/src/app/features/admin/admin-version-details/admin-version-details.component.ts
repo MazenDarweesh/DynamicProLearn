@@ -1,114 +1,104 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService } from '../../../core/services/admin.service';
-import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
-import { AdminModalComponent } from '../../../shared/components/admin-modal/admin-modal.component';
+import { EvaluationsDashboardComponent } from '../../../shared/components/evaluations-dashboard/evaluations-dashboard.component';
+import { Dialog } from '../../../core/utils/dialog';
 
 @Component({
   selector: 'app-admin-version-details',
   standalone: true,
-  imports: [CommonModule, FormsModule, AdminHeaderComponent, AdminModalComponent],
-  templateUrl: './admin-version-details.component.html',
-  styleUrl: '../admin-dashboard/admin-dashboard.component.css'
+  imports: [CommonModule, AdminHeaderComponent, EvaluationsDashboardComponent],
+  templateUrl: './admin-version-details.component.html'
 })
 export class AdminVersionDetailsComponent implements OnInit {
   private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private adminService = inject(AdminService);
-  
+
   versionId = '';
-  versionProgress: any = null;
+  versionDetails: any = null;
   isLoading = true;
+  
+  formattedTesters: any[] = [];
+  uniqueTesters: string[] = [];
+  completedLessonsCount = 0;
+  totalLessonsCount = 0;
 
-  showAssignTesterModal = false;
-  isSubmitting = false;
-
-  allTesters: any[] = [];
-  allModules: any[] = [];
-
-  selectedTesterId = '';
-  selectedModules: string[] = [];
-
-  ngOnInit() {
+  ngOnInit(): void {
     this.route.paramMap.subscribe(params => {
       this.versionId = params.get('id') || '';
       if (this.versionId) {
-        this.loadVersionProgress();
+        this.loadVersionDetails();
+      } else {
+        this.router.navigate(['/admin/testers']);
       }
     });
   }
 
-  loadVersionProgress() {
+  loadVersionDetails(): void {
     this.isLoading = true;
     this.adminService.getVersionProgress(this.versionId).subscribe({
-      next: (data) => {
-        this.versionProgress = data;
+      next: (res) => {
+        this.versionDetails = res;
+        this.formatProgressData();
         this.isLoading = false;
       },
       error: () => {
-        Dialog.alert('حدث خطأ أثناء تحميل بيانات التقدم', 'خطأ', 'error');
+        Dialog.alert('حدث خطأ أثناء تحميل بيانات الإصدار', 'خطأ', 'error');
         this.isLoading = false;
+        this.router.navigate(['/admin/testers']);
       }
     });
   }
 
-  openAssignTesterModal() {
-    this.selectedTesterId = '';
-    this.selectedModules = [];
+  formatProgressData(): void {
+    if (!this.versionDetails || !this.versionDetails.testers) return;
     
-    // Load testers if not loaded
-    if (this.allTesters.length === 0) {
-      this.adminService.getTestersProgress(1, 100).subscribe(t => {
-        this.allTesters = t.map((tester: any) => ({
-          userId: tester.userId,
-          name: tester.username || tester.userName
-        }));
-      });
-    }
+    this.totalLessonsCount = 0;
+    this.completedLessonsCount = 0;
 
-    // Load modules if not loaded
-    if (this.allModules.length === 0) {
-      this.adminService.getModules(1, 100).subscribe(m => {
-        this.allModules = m;
-      });
-    }
+    this.formattedTesters = this.versionDetails.testers.map((t: any) => {
+      return {
+        groupName: t.testerName,
+        modules: (t.modules || []).map((m: any) => {
+          
+          let mTotal = 0;
+          let mCompleted = 0;
 
-    this.showAssignTesterModal = true;
-  }
+          const lessons = (m.lessons || []).map((l: any) => {
+            const isCompleted = l.conditionLabel && l.conditionLabel !== 'غير مختبر';
+            this.totalLessonsCount++;
+            mTotal++;
+            if (isCompleted) {
+              this.completedLessonsCount++;
+              mCompleted++;
+            }
 
-  closeAssignTesterModal() {
-    this.showAssignTesterModal = false;
-  }
+            return {
+              title: l.lessonTitle,
+              status: l.conditionLabel || 'غير مختبر',
+              comment: l.notes,
+              evaluationDate: l.feedbackDate
+            };
+          });
 
-  toggleModuleSelection(moduleId: string) {
-    const idx = this.selectedModules.indexOf(moduleId);
-    if (idx > -1) {
-      this.selectedModules.splice(idx, 1);
-    } else {
-      this.selectedModules.push(moduleId);
-    }
-  }
-
-  submitAssignTester() {
-    if (!this.selectedTesterId || this.selectedModules.length === 0) {
-      Dialog.alert('الرجاء اختيار المختبر وموديول واحد على الأقل', 'تنبيه', 'info');
-      return;
-    }
-
-    this.isSubmitting = true;
-    this.adminService.assignTesterToVersion(this.versionId, this.selectedTesterId, this.selectedModules).subscribe({
-      next: () => {
-        Dialog.alert('تم إسناد المختبر والموديولات بنجاح', 'نجاح', 'success');
-        this.isSubmitting = false;
-        this.closeAssignTesterModal();
-        this.loadVersionProgress(); // Reload
-      },
-      error: (err) => {
-        Dialog.alert('حدث خطأ أثناء الإسناد', 'خطأ', 'error');
-        this.isSubmitting = false;
-      }
+          return {
+            name: m.moduleName,
+            totalLessons: mTotal,
+            completedLessons: mCompleted,
+            units: [
+              {
+                name: 'دروس الموديول',
+                lessons: lessons
+              }
+            ]
+          };
+        })
+      };
     });
+    
+    this.uniqueTesters = this.formattedTesters.map(t => t.groupName);
   }
 }
