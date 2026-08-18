@@ -75,10 +75,11 @@ export class LessonViewer implements OnInit {
         this.isLoadingLesson = false;
         
         if (detail.videoUrl) {
-          // simple check for youtube
+          // Extract YouTube video ID using Regex to handle complex URLs (playlists, timestamps)
           let url = detail.videoUrl;
-          if (url.includes('youtube.com/watch?v=')) {
-            url = url.replace('watch?v=', 'embed/');
+          const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+          if (ytMatch && ytMatch[1]) {
+            url = `https://www.youtube.com/embed/${ytMatch[1]}`;
           }
           this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
         } else {
