@@ -23,10 +23,12 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   return next(modifiedReq).pipe(
     catchError((error: HttpErrorResponse) => {
       if (error.status === 401) {
-        // Token expired or invalid
         Dialog.alert('انتهت صلاحية الجلسة. الرجاء تسجيل الدخول مجدداً.', 'تنبيه', 'error');
         authService.logout();
         router.navigate(['/login']);
+      } else if (error.status === 403) {
+        Dialog.alert('عذراً، ليس لديك الصلاحية للوصول إلى هذا المورد.', 'تنبيه', 'error');
+        // Optionally redirect or handle 403 gracefully
       }
       return throwError(() => error);
     })

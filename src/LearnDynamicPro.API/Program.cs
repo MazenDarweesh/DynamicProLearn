@@ -97,6 +97,7 @@ builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IProgressService, ProgressService>();
 builder.Services.AddScoped<IProgressAnalyticsService, ProgressAnalyticsService>();
 builder.Services.AddScoped<ITesterService, TesterService>();
+builder.Services.AddHttpClient<IWebhookDispatcher, LearnDynamicPro.Infrastructure.Services.WebhookDispatcher>();
 
 // Configure CORS for Angular
 builder.Services.AddCors(options =>

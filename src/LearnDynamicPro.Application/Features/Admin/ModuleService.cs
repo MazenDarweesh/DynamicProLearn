@@ -10,10 +10,12 @@ namespace LearnDynamicPro.Application.Features.Admin;
 public class ModuleService : IModuleService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IWebhookDispatcher _webhookDispatcher;
 
-    public ModuleService(IUnitOfWork unitOfWork)
+    public ModuleService(IUnitOfWork unitOfWork, IWebhookDispatcher webhookDispatcher)
     {
         _unitOfWork = unitOfWork;
+        _webhookDispatcher = webhookDispatcher;
     }
 
     public async Task<Result<ModuleDto>> CreateModuleAsync(CreateModuleRequest request)
@@ -193,6 +195,8 @@ public class ModuleService : IModuleService
         
         _unitOfWork.Repository<Lesson>().Update(lesson);
         await _unitOfWork.SaveChangesAsync();
+        
+        _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
 
         return Result<LessonDto>.Success(new LessonDto 
         { 
@@ -223,6 +227,8 @@ public class ModuleService : IModuleService
 
             _unitOfWork.Repository<Lesson>().Remove(lesson);
             await _unitOfWork.SaveChangesAsync();
+            
+            _ = _webhookDispatcher.DispatchLessonDeletedAsync(id);
         }
         return Result.Success();
     }

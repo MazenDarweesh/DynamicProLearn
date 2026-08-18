@@ -25,10 +25,12 @@ public class TokenService : ITokenService
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username),
+            new Claim("Id", user.Id.ToString()),
+            new Claim(JwtRegisteredClaimNames.UniqueName, user.Username ?? ""),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
-            new Claim("companyId", user.CompanyId.ToString()),
-            new Claim("departmentId", user.DepartmentId.ToString()),
+            new Claim("Role", user.Role.ToString()),
+            new Claim("CompanyId", user.CompanyId?.ToString() ?? ""),
+            new Claim("DepartmentId", user.DepartmentId?.ToString() ?? ""),
         };
 
         var token = new JwtSecurityToken(
