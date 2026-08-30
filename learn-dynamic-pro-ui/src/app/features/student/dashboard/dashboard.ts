@@ -98,8 +98,10 @@ export class DashboardComponent implements OnInit {
             this.lastLesson = detail;
             if (detail.videoUrl) {
               let url = detail.videoUrl;
-              if (url.includes('youtube.com/watch?v=')) {
-                url = url.replace('watch?v=', 'embed/');
+              // robust check for youtube
+              const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+              if (ytMatch && ytMatch[1]) {
+                url = `https://www.youtube.com/embed/${ytMatch[1]}`;
               }
               this.safeVideoUrl = san.bypassSecurityTrustResourceUrl(url);
             }
@@ -134,8 +136,10 @@ export class DashboardComponent implements OnInit {
       this.lastLesson = detail;
       if (detail.videoUrl) {
         let url = detail.videoUrl;
-        if (url.includes('youtube.com/watch?v=')) {
-          url = url.replace('watch?v=', 'embed/');
+        // robust check for youtube
+        const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+        if (ytMatch && ytMatch[1]) {
+          url = `https://www.youtube.com/embed/${ytMatch[1]}`;
         }
         this.safeVideoUrl = san.bypassSecurityTrustResourceUrl(url);
       }
