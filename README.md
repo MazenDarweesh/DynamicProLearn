@@ -320,6 +320,7 @@ Stage 3: dotnet/aspnet:10.0    → Minimal runtime image (~200MB)
          └── Serves Angular from wwwroot (SPA fallback: index.html)
          └── Exposes port 8080 as non-root user
 ```
+*Note: The Angular frontend uses relative API paths (`/api/...`) to ensure seamless dynamic integration regardless of the host environment (Docker, Localhost, or Production).*
 
 ### Quick Deploy with Docker Compose
 ```bash
@@ -387,7 +388,7 @@ ng serve
 After the database seeder runs on first startup:
 ```
 Username: admin
-Password: Admin@1234
+Password: Admin@123
 ```
 
 ---
