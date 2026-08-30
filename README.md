@@ -23,33 +23,29 @@
 ## 🏗️ Architecture
 ```mermaid
 graph TD
-    subgraph Presentation ["Presentation Layer"]
-        UI["Angular 19 SPA"]
-        API["ASP.NET Core 10 Web API"]
-    end
+  subgraph Presentation
+    UI(Angular 19 SPA)
+    API(ASP.NET Core 10 Web API)
+  end
+  subgraph Application
+    CQRS(Services, DTOs)
+  end
+  subgraph Infrastructure
+    EF(EF Core DbContext)
+    Auth(JWT Service)
+  end
+  subgraph Domain
+    Entities(Domain Entities)
+  end
+  DB[(SQL Server)]
 
-    subgraph Application ["Application Layer"]
-        CQRS["Services, DTOs, Feature Handlers"]
-    end
-
-    subgraph Infrastructure ["Infrastructure Layer"]
-        EF["EF Core 10 DbContext"]
-        Auth["JWT & PasswordHasher"]
-    end
-
-    subgraph Domain ["Domain Layer"]
-        Entities["18 Domain Entities & Enums"]
-    end
-
-    DB[("SQL Server 2022")]
-
-    UI --> API
-    API --> CQRS
-    CQRS --> EF
-    CQRS --> Auth
-    CQRS --> Entities
-    EF --> Entities
-    EF --> DB
+  UI --> API
+  API --> CQRS
+  CQRS --> EF
+  CQRS --> Auth
+  CQRS --> Entities
+  EF --> Entities
+  EF --> DB
 ```
 
 ## 🚀 API Endpoints
