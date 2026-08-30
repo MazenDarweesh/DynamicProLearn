@@ -23,7 +23,7 @@ export interface LookupDto {
 })
 export class TesterService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:5115/api/tester';
+  private apiUrl = '/api/tester';
 
   getVersions(): Observable<ErpVersionDto[]> {
     return this.http.get<ErpVersionDto[]>(`${this.apiUrl}/my-versions`);

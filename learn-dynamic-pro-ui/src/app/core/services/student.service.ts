@@ -40,7 +40,7 @@ export interface LessonDetailDto extends LessonDto {
 })
 export class StudentService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:5115/api/student';
+  private apiUrl = '/api/student';
 
   getAssignedModules(): Observable<ModuleDto[]> {
     return this.http.get<ModuleDto[]>(`${this.apiUrl}/modules`);

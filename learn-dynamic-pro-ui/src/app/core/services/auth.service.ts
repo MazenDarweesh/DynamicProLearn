@@ -12,7 +12,7 @@ export class AuthService {
   readonly userName = signal<string | null>(this.extractName(this.token()));
 
   erpLogin(username: string, password: string, erpKey: string | null) {
-    return this.http.post<any>('http://localhost:5115/api/Auth/erp-login', { username, password, erpKey });
+    return this.http.post<any>('/api/Auth/erp-login', { username, password, erpKey });
   }
 
   login(token: string) {

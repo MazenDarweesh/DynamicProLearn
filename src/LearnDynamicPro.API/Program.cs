@@ -115,18 +115,36 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
-// Apply migrations and seed data
+// Apply migrations and seed data — retry up to 5 times (defence against slow DB startup)
 using (var scope = app.Services.CreateScope())
 {
-    var services = scope.ServiceProvider;
-    try
+    var services   = scope.ServiceProvider;
+    var startLogger = services.GetRequiredService<ILogger<Program>>();
+
+    const int maxRetries = 5;
+    const int delaySeconds = 10;
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++)
     {
-        await DatabaseSeeder.SeedAsync(services);
-    }
-    catch (Exception ex)
-    {
-        var logger = services.GetRequiredService<ILogger<Program>>();
-        logger.LogError(ex, "An error occurred while migrating or seeding the database.");
+        try
+        {
+            await DatabaseSeeder.SeedAsync(services);
+            startLogger.LogInformation("✅ Database migration and seeding completed successfully.");
+            break;
+        }
+        catch (Exception ex) when (attempt < maxRetries)
+        {
+            startLogger.LogWarning(ex,
+                "⚠️ Database migration attempt {Attempt}/{Max} failed. Retrying in {Delay}s...",
+                attempt, maxRetries, delaySeconds);
+            await Task.Delay(TimeSpan.FromSeconds(delaySeconds));
+        }
+        catch (Exception ex)
+        {
+            startLogger.LogError(ex,
+                "❌ All {Max} migration attempts failed. The application will start but may be unstable.",
+                maxRetries);
+        }
     }
 }
 
@@ -154,3 +172,4 @@ app.MapControllers();
 app.MapFallbackToFile("index.html");
 
 app.Run();
+// Cache bust 2

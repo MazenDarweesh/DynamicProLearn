@@ -17,7 +17,7 @@ export class TesterSetupComponent implements OnInit {
   private http = inject(HttpClient);
   private router = inject(Router);
   private testerService = inject(TesterService);
-  private apiUrl = 'http://localhost:5115/api';
+  private apiUrl = '/api';
 
   versions: any[] = [];
   selectedVersionId: string = '';

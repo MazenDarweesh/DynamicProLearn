@@ -9,7 +9,7 @@ import { AdminModuleDto, LookupDto, CompanyDto } from '../models/admin.models';
 })
 export class AdminService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:5115/api/admin';
+  private apiUrl = '/api/admin';
 
   // ── Modules ──────────────────────────────────────────────────────────────
   getModules(page = 1, pageSize = 10): Observable<AdminModuleDto[]> {
