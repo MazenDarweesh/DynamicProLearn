@@ -24,24 +24,24 @@
 ```mermaid
 graph TD
     subgraph PresentationLayer [Presentation Layer]
-        UI[Angular 19 SPA]
-        API[ASP.NET Core 10 Web API]
+        UI["Angular 19 SPA"]
+        API["ASP.NET Core 10 Web API"]
     end
 
     subgraph ApplicationLayer [Application Layer]
-        CQRS[Services, DTOs, Feature Handlers]
+        CQRS["Services, DTOs, Feature Handlers"]
     end
 
     subgraph InfrastructureLayer [Infrastructure Layer]
-        EF[EF Core 10 DbContext]
-        Auth[JWT & PasswordHasher]
+        EF["EF Core 10 DbContext"]
+        Auth["JWT & PasswordHasher"]
     end
 
     subgraph DomainLayer [Domain Layer]
-        Entities[18 Domain Entities & Enums]
+        Entities["18 Domain Entities & Enums"]
     end
 
-    DB[(SQL Server 2022)]
+    DB[("SQL Server 2022")]
 
     UI -->|HTTP/JWT| API
     API -->|Dependency Injection| CQRS
