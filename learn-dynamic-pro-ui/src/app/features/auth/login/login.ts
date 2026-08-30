@@ -26,7 +26,7 @@ export class LoginComponent {
     this.errorMessage = '';
     this.isLoading = true;
     
-    this.http.post<{token: string}>('http://localhost:5115/api/Auth/login', {
+    this.http.post<{token: string}>('/api/Auth/login', {
       username: this.username,
       password: this.password
     }).subscribe({
