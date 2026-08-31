@@ -35,6 +35,10 @@ public class AppDbContext : DbContext, IApplicationDbContext
     // ── Progress ──────────────────────────────────────────────────────
     public DbSet<LessonProgress> LessonProgresses => Set<LessonProgress>();
 
+    // ── AI Generated Content ──────────────────────────────────────────
+    public DbSet<LessonQuiz> LessonQuizzes => Set<LessonQuiz>();
+    public DbSet<LessonSummary> LessonSummaries => Set<LessonSummary>();
+
     // ── Tester ────────────────────────────────────────────────────────
     public DbSet<ErpVersion> ErpVersions => Set<ErpVersion>();
     public DbSet<TesterActiveVersion> TesterActiveVersions => Set<TesterActiveVersion>();

@@ -17,6 +17,11 @@ public interface IApplicationDbContext
     DbSet<User> Users { get; }
     DbSet<DepartmentModuleAssignment> DepartmentModuleAssignments { get; }
     DbSet<LessonProgress> LessonProgresses { get; }
+
+    // ── AI Generated Content ──────────────────────────────────────────
+    DbSet<LessonQuiz> LessonQuizzes { get; }
+    DbSet<LessonSummary> LessonSummaries { get; }
+
     DbSet<ErpVersion> ErpVersions { get; }
     DbSet<TesterActiveVersion> TesterActiveVersions { get; }
     DbSet<VersionTester> VersionTesters { get; }

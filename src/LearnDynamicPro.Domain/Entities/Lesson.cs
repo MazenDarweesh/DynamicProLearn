@@ -24,4 +24,8 @@ public class Lesson : BaseEntity
     public TypeOption? Type { get; set; }
     public ICollection<LessonProgress> Progresses { get; set; } = new List<LessonProgress>();
     public ICollection<TesterFeedback> Feedbacks { get; set; } = new List<TesterFeedback>();
+
+    // AI-Generated Content (nullable — generated on demand by Admin)
+    public LessonQuiz? Quiz { get; set; }
+    public LessonSummary? Summary { get; set; }
 }

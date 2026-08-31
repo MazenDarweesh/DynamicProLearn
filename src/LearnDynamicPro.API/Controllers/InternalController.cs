@@ -75,8 +75,8 @@ public class InternalController : ControllerBase
         {
             var assignments = await _context.DepartmentModuleAssignments
                 .Include(a => a.Module)
-                .ThenInclude(m => m.Units)
-                .ThenInclude(u => u.Lessons)
+                .ThenInclude(m => m!.Units)
+                .ThenInclude(u => u!.Lessons)
                 .Include(a => a.LevelFilters)
                 .Include(a => a.TypeFilters)
                 .Where(a => a.DepartmentId == user.DepartmentId.Value)
@@ -118,7 +118,7 @@ public class InternalController : ControllerBase
 
         var lesson = await _context.Lessons
             .Include(l => l.Unit)
-            .ThenInclude(u => u.Module)
+            .ThenInclude(u => u!.Module)
             .Include(l => l.Level)
             .Include(l => l.Type)
             .FirstOrDefaultAsync(l => l.Id == lessonId);

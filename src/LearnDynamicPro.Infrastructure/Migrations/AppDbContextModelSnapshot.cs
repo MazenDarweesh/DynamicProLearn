@@ -382,6 +382,80 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.ToTable("LessonProgresses");
                 });
 
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LessonQuiz", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("LessonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LessonId")
+                        .IsUnique();
+
+                    b.ToTable("LessonQuizzes");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LessonSummary", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("LessonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Overview")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LessonId")
+                        .IsUnique();
+
+                    b.ToTable("LessonSummaries");
+                });
+
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LevelOption", b =>
                 {
                     b.Property<Guid>("Id")
@@ -861,6 +935,115 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LessonQuiz", b =>
+                {
+                    b.HasOne("LearnDynamicPro.Domain.Entities.Lesson", "Lesson")
+                        .WithOne("Quiz")
+                        .HasForeignKey("LearnDynamicPro.Domain.Entities.LessonQuiz", "LessonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("LearnDynamicPro.Domain.Entities.AI.QuizQuestion", "Questions", b1 =>
+                        {
+                            b1.Property<Guid>("LessonQuizId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAddOrUpdate();
+
+                            b1.Property<string>("CorrectAnswerId")
+                                .IsRequired();
+
+                            b1.Property<string>("Explanation")
+                                .IsRequired();
+
+                            b1.Property<int>("QuestionNumber");
+
+                            b1.Property<string>("QuestionText")
+                                .IsRequired();
+
+                            b1.HasKey("LessonQuizId", "__synthesizedOrdinal");
+
+                            b1.ToTable("LessonQuizzes");
+
+                            b1
+                                .ToJson("Questions")
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.WithOwner()
+                                .HasForeignKey("LessonQuizId");
+
+                            b1.OwnsMany("LearnDynamicPro.Domain.Entities.AI.QuizOption", "Options", b2 =>
+                                {
+                                    b2.Property<Guid>("QuizQuestionLessonQuizId");
+
+                                    b2.Property<int>("QuizQuestion__synthesizedOrdinal");
+
+                                    b2.Property<int>("__synthesizedOrdinal")
+                                        .ValueGeneratedOnAddOrUpdate();
+
+                                    b2.Property<string>("OptionId")
+                                        .IsRequired();
+
+                                    b2.Property<string>("Text")
+                                        .IsRequired();
+
+                                    b2.HasKey("QuizQuestionLessonQuizId", "QuizQuestion__synthesizedOrdinal", "__synthesizedOrdinal");
+
+                                    b2.ToTable("LessonQuizzes");
+
+                                    b2.WithOwner()
+                                        .HasForeignKey("QuizQuestionLessonQuizId", "QuizQuestion__synthesizedOrdinal");
+                                });
+
+                            b1.Navigation("Options");
+                        });
+
+                    b.Navigation("Lesson");
+
+                    b.Navigation("Questions");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LessonSummary", b =>
+                {
+                    b.HasOne("LearnDynamicPro.Domain.Entities.Lesson", "Lesson")
+                        .WithOne("Summary")
+                        .HasForeignKey("LearnDynamicPro.Domain.Entities.LessonSummary", "LessonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("LearnDynamicPro.Domain.Entities.AI.SummaryTopic", "Topics", b1 =>
+                        {
+                            b1.Property<Guid>("LessonSummaryId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAddOrUpdate();
+
+                            b1.Property<string>("Explanation")
+                                .IsRequired();
+
+                            b1.PrimitiveCollection<string>("KeyPoints")
+                                .IsRequired();
+
+                            b1.Property<string>("TopicName")
+                                .IsRequired();
+
+                            b1.HasKey("LessonSummaryId", "__synthesizedOrdinal");
+
+                            b1.ToTable("LessonSummaries");
+
+                            b1
+                                .ToJson("Topics")
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.WithOwner()
+                                .HasForeignKey("LessonSummaryId");
+                        });
+
+                    b.Navigation("Lesson");
+
+                    b.Navigation("Topics");
+                });
+
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LevelOption", b =>
                 {
                     b.HasOne("LearnDynamicPro.Domain.Entities.User", "CreatedByAdmin")
@@ -1043,6 +1226,10 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.Navigation("Feedbacks");
 
                     b.Navigation("Progresses");
+
+                    b.Navigation("Quiz");
+
+                    b.Navigation("Summary");
                 });
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.LevelOption", b =>

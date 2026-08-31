@@ -951,8 +951,8 @@ public class CompanyService : ICompanyService
             .Include(tc => tc.Version)
             .Include(tc => tc.AssignedModules)
                 .ThenInclude(am => am.Module)
-                    .ThenInclude(m => m.Units)
-                        .ThenInclude(u => u.Lessons)
+                    .ThenInclude(m => m!.Units)
+                        .ThenInclude(u => u!.Lessons)
             .Where(tc => userIds.Contains(tc.TesterId))
             .ToListAsync();
 
