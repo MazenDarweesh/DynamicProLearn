@@ -23,6 +23,7 @@ public class AdminController : ControllerBase
     private readonly ITesterService _testerService;
     private readonly IProgressAnalyticsService _progressAnalyticsService;
     private readonly IApplicationDbContext _context;
+    private readonly ILessonAiService _lessonAiService;
 
     public AdminController(
         ICompanyService companyService,
@@ -30,6 +31,7 @@ public class AdminController : ControllerBase
         IAssignmentService assignmentService,
         ITesterService testerService,
         IProgressAnalyticsService progressAnalyticsService,
+        ILessonAiService lessonAiService,
         IApplicationDbContext context)
     {
         _companyService = companyService;
@@ -37,6 +39,7 @@ public class AdminController : ControllerBase
         _assignmentService = assignmentService;
         _testerService = testerService;
         _progressAnalyticsService = progressAnalyticsService;
+        _lessonAiService = lessonAiService;
         _context = context;
     }
 
@@ -302,6 +305,22 @@ public class AdminController : ControllerBase
         var result = await _moduleService.DeleteLessonAsync(id);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return NoContent();
+    }
+
+    [HttpPost("lessons/{lessonId}/generate-quiz")]
+    public async Task<IActionResult> GenerateLessonQuiz(Guid lessonId)
+    {
+        var result = await _lessonAiService.GenerateLessonQuizAsync(lessonId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok();
+    }
+
+    [HttpPost("lessons/{lessonId}/generate-summary")]
+    public async Task<IActionResult> GenerateLessonSummary(Guid lessonId)
+    {
+        var result = await _lessonAiService.GenerateLessonSummaryAsync(lessonId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok();
     }
 
     // ── Assignments ─────────────────────────────────────────────────────────

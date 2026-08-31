@@ -19,4 +19,10 @@ public interface IStudentService
     Task<Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>> GetLessonsByLevelAsync(Guid moduleId, Guid userId);
     Task<Result<List<LearnDynamicPro.Application.Dtos.Student.LevelGroupDto>>> GetUnifiedStudentCurriculumAsync(Guid userId);
     Task<Result<LearnDynamicPro.Application.Dtos.Student.LastAccessedLessonDto>> GetNextLessonToLearnAsync(Guid userId);
+    
+    /// <summary>Retrieves the AI-generated quiz for a lesson. Strips correct answers for students.</summary>
+    Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>> GetLessonQuizAsync(Guid lessonId, Guid userId);
+    
+    /// <summary>Retrieves the AI-generated summary for a lesson.</summary>
+    Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>> GetLessonSummaryAsync(Guid lessonId, Guid userId);
 }

@@ -10,10 +10,12 @@ namespace LearnDynamicPro.Application.Features.Student;
 public class StudentService : IStudentService
 {
     private readonly IUnitOfWork _unitOfWork;
+    private readonly IApplicationDbContext _context;
 
-    public StudentService(IUnitOfWork unitOfWork)
+    public StudentService(IUnitOfWork unitOfWork, IApplicationDbContext context)
     {
         _unitOfWork = unitOfWork;
+        _context = context;
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -550,5 +552,64 @@ public class StudentService : IStudentService
             ModuleId = lastModuleId,
             LessonTitle = lastLesson.Title
         });
+    }
+
+    public async Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>> GetLessonQuizAsync(Guid lessonId, Guid userId)
+    {
+        // 1. Validate Access using existing business logic
+        var detailResult = await GetLessonDetailAsync(lessonId, userId);
+        if (!detailResult.IsSuccess)
+            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>.Failure(detailResult.Error);
+
+        // 2. Fetch Quiz from SQL Server (NO HTTP call to Python)
+        var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
+        if (quiz == null)
+            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>.Failure(AppErrors.General.NotFound);
+
+        // 3. Map to DTO, explicitly omitting CorrectAnswerId and Explanation
+        var dto = new LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto
+        {
+            LessonId = quiz.LessonId,
+            Questions = quiz.Questions.Select(q => new LearnDynamicPro.Application.Dtos.Student.StudentQuizQuestionDto
+            {
+                QuestionNumber = q.QuestionNumber,
+                QuestionText = q.QuestionText,
+                Options = q.Options.Select(o => new LearnDynamicPro.Application.Dtos.Student.StudentQuizOptionDto
+                {
+                    OptionId = o.OptionId,
+                    Text = o.Text
+                }).ToList()
+            }).ToList()
+        };
+
+        return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>.Success(dto);
+    }
+
+    public async Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>> GetLessonSummaryAsync(Guid lessonId, Guid userId)
+    {
+        // 1. Validate Access
+        var detailResult = await GetLessonDetailAsync(lessonId, userId);
+        if (!detailResult.IsSuccess)
+            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>.Failure(detailResult.Error);
+
+        // 2. Fetch Summary from SQL Server
+        var summary = await _context.LessonSummaries.AsNoTracking().FirstOrDefaultAsync(s => s.LessonId == lessonId);
+        if (summary == null)
+            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>.Failure(AppErrors.General.NotFound);
+
+        // 3. Map to DTO
+        var dto = new LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto
+        {
+            LessonId = summary.LessonId,
+            Overview = summary.Overview,
+            Topics = summary.Topics.Select(t => new LearnDynamicPro.Application.Dtos.Student.StudentSummaryTopicDto
+            {
+                TopicName = t.TopicName,
+                Explanation = t.Explanation,
+                KeyPoints = t.KeyPoints.ToList()
+            }).ToList()
+        };
+
+        return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>.Success(dto);
     }
 }

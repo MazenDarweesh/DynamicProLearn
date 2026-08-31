@@ -111,4 +111,30 @@ public class StudentController : ControllerBase
         if (!result.IsSuccess) return NotFound(result.Error);
         return Ok(result.Value);
     }
+
+    [HttpGet("lessons/{lessonId}/quiz")]
+    public async Task<IActionResult> GetLessonQuiz(Guid lessonId)
+    {
+        var result = await _studentService.GetLessonQuizAsync(lessonId, _currentUserService.UserId);
+        if (!result.IsSuccess) 
+        {
+            if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+                return Forbid(result.Error);
+            return NotFound(result.Error);
+        }
+        return Ok(result.Value);
+    }
+
+    [HttpGet("lessons/{lessonId}/summary")]
+    public async Task<IActionResult> GetLessonSummary(Guid lessonId)
+    {
+        var result = await _studentService.GetLessonSummaryAsync(lessonId, _currentUserService.UserId);
+        if (!result.IsSuccess) 
+        {
+            if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+                return Forbid(result.Error);
+            return NotFound(result.Error);
+        }
+        return Ok(result.Value);
+    }
 }
