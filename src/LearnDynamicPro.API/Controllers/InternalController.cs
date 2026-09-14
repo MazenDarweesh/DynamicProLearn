@@ -2,7 +2,9 @@ using LearnDynamicPro.Application.Dtos.Internal;
 using LearnDynamicPro.Application.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
@@ -14,11 +16,16 @@ public class InternalController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
     private readonly Microsoft.Extensions.Configuration.IConfiguration _configuration;
+    private readonly IMemoryCache _cache;
 
-    public InternalController(IApplicationDbContext context, Microsoft.Extensions.Configuration.IConfiguration configuration)
+    public InternalController(
+        IApplicationDbContext context,
+        Microsoft.Extensions.Configuration.IConfiguration configuration,
+        IMemoryCache cache)
     {
         _context = context;
         _configuration = configuration;
+        _cache = cache;
     }
 
     private bool ValidateServiceToken()
@@ -28,7 +35,10 @@ public class InternalController : ControllerBase
             return false;
 
         var token = authHeader.Substring("Bearer ".Length).Trim();
-        var expectedToken = _configuration["AiCoPilot:ServiceToken"] ?? "default_service_token";
+        var expectedToken = _configuration["AiCoPilot:ServiceToken"];
+        if (string.IsNullOrWhiteSpace(expectedToken))
+            return false;
+
         return token == expectedToken;
     }
 
@@ -54,22 +64,33 @@ public class InternalController : ControllerBase
         // Get modules assigned to this user's department, or all if admin
         if (user.Role == LearnDynamicPro.Domain.Enums.UserRole.Admin)
         {
-            var modules = await _context.Modules.ToListAsync();
-            foreach (var module in modules)
+            var adminData = await _cache.GetOrCreateAsync("internal_admin_accessible_ids", async entry =>
             {
-                permissions.AccessibleModules.Add(new AccessibleModuleDto
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                var mIds = await _context.Modules.Select(m => m.Id.ToString()).ToListAsync();
+                var uIds = await _context.Units.Select(u => u.Id.ToString()).ToListAsync();
+                var lIds = await _context.Lessons.Select(l => l.Id.ToString()).ToListAsync();
+                return (ModuleIds: mIds, UnitIds: uIds, LessonIds: lIds);
+            });
+
+            if (adminData.ModuleIds != null)
+            {
+                foreach (var moduleId in adminData.ModuleIds)
                 {
-                    ModuleId = module.Id.ToString(),
-                    LevelFilters = new System.Collections.Generic.List<string>(), // Admin accesses all
-                    TypeFilters = new System.Collections.Generic.List<string>()
-                });
+                    permissions.AccessibleModules.Add(new AccessibleModuleDto
+                    {
+                        ModuleId = moduleId,
+                        LevelFilters = new List<string>(), // Admin accesses all
+                        TypeFilters = new List<string>()
+                    });
+                }
             }
             
-            var units = await _context.Units.Select(u => u.Id.ToString()).ToListAsync();
-            permissions.AccessibleUnitIds.AddRange(units);
+            if (adminData.UnitIds != null)
+                permissions.AccessibleUnitIds.AddRange(adminData.UnitIds);
 
-            var lessons = await _context.Lessons.Select(l => l.Id.ToString()).ToListAsync();
-            permissions.AccessibleLessonIds.AddRange(lessons);
+            if (adminData.LessonIds != null)
+                permissions.AccessibleLessonIds.AddRange(adminData.LessonIds);
         }
         else if (user.DepartmentId.HasValue)
         {

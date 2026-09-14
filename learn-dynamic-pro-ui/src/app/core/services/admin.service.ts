@@ -269,4 +269,21 @@ export class AdminService {
   uncompleteLessonForTarget(lessonId: string, targetType: string, targetId: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/analytics/lessons/${lessonId}/uncomplete/${targetType}/${targetId}`, {});
   }
+
+  // ── AI Studio (Quiz & Summary) ───────────────────────────────────────────
+  generateLessonQuiz(lessonId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/lessons/${lessonId}/generate-quiz`, {});
+  }
+
+  getLessonQuiz(lessonId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/lessons/${lessonId}/quiz`);
+  }
+
+  generateLessonSummary(lessonId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/lessons/${lessonId}/generate-summary`, {});
+  }
+
+  getLessonSummary(lessonId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/lessons/${lessonId}/summary`);
+  }
 }

@@ -1,4 +1,5 @@
 using LearnDynamicPro.Application.Common;
+using LearnDynamicPro.Application.Dtos.Modules;
 using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Application.Interfaces.Repositories;
 using LearnDynamicPro.Domain.Entities;
@@ -58,7 +59,7 @@ public class LessonAiService : ILessonAiService
             }).ToList()
         };
 
-        // 5. Replace existing quiz if any (Domain Rules)
+        // 5. Replace existing quiz if any (Domain Rules - allows seamless regeneration)
         var existingQuiz = await _context.LessonQuizzes.FirstOrDefaultAsync(q => q.LessonId == lessonId);
         if (existingQuiz != null)
         {
@@ -96,13 +97,13 @@ public class LessonAiService : ILessonAiService
             Overview = generatedSummary.Overview,
             Topics = generatedSummary.Topics.Select(t => new SummaryTopic
             {
-                TopicName = t.TopicName,
-                Explanation = t.Explanation,
-                KeyPoints = t.KeyPoints
+                TopicName = t.Title,
+                Explanation = string.Empty,
+                KeyPoints = t.Points
             }).ToList()
         };
 
-        // 5. Replace existing summary if any
+        // 5. Replace existing summary if any (Domain Rules - allows seamless regeneration)
         var existingSummary = await _context.LessonSummaries.FirstOrDefaultAsync(s => s.LessonId == lessonId);
         if (existingSummary != null)
         {
@@ -114,5 +115,66 @@ public class LessonAiService : ILessonAiService
         await _context.SaveChangesAsync();
 
         return Result<bool>.Success(true);
+    }
+
+    public async Task<Result<AdminLessonQuizDto>> GetAdminLessonQuizAsync(Guid lessonId)
+    {
+        if (_currentUserService.UserId == Guid.Empty)
+            return Result<AdminLessonQuizDto>.Failure(AppErrors.Authorization.AccessDenied);
+
+        var quiz = await _context.LessonQuizzes
+            .AsNoTracking()
+            .FirstOrDefaultAsync(q => q.LessonId == lessonId);
+
+        if (quiz == null)
+            return Result<AdminLessonQuizDto>.Failure(AppErrors.General.NotFound);
+
+        var dto = new AdminLessonQuizDto
+        {
+            LessonId = quiz.LessonId,
+            GeneratedAt = quiz.GeneratedAt,
+            Questions = quiz.Questions.Select(q => new AdminQuizQuestionDto
+            {
+                QuestionNumber = q.QuestionNumber,
+                QuestionText = q.QuestionText,
+                CorrectAnswerId = q.CorrectAnswerId,
+                Explanation = q.Explanation,
+                Options = q.Options.Select(o => new AdminQuizOptionDto
+                {
+                    OptionId = o.OptionId,
+                    Text = o.Text
+                }).ToList()
+            }).ToList()
+        };
+
+        return Result<AdminLessonQuizDto>.Success(dto);
+    }
+
+    public async Task<Result<AdminLessonSummaryDto>> GetAdminLessonSummaryAsync(Guid lessonId)
+    {
+        if (_currentUserService.UserId == Guid.Empty)
+            return Result<AdminLessonSummaryDto>.Failure(AppErrors.Authorization.AccessDenied);
+
+        var summary = await _context.LessonSummaries
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.LessonId == lessonId);
+
+        if (summary == null)
+            return Result<AdminLessonSummaryDto>.Failure(AppErrors.General.NotFound);
+
+        var dto = new AdminLessonSummaryDto
+        {
+            LessonId = summary.LessonId,
+            Overview = summary.Overview,
+            GeneratedAt = summary.GeneratedAt,
+            Topics = summary.Topics.Select(t => new AdminSummaryTopicDto
+            {
+                TopicName = t.TopicName,
+                Explanation = t.Explanation,
+                KeyPoints = t.KeyPoints
+            }).ToList()
+        };
+
+        return Result<AdminLessonSummaryDto>.Success(dto);
     }
 }

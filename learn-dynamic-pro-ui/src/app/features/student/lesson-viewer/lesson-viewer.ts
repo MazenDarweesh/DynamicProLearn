@@ -31,6 +31,14 @@ export class LessonViewer implements OnInit {
   isSubmitting = false;
   safeVideoUrl: SafeResourceUrl | null = null;
 
+  // ── AI Smart Content State ───────────────────────────────────────────────
+  activeAiTab: 'summary' | 'quiz' = 'summary';
+  isLoadingAi = false;
+  quizData: any = null;
+  summaryData: any = null;
+  selectedOptions: { [questionNumber: number]: string } = {};
+  quizSubmitted = false;
+
   ngOnInit() {
     const moduleId = this.route.snapshot.paramMap.get('id');
     if (moduleId) {
@@ -69,13 +77,17 @@ export class LessonViewer implements OnInit {
   
   loadLesson(lessonId: string) {
     this.isLoadingLesson = true;
+    this.quizData = null;
+    this.summaryData = null;
+    this.selectedOptions = {};
+    this.quizSubmitted = false;
+
     this.studentService.getLessonDetail(lessonId).subscribe({
       next: (detail: any) => {
         this.activeLesson = detail;
         this.isLoadingLesson = false;
         
         if (detail.videoUrl) {
-          // Extract YouTube video ID using Regex to handle complex URLs (playlists, timestamps)
           let url = detail.videoUrl;
           const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
           if (ytMatch && ytMatch[1]) {
@@ -85,12 +97,55 @@ export class LessonViewer implements OnInit {
         } else {
           this.safeVideoUrl = null;
         }
+
+        // Fetch AI Quiz and Summary directly from SQL Server via .NET
+        this.loadAiContent(lessonId);
       },
       error: () => {
         this.isLoadingLesson = false;
         Dialog.alert('تعذر تحميل تفاصيل الدرس.', 'خطأ', 'error');
       }
     });
+  }
+
+  loadAiContent(lessonId: string) {
+    this.isLoadingAi = true;
+
+    // 1. Fetch Summary
+    this.studentService.getLessonSummary(lessonId).subscribe({
+      next: (data) => this.summaryData = data,
+      error: () => this.summaryData = null
+    });
+
+    // 2. Fetch Quiz
+    this.studentService.getLessonQuiz(lessonId).subscribe({
+      next: (data) => this.quizData = data,
+      error: () => this.quizData = null,
+      complete: () => this.isLoadingAi = false
+    });
+  }
+
+  selectOption(questionNumber: number, optionId: string) {
+    if (this.quizSubmitted) return;
+    this.selectedOptions[questionNumber] = optionId;
+  }
+
+  submitQuiz() {
+    if (!this.quizData || !this.quizData.questions) return;
+    
+    const answeredCount = Object.keys(this.selectedOptions).length;
+    if (answeredCount < this.quizData.questions.length) {
+      Dialog.alert('يرجى الإجابة على جميع الأسئلة قبل تأكيد الاختبار.', 'اختبار غير مكتمل', 'info');
+      return;
+    }
+
+    this.quizSubmitted = true;
+    Dialog.alert('تم استلام إجاباتك بنجاح! يمكنك الآن مراجعة إجاباتك وتثبيت الفهم.', 'أحسنت!', 'success');
+  }
+
+  resetQuiz() {
+    this.selectedOptions = {};
+    this.quizSubmitted = false;
   }
 
   goBack() {
@@ -106,7 +161,6 @@ export class LessonViewer implements OnInit {
     this.studentService.completeLesson(this.activeLesson.id, newStatus).subscribe({
       next: () => {
         this.activeLesson!.isCompleted = newStatus;
-        // Also update it in the units list sidebar
         const u = this.units.find(u => u.id === this.activeLesson?.unitId);
         if (u) {
           const l = u.lessons.find(l => l.id === this.activeLesson?.id);

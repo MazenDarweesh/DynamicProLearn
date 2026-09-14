@@ -23,32 +23,28 @@ public class PythonAiClient : IPythonAiClient
         _httpClient.BaseAddress = new Uri(baseUrl);
         _httpClient.Timeout = TimeSpan.FromMinutes(5); // Explicit timeout since AI generation takes time
 
-        _serviceToken = configuration["AiCoPilot:ServiceToken"];
-        if (string.IsNullOrWhiteSpace(_serviceToken))
-        {
-            _serviceToken = "default_service_token";
-        }
+        _serviceToken = configuration["AiCoPilot:ServiceToken"] ?? "default_service_token";
     }
 
-    public async Task<PythonAiQuizResponseDto?> GenerateQuizAsync(Guid lessonId)
+    public async Task<GeneratedQuizDto?> GenerateQuizAsync(Guid lessonId)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/lessons/{lessonId}/generate-quiz");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/admin/lessons/{lessonId}/generate-quiz");
         request.Headers.Add("Authorization", $"Bearer {_serviceToken}");
 
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
-        return await response.Content.ReadFromJsonAsync<PythonAiQuizResponseDto>();
+        return await response.Content.ReadFromJsonAsync<GeneratedQuizDto>();
     }
 
-    public async Task<PythonAiSummaryResponseDto?> GenerateSummaryAsync(Guid lessonId)
+    public async Task<GeneratedSummaryDto?> GenerateSummaryAsync(Guid lessonId)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/admin/lessons/{lessonId}/generate-summary");
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/admin/lessons/{lessonId}/generate-summary");
         request.Headers.Add("Authorization", $"Bearer {_serviceToken}");
 
         var response = await _httpClient.SendAsync(request);
         response.EnsureSuccessStatusCode();
 
-        return await response.Content.ReadFromJsonAsync<PythonAiSummaryResponseDto>();
+        return await response.Content.ReadFromJsonAsync<GeneratedSummaryDto>();
     }
 }

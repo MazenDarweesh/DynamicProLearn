@@ -38,7 +38,7 @@ public class WebhookDispatcher : IWebhookDispatcher
     {
         var payload = new
         {
-            lessonId = lessonId.ToString(),
+            lesson_id = lessonId.ToString(),
             action = action
         };
 

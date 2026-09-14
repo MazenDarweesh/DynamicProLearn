@@ -33,7 +33,7 @@
   <div class="form-group mb-3">
     <label>رابط الفيديو (Video URL)</label>
     <input type="text" class="form-control" [(ngModel)]="lesson.videoUrl" placeholder="https://youtube.com/watch?v=...">
-    <small class="text-secondary mt-1 d-block">سيدعم النظام تحويل روابط يوتيوب تلقائياً إلى Embed.</small>
+    <small class="text-secondary mt-1 d-block">سيدعم النظام تحويل روابط يوتيوب تلقائياً إلى Embed ومزامنتها مع محرك الذكاء الاصطناعي.</small>
   </div>
 
   <div class="form-group mb-4">
@@ -76,10 +76,176 @@
     <input type="text" class="form-control" [(ngModel)]="lesson.externalLink" placeholder="https://drive.google.com/...">
   </div>
 
+  <!-- ── AI Smart Studio ────────────────────────────────────────────────── -->
+  <div class="ai-studio-card mb-4">
+    <div class="ai-studio-header">
+      <div class="d-flex align-center gap-2">
+        <div class="ai-spark-icon">✨</div>
+        <div>
+          <h3 class="ai-studio-title">استوديو الذكاء الاصطناعي (AI Smart Studio)</h3>
+          <p class="ai-studio-desc">توليد ومراجعة الاختبارات والملخصات التلقائية المعتمدة على محتوى وفيديو الدرس.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="ai-cards-grid mt-3">
+      <!-- Quiz Card -->
+      <div class="ai-feature-card">
+        <div class="d-flex justify-between align-center mb-2">
+          <div class="d-flex align-center gap-2">
+            <span class="ai-feature-icon">🧠</span>
+            <span class="ai-feature-name">اختبار تقييم الفهم (Quiz)</span>
+          </div>
+          <span class="ai-badge" [class.ai-badge-success]="quizData" [class.ai-badge-pending]="!quizData">
+            {{ quizData ? ('متوفر (' + quizData.questions.length + ' أسئلة)') : 'لم يتم التوليد' }}
+          </span>
+        </div>
+        <p class="text-secondary text-sm mb-3">5 أسئلة اختيار من متعدد مقسمة على الفيديو لقياس فهم الطالب.</p>
+        
+        <div class="d-flex gap-2">
+          <button *ngIf="!quizData" class="btn-ai btn-ai-primary flex-1" [disabled]="isGeneratingQuiz" (click)="generateQuiz()">
+            {{ isGeneratingQuiz ? '⏳ جاري التوليد بالذكاء الاصطناعي...' : '🧠 توليد اختبار ذكي' }}
+          </button>
+          
+          <ng-container *ngIf="quizData">
+            <button class="btn-ai btn-ai-secondary flex-1" (click)="openQuizModal()">
+              👁️ معاينة ومراجعة ({{ quizData.questions.length }})
+            </button>
+            <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingQuiz" (click)="generateQuiz()" title="إعادة التوليد وتحديث الأسئلة">
+              {{ isGeneratingQuiz ? '⏳...' : '🔄 إعادة التوليد' }}
+            </button>
+          </ng-container>
+        </div>
+      </div>
+
+      <!-- Summary Card -->
+      <div class="ai-feature-card">
+        <div class="d-flex justify-between align-center mb-2">
+          <div class="d-flex align-center gap-2">
+            <span class="ai-feature-icon">📝</span>
+            <span class="ai-feature-name">ملخص الدرس الذكي (Summary)</span>
+          </div>
+          <span class="ai-badge" [class.ai-badge-success]="summaryData" [class.ai-badge-pending]="!summaryData">
+            {{ summaryData ? ('متوفر (' + summaryData.topics.length + ' مواضيع)') : 'لم يتم التوليد' }}
+          </span>
+        </div>
+        <p class="text-secondary text-sm mb-3">نظرة عامة هرمية ونقاط رئيسية تلخص جوهر المحتوى التعليمي.</p>
+        
+        <div class="d-flex gap-2">
+          <button *ngIf="!summaryData" class="btn-ai btn-ai-primary flex-1" [disabled]="isGeneratingSummary" (click)="generateSummary()">
+            {{ isGeneratingSummary ? '⏳ جاري التوليد بالذكاء الاصطناعي...' : '📝 توليد ملخص الدرس' }}
+          </button>
+          
+          <ng-container *ngIf="summaryData">
+            <button class="btn-ai btn-ai-secondary flex-1" (click)="openSummaryModal()">
+              👁️ معاينة وقراءة الملخص
+            </button>
+            <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingSummary" (click)="generateSummary()" title="إعادة التوليد وتحديث الملخص">
+              {{ isGeneratingSummary ? '⏳...' : '🔄 إعادة التوليد' }}
+            </button>
+          </ng-container>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="video-preview" *ngIf="lesson.videoUrl">
     <div class="text-center text-secondary py-4">
       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="mb-2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
       <p style="margin: 0;">معاينة الفيديو ستكون متاحة للطالب هنا</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Admin Quiz Review Modal ──────────────────────────────────────────── -->
+<div class="ai-modal-backdrop" *ngIf="showQuizModal" (click)="closeModals()">
+  <div class="ai-modal-content" (click)="$event.stopPropagation()">
+    <div class="ai-modal-header">
+      <div class="d-flex align-center gap-2">
+        <span style="font-size: 24px;">🧠</span>
+        <div>
+          <h3 style="margin: 0; font-size: 18px; color: var(--color-navy);">مراجعة اختبار الدرس (Admin Quiz Review)</h3>
+          <span class="text-secondary text-sm">راجع الأسئلة وإجاباتها المعتمدة، ويمكنك إعادة توليدها في حال لم تعجبك.</span>
+        </div>
+      </div>
+      <button class="ai-modal-close" (click)="closeModals()">✕</button>
+    </div>
+
+    <div class="ai-modal-body" *ngIf="quizData">
+      <div *ngFor="let q of quizData.questions" class="ai-review-question-card">
+        <div class="ai-review-q-header">
+          <span class="ai-review-q-num">سؤال {{ q.questionNumber }}</span>
+          <span class="ai-review-q-text">{{ q.questionText }}</span>
+        </div>
+
+        <div class="ai-review-options-grid mt-2">
+          <div *ngFor="let opt of q.options" 
+               class="ai-review-opt-item" 
+               [class.ai-opt-correct]="opt.optionId === q.correctAnswerId">
+            <span class="ai-opt-indicator">
+              {{ opt.optionId === q.correctAnswerId ? '✓' : '•' }}
+            </span>
+            <span class="ai-opt-text">{{ opt.text }}</span>
+            <span *ngIf="opt.optionId === q.correctAnswerId" class="ai-opt-correct-tag">الإجابة الصحيحة ✅</span>
+          </div>
+        </div>
+
+        <div *ngIf="q.explanation" class="ai-review-explanation mt-2">
+          <strong>💡 التفسير النموذجي:</strong> {{ q.explanation }}
+        </div>
+      </div>
+    </div>
+
+    <div class="ai-modal-footer">
+      <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingQuiz" (click)="generateQuiz()">
+        {{ isGeneratingQuiz ? '⏳ جاري إعادة التوليد...' : '🔄 المحتوى غير مناسب - إعادة التوليد (Regenerate)' }}
+      </button>
+      <button class="btn-blue" (click)="closeModals()">
+        ✅ المحتوى ممتاز ومعتمد
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Admin Summary Review Modal ───────────────────────────────────────── -->
+<div class="ai-modal-backdrop" *ngIf="showSummaryModal" (click)="closeModals()">
+  <div class="ai-modal-content" (click)="$event.stopPropagation()">
+    <div class="ai-modal-header">
+      <div class="d-flex align-center gap-2">
+        <span style="font-size: 24px;">📝</span>
+        <div>
+          <h3 style="margin: 0; font-size: 18px; color: var(--color-navy);">مراجعة ملخص الدرس (Admin Summary Review)</h3>
+          <span class="text-secondary text-sm">ملخص شامل ومستخرج آلياً لمساعدة الطالب على استيعاب الدرس.</span>
+        </div>
+      </div>
+      <button class="ai-modal-close" (click)="closeModals()">✕</button>
+    </div>
+
+    <div class="ai-modal-body" *ngIf="summaryData">
+      <div class="ai-summary-overview-box mb-4">
+        <h4 style="margin: 0 0 8px 0; color: #4338ca; font-size: 15px;">📌 النظرة العامة على الدرس (Overview)</h4>
+        <p style="margin: 0; line-height: 1.8; color: #334155;">{{ summaryData.overview }}</p>
+      </div>
+
+      <h4 style="margin: 0 0 12px 0; color: var(--color-navy); font-size: 15px;">🔹 أهم المحاور والنقاط المستخلصة:</h4>
+      
+      <div *ngFor="let topic of summaryData.topics" class="ai-summary-topic-card mb-3">
+        <h5 style="margin: 0 0 8px 0; font-size: 14px; font-weight: 700; color: var(--color-navy);">
+          {{ topic.topicName }}
+        </h5>
+        <ul style="margin: 0; padding-right: 20px; color: #475569; line-height: 1.8;">
+          <li *ngFor="let point of topic.keyPoints">{{ point }}</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ai-modal-footer">
+      <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingSummary" (click)="generateSummary()">
+        {{ isGeneratingSummary ? '⏳ جاري إعادة التوليد...' : '🔄 الملخص غير مناسب - إعادة التوليد (Regenerate)' }}
+      </button>
+      <button class="btn-blue" (click)="closeModals()">
+        ✅ الملخص ممتاز ومعتمد
+      </button>
     </div>
   </div>
 </div>

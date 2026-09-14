@@ -1,4 +1,4 @@
-/* Specific styles for lesson editor can go here */
+/* Specific styles for lesson editor */
 
 input[type="file"].form-control {
   padding: 6px 12px;
@@ -27,7 +27,7 @@ input[type="file"]::file-selector-button:hover {
 }
 
 .btn-blue {
-  background-color: var(--color-primary);
+  background-color: var(--color-primary, #4338ca);
   color: white;
   border: none;
   padding: 10px 24px;
@@ -45,7 +45,7 @@ input[type="file"]::file-selector-button:hover {
 .btn-blue:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 10px rgba(67, 56, 202, 0.25);
-  background-color: #3730a3; /* dark primary */
+  background-color: #3730a3;
 }
 
 .btn-blue:disabled {
@@ -62,4 +62,313 @@ input[type="file"]::file-selector-button:hover {
   display: flex;
   align-items: center;
   gap: 5px;
+}
+
+/* ── AI Studio Cards ──────────────────────────────────────────────────────── */
+.ai-studio-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  box-shadow: 0 4px 12px rgba(67, 56, 202, 0.05);
+}
+
+.ai-studio-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e0e7ff;
+}
+
+.ai-spark-icon {
+  font-size: 24px;
+  background: #e0e7ff;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ai-studio-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #312e81;
+}
+
+.ai-studio-desc {
+  margin: 2px 0 0 0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.ai-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.ai-feature-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  transition: all 0.2s ease;
+}
+
+.ai-feature-card:hover {
+  border-color: #818cf8;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+}
+
+.ai-feature-icon {
+  font-size: 20px;
+}
+
+.ai-feature-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.ai-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 20px;
+}
+
+.ai-badge-success {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+}
+
+.ai-badge-pending {
+  background: #f1f5f9;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+}
+
+.btn-ai {
+  border: none;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.btn-ai-primary {
+  background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+  color: #ffffff;
+}
+
+.btn-ai-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #4338ca 0%, #3730a3 100%);
+  box-shadow: 0 4px 10px rgba(67, 56, 202, 0.25);
+}
+
+.btn-ai-secondary {
+  background: #eef2ff;
+  color: #4338ca;
+  border: 1px solid #c7d2fe;
+}
+
+.btn-ai-secondary:hover {
+  background: #e0e7ff;
+}
+
+.btn-ai-outline {
+  background: transparent;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.btn-ai-outline:hover:not(:disabled) {
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
+}
+
+.btn-ai:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Modals ───────────────────────────────────────────────────────────────── */
+.ai-modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 20px;
+}
+
+.ai-modal-content {
+  background: #ffffff;
+  border-radius: 14px;
+  max-width: 750px;
+  width: 100%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+  animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.ai-modal-header {
+  padding: 20px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ai-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: 0.2s;
+}
+
+.ai-modal-close:hover {
+  color: #0f172a;
+}
+
+.ai-modal-body {
+  padding: 24px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ai-modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 0 0 14px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Review Question Cards ────────────────────────────────────────────────── */
+.ai-review-question-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+
+.ai-review-q-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.ai-review-q-num {
+  background: #4338ca;
+  color: white;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.ai-review-q-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+  line-height: 1.6;
+}
+
+.ai-review-options-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-review-opt-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #334155;
+}
+
+.ai-opt-correct {
+  background: #f0fdf4 !important;
+  border-color: #86efac !important;
+  color: #166534 !important;
+  font-weight: 600;
+}
+
+.ai-opt-indicator {
+  width: 20px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.ai-opt-correct-tag {
+  margin-right: auto;
+  font-size: 11px;
+  background: #bbf7d0;
+  color: #14532d;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.ai-review-explanation {
+  background: #eff6ff;
+  border-right: 4px solid #3b82f6;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #1e40af;
+  line-height: 1.6;
+}
+
+.ai-summary-overview-box {
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.ai-summary-topic-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 14px;
 }

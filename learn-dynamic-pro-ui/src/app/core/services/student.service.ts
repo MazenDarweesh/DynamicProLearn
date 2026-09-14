@@ -81,4 +81,12 @@ export class StudentService {
   getNextLesson(): Observable<any> {
     return this.http.get<any>(`${this.apiUrl}/next-lesson`);
   }
+
+  getLessonQuiz(lessonId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/lessons/${lessonId}/quiz`);
+  }
+
+  getLessonSummary(lessonId: string): Observable<any> {
+    return this.http.get<any>(`${this.apiUrl}/lessons/${lessonId}/summary`);
+  }
 }

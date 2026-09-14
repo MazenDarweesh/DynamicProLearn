@@ -75,6 +75,93 @@
             </div>
           </div>
         </div>
+
+        <!-- ── AI Enhanced Smart Content Tabs ───────────────────────────── -->
+        <div class="ai-student-section mt-4">
+          <div class="ai-tabs-nav">
+            <button class="ai-tab-btn" 
+                    [class.active]="activeAiTab === 'summary'" 
+                    (click)="activeAiTab = 'summary'">
+              📝 ملخص الدرس الذكي (AI Summary)
+            </button>
+            <button class="ai-tab-btn" 
+                    [class.active]="activeAiTab === 'quiz'" 
+                    (click)="activeAiTab = 'quiz'">
+              🧠 اختبار تقييم الفهم
+              <span *ngIf="quizData" class="tab-count-badge">{{ quizData.questions?.length }}</span>
+            </button>
+          </div>
+
+          <!-- Tab Content: Summary -->
+          <div *ngIf="activeAiTab === 'summary'" class="ai-tab-panel">
+            <div *ngIf="summaryData" class="ai-summary-container">
+              <div class="ai-overview-card mb-4">
+                <div class="d-flex align-center gap-2 mb-2">
+                  <span style="font-size: 20px;">💡</span>
+                  <h3 class="overview-title">النظرة العامة على الدرس</h3>
+                </div>
+                <p class="overview-text">{{ summaryData.overview }}</p>
+              </div>
+
+              <h4 class="topics-heading mb-3">🔹 أهم المفاهيم والمحاور المشروحة:</h4>
+              <div *ngFor="let topic of summaryData.topics" class="ai-topic-block mb-3">
+                <h5 class="topic-name">{{ topic.topicName }}</h5>
+                <ul class="topic-points">
+                  <li *ngFor="let pt of topic.keyPoints">{{ pt }}</li>
+                </ul>
+              </div>
+            </div>
+
+            <div *ngIf="!summaryData && !isLoadingAi" class="ai-empty-box">
+              <span style="font-size: 32px; display: block; margin-bottom: 8px;">📑</span>
+              <p style="margin: 0; font-weight: 500; color: #64748b;">لم يتم نشر ملخص ذكي لهذا الدرس بعد.</p>
+              <span class="text-secondary text-sm">سيظهر ملخص الذكاء الاصطناعي هنا بمجرد اعتماده من قِبل المشرف.</span>
+            </div>
+          </div>
+
+          <!-- Tab Content: Quiz -->
+          <div *ngIf="activeAiTab === 'quiz'" class="ai-tab-panel">
+            <div *ngIf="quizData && quizData.questions?.length > 0" class="ai-quiz-container">
+              <div *ngFor="let q of quizData.questions" class="ai-student-q-card mb-3">
+                <div class="d-flex align-center gap-2 mb-3">
+                  <span class="student-q-badge">سؤال {{ q.questionNumber }}</span>
+                  <span class="student-q-text">{{ q.questionText }}</span>
+                </div>
+
+                <div class="student-options-list">
+                  <div *ngFor="let opt of q.options" 
+                       class="student-opt-row" 
+                       [class.selected]="selectedOptions[q.questionNumber] === opt.optionId"
+                       (click)="selectOption(q.questionNumber, opt.optionId)">
+                    <span class="opt-radio">
+                      <span *ngIf="selectedOptions[q.questionNumber] === opt.optionId" class="radio-inner"></span>
+                    </span>
+                    <span class="opt-text">{{ opt.text }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="d-flex justify-between align-center mt-4">
+                <button *ngIf="!quizSubmitted" 
+                        class="btn-accent" 
+                        (click)="submitQuiz()">
+                  ✅ تأكيد إجابات الاختبار وحفظ النتيجة
+                </button>
+                <button *ngIf="quizSubmitted" 
+                        class="btn-resource link-btn" 
+                        (click)="resetQuiz()">
+                  🔄 إعادة محاولة الاختبار
+                </button>
+              </div>
+            </div>
+
+            <div *ngIf="!quizData && !isLoadingAi" class="ai-empty-box">
+              <span style="font-size: 32px; display: block; margin-bottom: 8px;">🎓</span>
+              <p style="margin: 0; font-weight: 500; color: #64748b;">لا يوجد اختبار متاح لهذا الدرس حالياً.</p>
+              <span class="text-secondary text-sm">سيتم تفعيل الاختبار التفاعلي فور توليده من قبل المشرف.</span>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>

@@ -8,6 +8,7 @@ using LearnDynamicPro.Application.Features.Tester;
 using LearnDynamicPro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace LearnDynamicPro.API.Controllers;
@@ -307,6 +308,7 @@ public class AdminController : ControllerBase
         return NoContent();
     }
 
+    [EnableRateLimiting("AiGenerationLimit")]
     [HttpPost("lessons/{lessonId}/generate-quiz")]
     public async Task<IActionResult> GenerateLessonQuiz(Guid lessonId)
     {
@@ -315,12 +317,29 @@ public class AdminController : ControllerBase
         return Ok();
     }
 
+    [HttpGet("lessons/{lessonId}/quiz")]
+    public async Task<IActionResult> GetLessonQuiz(Guid lessonId)
+    {
+        var result = await _lessonAiService.GetAdminLessonQuizAsync(lessonId);
+        if (!result.IsSuccess) return NotFound(result.Error);
+        return Ok(result.Value);
+    }
+
+    [EnableRateLimiting("AiGenerationLimit")]
     [HttpPost("lessons/{lessonId}/generate-summary")]
     public async Task<IActionResult> GenerateLessonSummary(Guid lessonId)
     {
         var result = await _lessonAiService.GenerateLessonSummaryAsync(lessonId);
         if (!result.IsSuccess) return BadRequest(result.Error);
         return Ok();
+    }
+
+    [HttpGet("lessons/{lessonId}/summary")]
+    public async Task<IActionResult> GetLessonSummary(Guid lessonId)
+    {
+        var result = await _lessonAiService.GetAdminLessonSummaryAsync(lessonId);
+        if (!result.IsSuccess) return NotFound(result.Error);
+        return Ok(result.Value);
     }
 
     // ── Assignments ─────────────────────────────────────────────────────────

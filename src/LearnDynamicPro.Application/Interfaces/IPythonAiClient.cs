@@ -4,6 +4,6 @@ namespace LearnDynamicPro.Application.Interfaces;
 
 public interface IPythonAiClient
 {
-    Task<PythonAiQuizResponseDto?> GenerateQuizAsync(Guid lessonId);
-    Task<PythonAiSummaryResponseDto?> GenerateSummaryAsync(Guid lessonId);
+    Task<GeneratedQuizDto?> GenerateQuizAsync(Guid lessonId);
+    Task<GeneratedSummaryDto?> GenerateSummaryAsync(Guid lessonId);
 }

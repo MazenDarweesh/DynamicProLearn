@@ -1,4 +1,5 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using LearnDynamicPro.Application.Features.Admin;
 using LearnDynamicPro.Application.Features.Auth;
 using LearnDynamicPro.Application.Features.Progress;
@@ -10,6 +11,7 @@ using LearnDynamicPro.Infrastructure.Identity;
 using LearnDynamicPro.Infrastructure.Persistence;
 using LearnDynamicPro.Infrastructure.Persistence.Interceptors;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
@@ -101,6 +103,22 @@ builder.Services.AddScoped<ILessonAiService, LessonAiService>();
 builder.Services.AddHttpClient<IWebhookDispatcher, LearnDynamicPro.Infrastructure.Services.WebhookDispatcher>();
 builder.Services.AddHttpClient<IPythonAiClient, LearnDynamicPro.Infrastructure.Services.PythonAiClient>();
 
+// Configure Memory Cache
+builder.Services.AddMemoryCache();
+
+// Configure Rate Limiting for AI endpoints
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddFixedWindowLimiter("AiGenerationLimit", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+        opt.QueueLimit = 0;
+    });
+});
+
 // Configure CORS for Angular
 builder.Services.AddCors(options =>
 {
@@ -166,6 +184,8 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 app.UseCors("AllowAngularApp");
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();

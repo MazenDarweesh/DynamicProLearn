@@ -1,0 +1,103 @@
+<!-- ── Floating Launcher Button ────────────────────────────────────────── -->
+<div *ngIf="!isOpen" class="copilot-launcher" (click)="toggleChat()" title="المساعد الذكي (AI Co-Pilot)">
+  <div class="launcher-pulse"></div>
+  <div class="launcher-icon">✨</div>
+  <span class="launcher-text">اسأل المساعد الذكي</span>
+</div>
+
+<!-- ── Chat Window ──────────────────────────────────────────────────────── -->
+<div *ngIf="isOpen" class="copilot-window" [class.minimized]="isMinimized" dir="rtl">
+  <!-- Header -->
+  <div class="copilot-header">
+    <div class="header-info">
+      <div class="header-avatar">🤖</div>
+      <div>
+        <h4 class="header-title">LMS AI Co-Pilot</h4>
+        <span class="header-status">
+          <span class="status-dot"></span> متصل وجاهز للإجابة
+        </span>
+      </div>
+    </div>
+    <div class="header-controls">
+      <button class="header-btn" (click)="toggleMinimize()" title="{{ isMinimized ? 'تكبير' : 'تصغير' }}">
+        {{ isMinimized ? '▲' : '▼' }}
+      </button>
+      <button class="header-btn" (click)="closeChat()" title="إغلاق">✕</button>
+    </div>
+  </div>
+
+  <!-- Body (Hidden if minimized) -->
+  <ng-container *ngIf="!isMinimized">
+    <div class="copilot-body" #scrollContainer>
+      <div *ngFor="let msg of messages; let idx = index" 
+           class="chat-msg" 
+           [class.user-msg]="msg.sender === 'user'" 
+           [class.bot-msg]="msg.sender === 'assistant'">
+        
+        <div class="msg-avatar">
+          {{ msg.sender === 'user' ? '👤' : '🤖' }}
+        </div>
+
+        <div class="msg-bubble-container">
+          <!-- Sources Chips (Shown above or with bot message) -->
+          <div *ngIf="msg.sources && msg.sources.length > 0" class="msg-sources-box mb-2">
+            <span class="sources-label">📍 المصادر المستند إليها:</span>
+            <div class="sources-chips">
+              <span *ngFor="let src of msg.sources" class="source-chip">
+                📹 {{ src.lesson_title || src.title || 'درس تعليمي' }}
+                <small *ngIf="src.timestamp">({{ src.timestamp }})</small>
+              </span>
+            </div>
+          </div>
+
+          <!-- Message Text -->
+          <div class="msg-bubble">
+            <p class="msg-text">{{ msg.text }}</p>
+            <span *ngIf="msg.isStreaming" class="typing-cursor">▋</span>
+          </div>
+
+          <!-- Rating Bar (For completed assistant responses) -->
+          <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0" class="msg-rating-bar mt-1">
+            <span class="rating-label">هل كانت الإجابة مفيدة؟</span>
+            <button class="rate-btn" 
+                    [class.rated]="msg.rating === 'up'" 
+                    [disabled]="msg.feedbackSubmitted"
+                    (click)="rateAnswer(idx, 'up')" 
+                    title="إجابة دقيقة ومفيدة">
+              👍
+            </button>
+            <button class="rate-btn" 
+                    [class.rated]="msg.rating === 'down'" 
+                    [disabled]="msg.feedbackSubmitted"
+                    (click)="rateAnswer(idx, 'down')" 
+                    title="تحتاج تحسين">
+              👎
+            </button>
+            <span *ngIf="msg.feedbackSubmitted" class="feedback-thanks">شكراً لتقييمك! 🎓</span>
+          </div>
+        </div>
+      </div>
+
+      <div *ngIf="isStreaming" class="bot-typing-indicator">
+        <span></span><span></span><span></span>
+        <small class="text-secondary" style="margin-right: 8px;">جاري استخراج الإجابة وتدفقها لحظياً...</small>
+      </div>
+    </div>
+
+    <!-- Input Footer -->
+    <div class="copilot-footer">
+      <input type="text" 
+             class="copilot-input" 
+             placeholder="اسأل عن أي موديول، شاشة، أو درس..." 
+             [(ngModel)]="inputQuery" 
+             (keyup.enter)="sendMessage()" 
+             [disabled]="isStreaming">
+      <button class="copilot-send-btn" 
+              [disabled]="!inputQuery.trim() || isStreaming" 
+              (click)="sendMessage()" 
+              title="إرسال">
+        ➔
+      </button>
+    </div>
+  </ng-container>
+</div>
