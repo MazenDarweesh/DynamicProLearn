@@ -18,6 +18,9 @@ export interface ChatMessage {
   isStreaming?: boolean;
   threadId?: string;
   lessonId?: string;
+  /** Stores the original user question paired with this assistant response */
+  relatedUserQuery?: string;
+  isRetrying?: boolean;
 }
 
 @Component({
@@ -37,6 +40,12 @@ export class CopilotChatComponent implements AfterViewChecked {
   isMinimized = false;
   inputQuery = '';
   isStreaming = false;
+  isClearingCache = false;
+  clearCacheStatus: 'idle' | 'success' | 'error' = 'idle';
+
+  get isAdmin(): boolean {
+    return this.authService.userRole() === 'Admin';
+  }
 
   messages: ChatMessage[] = [
     {
@@ -203,7 +212,7 @@ export class CopilotChatComponent implements AfterViewChecked {
     }
   }
 
-  async sendMessage() {
+  async sendMessage(skipCache: boolean = false) {
     const query = this.inputQuery.trim();
     if (!query || this.isStreaming) return;
 
@@ -214,6 +223,11 @@ export class CopilotChatComponent implements AfterViewChecked {
     });
 
     this.inputQuery = '';
+    await this.streamQuery(query, skipCache);
+  }
+
+  /** Core stream method — shared by sendMessage() and retryMessage() */
+  private async streamQuery(query: string, skipCache: boolean = false) {
     this.isStreaming = true;
 
     // Create assistant message placeholder
@@ -222,7 +236,8 @@ export class CopilotChatComponent implements AfterViewChecked {
       sender: 'assistant',
       text: '',
       sources: [],
-      isStreaming: true
+      isStreaming: true,
+      relatedUserQuery: query
     });
 
     await this.copilotService.streamSearch(
@@ -236,6 +251,7 @@ export class CopilotChatComponent implements AfterViewChecked {
       },
       (meta?: any) => {
         this.messages[assistantMsgIndex].isStreaming = false;
+        this.messages[assistantMsgIndex].isRetrying = false;
         this.isStreaming = false;
         if (meta?.thread_id) {
           this.messages[assistantMsgIndex].threadId = meta.thread_id;
@@ -244,9 +260,83 @@ export class CopilotChatComponent implements AfterViewChecked {
       (err: any) => {
         this.messages[assistantMsgIndex].text += '\n\n⚠️ تعذر إكمال الإجابة. يرجى التأكد من تشغيل محرك الذكاء الاصطناعي.';
         this.messages[assistantMsgIndex].isStreaming = false;
+        this.messages[assistantMsgIndex].isRetrying = false;
         this.isStreaming = false;
-      }
+      },
+      skipCache
     );
+  }
+
+  /**
+   * Retries the answer for a specific assistant message at msgIndex,
+   * bypassing both Exact Cache and Semantic Cache (skip_cache: true).
+   */
+  async retryMessage(msgIndex: number) {
+    const msg = this.messages[msgIndex];
+    if (!msg || this.isStreaming || msg.isStreaming) return;
+
+    const userQuery = msg.relatedUserQuery;
+    if (!userQuery) return;
+
+    // Reset assistant message in-place (clean slate for new answer)
+    msg.text = '';
+    msg.sources = [];
+    msg.rating = null;
+    msg.feedbackSubmitted = false;
+    msg.feedbackComment = '';
+    msg.showCommentBox = false;
+    msg.selectedReasonTag = undefined;
+    msg.isStreaming = true;
+    msg.isRetrying = true;
+    msg.threadId = undefined;
+
+    console.info('%c[CoPilot] RETRY', 'color:#f59e0b;font-weight:bold', { userQuery, msgIndex });
+
+    this.isStreaming = true;
+
+    await this.copilotService.streamSearch(
+      userQuery,
+      msg.lessonId,
+      (sources) => { msg.sources = this.deduplicateSources(sources); },
+      (token) => { msg.text += token; },
+      (meta?: any) => {
+        msg.isStreaming = false;
+        msg.isRetrying = false;
+        this.isStreaming = false;
+        if (meta?.thread_id) msg.threadId = meta.thread_id;
+      },
+      (err) => {
+        msg.text += '\n\n⚠️ تعذر إعادة المحاولة.';
+        msg.isStreaming = false;
+        msg.isRetrying = false;
+        this.isStreaming = false;
+      },
+      true   // skip_cache = true
+    );
+  }
+
+  /**
+   * Admin-only: clears both Exact Cache and Semantic Cache in the Python AI engine.
+   */
+  clearAiCache() {
+    if (this.isClearingCache) return;
+    this.isClearingCache = true;
+    this.clearCacheStatus = 'idle';
+
+    this.copilotService.clearAiCache().subscribe({
+      next: (res) => {
+        this.isClearingCache = false;
+        this.clearCacheStatus = 'success';
+        console.info('[CoPilot Admin] Cache cleared:', res.message);
+        setTimeout(() => this.clearCacheStatus = 'idle', 4000);
+      },
+      error: (err) => {
+        this.isClearingCache = false;
+        this.clearCacheStatus = 'error';
+        console.error('[CoPilot Admin] Cache clear failed:', err);
+        setTimeout(() => this.clearCacheStatus = 'idle', 4000);
+      }
+    });
   }
 
   /**

@@ -44,15 +44,20 @@ export class CopilotService {
     onSources?: (sources: CopilotSource[]) => void,
     onToken?: (token: string) => void,
     onDone?: (meta?: any) => void,
-    onError?: (err: any) => void
+    onError?: (err: any) => void,
+    skipCache: boolean = false
   ): Promise<void> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
 
-    const payload = {
+    const payload: Record<string, any> = {
       query: query,
       lesson_id: lessonId || null,
       scope: lessonId ? 'lesson' : 'global'
     };
+
+    if (skipCache) {
+      payload['skip_cache'] = true;
+    }
 
     const startTime = Date.now();
     console.info('%c[CoPilot SSE] STREAM_START', 'color:#6366f1;font-weight:bold', { query, lessonId });
@@ -160,5 +165,19 @@ export class CopilotService {
         'Authorization': `Bearer ${token}`
       }
     });
+  }
+
+  /**
+   * Admin-only: clears both Exact Cache and Semantic Cache in the Python AI engine.
+   * Routes through the .NET proxy at /api/admin/ai/cache/clear (AdminOnly policy).
+   */
+  clearAiCache(): Observable<{ status: string; message: string }> {
+    const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
+    console.info('%c[CoPilot Admin] CLEAR_CACHE', 'color:#f59e0b;font-weight:bold');
+    return this.http.post<{ status: string; message: string }>(
+      '/api/admin/ai/cache/clear',
+      {},
+      { headers: { 'Authorization': `Bearer ${token}` } }
+    );
   }
 }

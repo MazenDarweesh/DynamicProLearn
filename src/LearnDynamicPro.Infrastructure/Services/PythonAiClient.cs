@@ -99,6 +99,32 @@ public class PythonAiClient : IPythonAiClient
         _logger.LogInformation("[PythonAI] OK POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
             endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds);
 
-        return await response.Content.ReadFromJsonAsync<GeneratedSummaryDto>();
+        return await response.Content.ReadFromJsonAsync<GeneratedSummaryDto?>();
+    }
+
+    public async Task<bool> ClearAiCacheAsync()
+    {
+        const string endpoint = "/v1/admin/cache/clear";
+        var sw = Stopwatch.StartNew();
+        _logger.LogInformation("[PythonAI] POST {Endpoint} | ClearAllCaches", endpoint);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+        AttachAuthorization(request);
+
+        var response = await _httpClient.SendAsync(request);
+        sw.Stop();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errContent = await response.Content.ReadAsStringAsync();
+            _logger.LogError("[PythonAI] FAIL POST {Endpoint} | StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
+                endpoint, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
+            return false;
+        }
+
+        _logger.LogInformation("[PythonAI] OK POST {Endpoint} | StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
+            endpoint, (int)response.StatusCode, sw.ElapsedMilliseconds);
+
+        return true;
     }
 }

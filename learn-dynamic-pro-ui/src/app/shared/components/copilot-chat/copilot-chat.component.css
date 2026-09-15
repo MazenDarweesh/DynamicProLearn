@@ -156,6 +156,57 @@
   background: rgba(255, 255, 255, 0.3);
 }
 
+/* ── Admin Cache Strip ─────────────────────────────────────────────────── */
+.admin-cache-strip {
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 6px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+}
+
+.cache-clear-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s ease;
+}
+
+.cache-clear-btn:hover:not(:disabled) {
+  background: #fee2e2;
+  border-color: #fca5a5;
+  color: #b91c1c;
+  transform: translateY(-1px);
+}
+
+.cache-clear-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.cache-status {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cache-status.success {
+  color: #15803d;
+}
+
+.cache-status.error {
+  color: #b91c1c;
+}
+
 /* Body */
 .copilot-body {
   flex: 1;
@@ -482,6 +533,32 @@
   gap: 6px;
   font-size: 11.5px;
   color: #64748b;
+}
+
+.action-icon-btn {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 3px 7px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  color: #475569;
+}
+
+.action-icon-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #1e293b;
+  transform: rotate(35deg) scale(1.05);
+}
+
+.action-icon-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .rate-btn {

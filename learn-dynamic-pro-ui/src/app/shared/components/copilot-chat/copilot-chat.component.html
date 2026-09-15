@@ -26,6 +26,20 @@
     </div>
   </div>
 
+  <!-- Admin Cache-Clear Strip (visible only for Admins) -->
+  <div *ngIf="isAdmin" class="admin-cache-strip">
+    <button type="button"
+            class="cache-clear-btn"
+            [disabled]="isClearingCache"
+            (click)="clearAiCache()"
+            title="تفريغ ذاكرة التخزين المؤقت للذكاء الاصطناعي">
+      <span *ngIf="!isClearingCache">🧹 تفريغ الكاش</span>
+      <span *ngIf="isClearingCache">⏳ جاري التفريغ...</span>
+    </button>
+    <span *ngIf="clearCacheStatus === 'success'" class="cache-status success">✅ تم التفريغ</span>
+    <span *ngIf="clearCacheStatus === 'error'" class="cache-status error">❌ فشل التفريغ</span>
+  </div>
+
   <!-- Body (Hidden if minimized) -->
   <ng-container *ngIf="!isMinimized">
     <div class="copilot-body" #scrollContainer>
@@ -80,7 +94,16 @@
           <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0" class="msg-feedback-container">
             <div class="msg-rating-bar">
               <span class="rating-label">هل كانت الإجابة مفيدة؟</span>
-              
+
+              <!-- 🔄 Retry / Regenerate Button -->
+              <button type="button"
+                      class="action-icon-btn retry-btn"
+                      [disabled]="isStreaming"
+                      (click)="retryMessage(idx)"
+                      title="إعادة التوليد (يتجاوز الكاش ويولد إجابة جديدة)">
+                🔄
+              </button>
+
               <button type="button"
                       class="rate-btn up-btn"
                       [class.active]="msg.rating === 'UP'"
@@ -89,7 +112,7 @@
                       title="إجابة دقيقة ومفيدة (موافق)">
                 <span>👍</span>
               </button>
-              
+
               <button type="button"
                       class="rate-btn down-btn"
                       [class.active]="msg.rating === 'DOWN'"
@@ -103,7 +126,8 @@
                 {{ msg.rating === 'UP' ? 'شكراً لتقييمك الإيجابي! 🌟' : 'تم تسجيل ملاحظتك بنجاح! 🎓' }}
               </span>
 
-              <span *ngIf="msg.isSubmittingFeedback" class="feedback-loading">جاري التسجيل...</span>
+              <span *ngIf="msg.isRetrying" class="feedback-loading">⏳ إعادة التوليد...</span>
+              <span *ngIf="msg.isSubmittingFeedback && !msg.isRetrying" class="feedback-loading">جاري التسجيل...</span>
             </div>
 
             <!-- Popover / Collapsible Comment Box for Downvote -->

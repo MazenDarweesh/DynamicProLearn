@@ -26,6 +26,7 @@ public class AdminController : ControllerBase
     private readonly IProgressAnalyticsService _progressAnalyticsService;
     private readonly IApplicationDbContext _context;
     private readonly ILessonAiService _lessonAiService;
+    private readonly IPythonAiClient _pythonAiClient;
     private readonly ILogger<AdminController> _logger;
 
     public AdminController(
@@ -35,6 +36,7 @@ public class AdminController : ControllerBase
         ITesterService testerService,
         IProgressAnalyticsService progressAnalyticsService,
         ILessonAiService lessonAiService,
+        IPythonAiClient pythonAiClient,
         IApplicationDbContext context,
         ILogger<AdminController> logger)
     {
@@ -44,6 +46,7 @@ public class AdminController : ControllerBase
         _testerService = testerService;
         _progressAnalyticsService = progressAnalyticsService;
         _lessonAiService = lessonAiService;
+        _pythonAiClient = pythonAiClient;
         _context = context;
         _logger = logger;
     }
@@ -540,5 +543,30 @@ public class AdminController : ControllerBase
     {
         var result = await _progressAnalyticsService.UncompleteLessonForTargetAsync(lessonId, targetType, targetId);
         return result.IsSuccess ? Ok() : BadRequest(result.Error);
+    }
+
+    // ── AI Cache Management ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Purges both Tier-1 Exact Cache and Tier-2 Semantic Cache in the Python AI engine.
+    /// Useful after uploading new lesson content to force fresh answer generation.
+    /// </summary>
+    [HttpPost("ai/cache/clear")]
+    public async Task<IActionResult> ClearAiCache()
+    {
+        _logger.LogInformation("[AdminAPI] ClearAiCache REQUEST");
+        var success = await _pythonAiClient.ClearAiCacheAsync();
+        if (!success)
+        {
+            _logger.LogError("[AdminAPI] ClearAiCache FAILED — Python AI returned non-success");
+            return StatusCode(502, new { error = "فشل تفريغ الكاش. تأكد من تشغيل محرك الذكاء الاصطناعي." });
+        }
+
+        _logger.LogInformation("[AdminAPI] ClearAiCache DONE");
+        return Ok(new
+        {
+            status = "success",
+            message = "تم تفريغ كافة مستويات الكاش (Exact Cache + Semantic Cache) بنجاح ✅"
+        });
     }
 }
