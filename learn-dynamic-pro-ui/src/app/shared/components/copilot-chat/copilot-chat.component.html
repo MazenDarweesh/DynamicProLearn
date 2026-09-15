@@ -76,24 +76,76 @@
             </div>
           </div>
 
-          <!-- Rating Bar (For completed assistant responses) -->
-          <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0" class="msg-rating-bar mt-1">
-            <span class="rating-label">هل كانت الإجابة مفيدة؟</span>
-            <button class="rate-btn"
-                    [class.rated]="msg.rating === 'up'"
-                    [disabled]="msg.feedbackSubmitted"
-                    (click)="rateAnswer(idx, 'up')"
-                    title="إجابة دقيقة ومفيدة">
-              👍
-            </button>
-            <button class="rate-btn"
-                    [class.rated]="msg.rating === 'down'"
-                    [disabled]="msg.feedbackSubmitted"
-                    (click)="rateAnswer(idx, 'down')"
-                    title="تحتاج تحسين">
-              👎
-            </button>
-            <span *ngIf="msg.feedbackSubmitted" class="feedback-thanks">شكراً لتقييمك! 🎓</span>
+          <!-- Rating Bar & Feedback Popover (For completed assistant responses) -->
+          <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0" class="msg-feedback-container">
+            <div class="msg-rating-bar">
+              <span class="rating-label">هل كانت الإجابة مفيدة؟</span>
+              
+              <button type="button"
+                      class="rate-btn up-btn"
+                      [class.active]="msg.rating === 'UP'"
+                      [disabled]="msg.isSubmittingFeedback"
+                      (click)="toggleRating(idx, 'UP')"
+                      title="إجابة دقيقة ومفيدة (موافق)">
+                <span>👍</span>
+              </button>
+              
+              <button type="button"
+                      class="rate-btn down-btn"
+                      [class.active]="msg.rating === 'DOWN'"
+                      [disabled]="msg.isSubmittingFeedback"
+                      (click)="toggleRating(idx, 'DOWN')"
+                      title="تحتاج تحسين (غير موافق)">
+                <span>👎</span>
+              </button>
+
+              <span *ngIf="msg.feedbackSubmitted && !msg.showCommentBox" class="feedback-thanks">
+                {{ msg.rating === 'UP' ? 'شكراً لتقييمك الإيجابي! 🌟' : 'تم تسجيل ملاحظتك بنجاح! 🎓' }}
+              </span>
+
+              <span *ngIf="msg.isSubmittingFeedback" class="feedback-loading">جاري التسجيل...</span>
+            </div>
+
+            <!-- Popover / Collapsible Comment Box for Downvote -->
+            <div *ngIf="msg.showCommentBox" class="feedback-popover">
+              <div class="popover-header">
+                <span class="popover-title">ما المشكلة في هذه الإجابة؟ <small class="text-muted">(اختياري)</small></span>
+                <button type="button" class="popover-close-btn" (click)="closeCommentBox(idx)" title="إغلاق">✕</button>
+              </div>
+
+              <!-- Quick Reasons Chips -->
+              <div class="popover-reasons">
+                <button type="button"
+                        *ngFor="let reason of feedbackReasons"
+                        class="reason-chip"
+                        [class.selected]="msg.selectedReasonTag === reason"
+                        (click)="selectReasonChip(idx, reason)">
+                  {{ reason }}
+                </button>
+              </div>
+
+              <!-- Textarea for optional custom comments -->
+              <textarea class="feedback-textarea"
+                        rows="2"
+                        placeholder="أخبرنا كيف يمكن تحسين الإجابة أو ما ينقصها..."
+                        [(ngModel)]="msg.feedbackComment"></textarea>
+
+              <!-- Popover Action Buttons -->
+              <div class="popover-actions">
+                <button type="button"
+                        class="feedback-submit-btn"
+                        [disabled]="msg.isSubmittingFeedback"
+                        (click)="submitDownvote(idx)">
+                  إرسال التقييم
+                </button>
+                <button type="button"
+                        class="feedback-skip-btn"
+                        [disabled]="msg.isSubmittingFeedback"
+                        (click)="submitDownvote(idx, true)">
+                  تخطي بدون تعليق
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>

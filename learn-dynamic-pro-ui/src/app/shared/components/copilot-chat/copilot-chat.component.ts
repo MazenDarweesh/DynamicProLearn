@@ -2,16 +2,22 @@ import { Component, inject, ElementRef, ViewChild, AfterViewChecked } from '@ang
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MarkdownComponent } from 'ngx-markdown';
-import { CopilotService, CopilotSource } from '../../../core/services/copilot.service';
+import { CopilotService, CopilotSource, CopilotFeedbackRequest } from '../../../core/services/copilot.service';
 import { AuthService } from '../../../core/services/auth.service';
 
 export interface ChatMessage {
   sender: 'user' | 'assistant';
   text: string;
   sources?: CopilotSource[];
-  rating?: 'up' | 'down';
+  rating?: 'UP' | 'DOWN' | null;
   feedbackSubmitted?: boolean;
+  feedbackComment?: string;
+  showCommentBox?: boolean;
+  isSubmittingFeedback?: boolean;
+  selectedReasonTag?: string;
   isStreaming?: boolean;
+  threadId?: string;
+  lessonId?: string;
 }
 
 @Component({
@@ -117,9 +123,10 @@ export class CopilotChatComponent implements AfterViewChecked {
    * Avoids showing raw video IDs, file extensions, or system hashes.
    */
   formatSourceLabel(src: CopilotSource, index: number): string {
-    const rawTitle = src.lesson_title || src.title;
+    let rawTitle = src.lesson_title || src.title;
     if (rawTitle && !this.isRawFileNameOrId(rawTitle)) {
-      return rawTitle;
+      // Strip redundant "المصدر [X] — " prefix from title if sent by backend
+      return rawTitle.replace(/^المصدر\s*\[\d+\]\s*[—\-]\s*/i, '').trim();
     }
 
     if (src.type === 'video' || (src.url && (src.url.includes('youtu') || src.url.includes('video')))) {
@@ -227,9 +234,12 @@ export class CopilotChatComponent implements AfterViewChecked {
       (token: string) => {
         this.messages[assistantMsgIndex].text += token;
       },
-      () => {
+      (meta?: any) => {
         this.messages[assistantMsgIndex].isStreaming = false;
         this.isStreaming = false;
+        if (meta?.thread_id) {
+          this.messages[assistantMsgIndex].threadId = meta.thread_id;
+        }
       },
       (err: any) => {
         this.messages[assistantMsgIndex].text += '\n\n⚠️ تعذر إكمال الإجابة. يرجى التأكد من تشغيل محرك الذكاء الاصطناعي.';
@@ -239,9 +249,76 @@ export class CopilotChatComponent implements AfterViewChecked {
     );
   }
 
-  rateAnswer(msgIndex: number, rating: 'up' | 'down') {
+  /**
+   * Predefined quick reason chips for downvoting.
+   */
+  readonly feedbackReasons: string[] = [
+    'معلومات غير دقيقة',
+    'شرح ناقص أو غير مكتمل',
+    'مصادر غير مطابقة',
+    'لم تجب على سؤالي'
+  ];
+
+  /**
+   * Allows toggling and switching between thumbs up and down.
+   */
+  toggleRating(msgIndex: number, newRating: 'UP' | 'DOWN') {
     const msg = this.messages[msgIndex];
-    if (msg.feedbackSubmitted) return;
+    if (msg.isSubmittingFeedback) return;
+
+    if (newRating === 'UP') {
+      // User clicked thumbs up
+      msg.showCommentBox = false;
+      msg.rating = 'UP';
+      this.submitFeedback(msgIndex, 'UP', '');
+    } else {
+      // User clicked thumbs down
+      msg.rating = 'DOWN';
+      msg.showCommentBox = true;
+      if (!msg.feedbackComment) {
+        msg.feedbackComment = '';
+      }
+    }
+  }
+
+  /**
+   * Fast select reason chip for feedback.
+   */
+  selectReasonChip(msgIndex: number, reason: string) {
+    const msg = this.messages[msgIndex];
+    if (msg.selectedReasonTag === reason) {
+      msg.selectedReasonTag = undefined;
+      msg.feedbackComment = '';
+    } else {
+      msg.selectedReasonTag = reason;
+      msg.feedbackComment = reason;
+    }
+  }
+
+  /**
+   * Submits downvote feedback with optional comment or skips comment.
+   */
+  submitDownvote(msgIndex: number, skipComment: boolean = false) {
+    const msg = this.messages[msgIndex];
+    const comment = skipComment ? '' : (msg.feedbackComment || '').trim();
+    msg.showCommentBox = false;
+    this.submitFeedback(msgIndex, 'DOWN', comment);
+  }
+
+  /**
+   * Closes the comment popover without revoking the downvote.
+   */
+  closeCommentBox(msgIndex: number) {
+    const msg = this.messages[msgIndex];
+    msg.showCommentBox = false;
+  }
+
+  /**
+   * Dispatches the feedback request to the backend.
+   */
+  private submitFeedback(msgIndex: number, rating: 'UP' | 'DOWN', comment: string) {
+    const msg = this.messages[msgIndex];
+    msg.isSubmittingFeedback = true;
 
     // Find the prior user query
     let userQuery = '';
@@ -252,17 +329,26 @@ export class CopilotChatComponent implements AfterViewChecked {
       }
     }
 
-    msg.rating = rating;
-    msg.feedbackSubmitted = true;
-
-    this.copilotService.sendFeedback({
+    const payload: CopilotFeedbackRequest = {
       query: userQuery || 'استفسار عام',
       answer: msg.text,
       rating: rating,
+      comment: comment || undefined,
+      lesson_id: msg.lessonId || undefined,
+      thread_id: msg.threadId || undefined,
       sources: msg.sources || []
-    }).subscribe({
-      next: () => {},
-      error: () => {}
+    };
+
+    this.copilotService.sendFeedback(payload).subscribe({
+      next: () => {
+        msg.feedbackSubmitted = true;
+        msg.isSubmittingFeedback = false;
+      },
+      error: (err) => {
+        console.warn('[CoPilot Feedback] Error submitting feedback', err);
+        msg.feedbackSubmitted = true;
+        msg.isSubmittingFeedback = false;
+      }
     });
   }
 }

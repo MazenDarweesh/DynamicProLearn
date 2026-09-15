@@ -22,7 +22,7 @@ export interface CopilotSource {
 export interface CopilotFeedbackRequest {
   query: string;
   answer: string;
-  rating: 'up' | 'down';
+  rating: 'UP' | 'DOWN' | 'up' | 'down' | string;
   comment?: string;
   lesson_id?: string;
   thread_id?: string;
@@ -80,6 +80,7 @@ export class CopilotService {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
       let tokenCount = 0;
+      let doneCalled = false;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -128,6 +129,7 @@ export class CopilotService {
                 console.info('%c[CoPilot SSE] DONE', 'color:#6366f1;font-weight:bold',
                   { tokenCount, elapsedMs, meta: data });
                 onDone(data);
+                doneCalled = true;
               }
             } catch (e) {
               // Plain text token (non-JSON)
@@ -142,7 +144,7 @@ export class CopilotService {
 
       const totalMs = Date.now() - startTime;
       console.info('%c[CoPilot SSE] STREAM_END', 'color:#6366f1;font-weight:bold', { tokenCount, totalMs });
-      if (onDone) onDone();
+      if (onDone && !doneCalled) onDone();
     } catch (err) {
       const elapsedMs = Date.now() - startTime;
       console.error('[CoPilot SSE] STREAM_ERROR', { err, elapsedMs });
@@ -152,6 +154,7 @@ export class CopilotService {
 
   sendFeedback(feedback: CopilotFeedbackRequest): Observable<any> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
+    console.info('%c[CoPilot Feedback] SENDING', 'color:#ec4899;font-weight:bold', feedback);
     return this.http.post(`${this.aiBaseUrl}/v1/search/feedback`, feedback, {
       headers: {
         'Authorization': `Bearer ${token}`
