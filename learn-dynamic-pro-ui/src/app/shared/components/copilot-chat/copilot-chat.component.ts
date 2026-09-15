@@ -80,12 +80,18 @@ export class CopilotChatComponent implements AfterViewChecked {
   }
 
   /**
-   * Formats seconds into MM:SS display format.
+   * Formats seconds into MM:SS or HH:MM:SS display format.
    */
   formatTimestamp(seconds?: number): string {
     if (seconds == null || seconds < 0) return '';
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
+    const totalSeconds = Math.floor(seconds);
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = Math.floor(totalSeconds % 60);
+
+    if (h > 0) {
+      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    }
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   }
 
@@ -107,17 +113,77 @@ export class CopilotChatComponent implements AfterViewChecked {
   }
 
   /**
-   * Returns a display label for a source chip.
+   * Returns a clean, friendly display label for a source chip.
+   * Avoids showing raw video IDs, file extensions, or system hashes.
    */
   formatSourceLabel(src: CopilotSource, index: number): string {
-    if (src.lesson_title) return src.lesson_title;
-    if (src.title) return src.title;
-    if (src.url) {
-      // Extract YouTube video ID for a compact label
-      const match = src.url.match(/(?:youtu\.be\/|v=)([^?&]+)/);
-      return match ? `فيديو ${match[1].substring(0, 8)}…` : `مصدر ${index + 1}`;
+    const rawTitle = src.lesson_title || src.title;
+    if (rawTitle && !this.isRawFileNameOrId(rawTitle)) {
+      return rawTitle;
     }
-    return `مصدر ${index + 1}`;
+
+    if (src.type === 'video' || (src.url && (src.url.includes('youtu') || src.url.includes('video')))) {
+      return `مقطع فيديو تعليمي ${index + 1}`;
+    }
+
+    if (src.type === 'pdf') {
+      if (src.page != null) {
+        return `مستند دراسي (صفحة ${src.page})`;
+      }
+      return `مستند دراسي ${index + 1}`;
+    }
+
+    return `مصدر تعليمي ${index + 1}`;
+  }
+
+  private isRawFileNameOrId(str: string): boolean {
+    return /\.(mp4|mkv|avi|webm|mov|flv|pdf|docx|txt)$/i.test(str)
+      || /^lesson_[a-zA-Z0-9_-]+$/i.test(str)
+      || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
+      || /^[a-zA-Z0-9_-]{11}$/.test(str);
+  }
+
+  /**
+   * Transforms raw message text citations like [1], [1, 2], [1][2] into markdown links
+   * pointing directly to the corresponding source URL with timestamp.
+   * If a citation index exceeds available sources, preserves it gracefully without broken links.
+   */
+  renderMessageText(msg: ChatMessage): string {
+    if (!msg.text) return '';
+    if (!msg.sources || msg.sources.length === 0) return msg.text;
+
+    // Matches bracketed citations e.g. [1], [1, 2], [1, 2, 3] or 【1】
+    const citationRegex = /\[([0-9]+(?:\s*,\s*[0-9]+)*)\]/g;
+
+    return msg.text.replace(citationRegex, (match, group) => {
+      const numbers = group.split(',').map((s: string) => parseInt(s.trim(), 10));
+      const formattedLinks = numbers.map((num: number) => {
+        const sourceIndex = num - 1;
+        if (sourceIndex >= 0 && sourceIndex < msg.sources!.length) {
+          const src = msg.sources![sourceIndex];
+          const url = this.buildSourceUrl(src);
+          const label = this.formatSourceLabel(src, sourceIndex);
+          return `[\[${num}\]](${url} "${label}")`;
+        }
+        // Graceful fallback for hallucinated citation indices
+        return `[${num}]`;
+      });
+      return formattedLinks.join(' ');
+    });
+  }
+
+  /**
+   * Intercepts clicks on markdown links in message bubbles to open them
+   * in a new tab and prevent in-app route changes.
+   */
+  onBubbleClick(event: MouseEvent): void {
+    const target = event.target as HTMLElement;
+    const anchor = target.closest('a');
+    if (anchor && anchor.href && !anchor.href.endsWith('#')) {
+      event.preventDefault();
+      event.stopPropagation();
+      window.open(anchor.href, '_blank', 'noopener,noreferrer');
+    }
   }
 
   /**

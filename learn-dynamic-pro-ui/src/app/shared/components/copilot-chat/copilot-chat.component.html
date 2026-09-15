@@ -41,9 +41,9 @@
         <div class="msg-bubble-container">
 
           <!-- Message Bubble — Markdown rendered for assistant -->
-          <div class="msg-bubble">
+          <div class="msg-bubble" (click)="onBubbleClick($event)">
             <ng-container *ngIf="msg.sender === 'assistant'; else plainText">
-              <markdown [data]="msg.text" class="markdown-body"></markdown>
+              <markdown [data]="renderMessageText(msg)" class="markdown-body"></markdown>
               <span *ngIf="msg.isStreaming" class="typing-cursor">▋</span>
             </ng-container>
             <ng-template #plainText>
@@ -68,9 +68,8 @@
                 <span class="chip-index">{{ i + 1 }}</span>
                 <span class="chip-icon">{{ src.type === 'pdf' ? '📄' : '📹' }}</span>
                 <span class="chip-label">{{ formatSourceLabel(src, i) }}</span>
-                <span *ngIf="src.start != null" class="chip-timestamp">
-                  {{ formatTimestamp(src.start) }}
-                  <ng-container *ngIf="src.end != null"> – {{ formatTimestamp(src.end) }}</ng-container>
+                <span *ngIf="src.start != null" class="chip-timestamp" dir="ltr">
+                  {{ formatTimestamp(src.start) }}<ng-container *ngIf="src.end != null"> – {{ formatTimestamp(src.end) }}</ng-container>
                 </span>
                 <span class="chip-open">↗</span>
               </a>
