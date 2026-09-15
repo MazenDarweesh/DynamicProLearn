@@ -4,6 +4,7 @@ using LearnDynamicPro.Application.Features.Student;
 using LearnDynamicPro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace LearnDynamicPro.API.Controllers;
 
@@ -15,15 +16,18 @@ public class StudentController : ControllerBase
     private readonly IStudentService _studentService;
     private readonly IProgressService _progressService;
     private readonly ICurrentUserService _currentUserService;
+    private readonly ILogger<StudentController> _logger;
 
     public StudentController(
         IStudentService studentService,
         IProgressService progressService,
-        ICurrentUserService currentUserService)
+        ICurrentUserService currentUserService,
+        ILogger<StudentController> logger)
     {
         _studentService = studentService;
         _progressService = progressService;
         _currentUserService = currentUserService;
+        _logger = logger;
     }
 
     [HttpGet("modules")]
@@ -115,26 +119,42 @@ public class StudentController : ControllerBase
     [HttpGet("lessons/{lessonId}/quiz")]
     public async Task<IActionResult> GetLessonQuiz(Guid lessonId)
     {
+        _logger.LogInformation("[StudentAPI] GetLessonQuiz REQUEST | LessonId={LessonId} UserId={UserId}",
+            lessonId, _currentUserService.UserId);
         var result = await _studentService.GetLessonQuizAsync(lessonId, _currentUserService.UserId);
         if (!result.IsSuccess) 
         {
             if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+            {
+                _logger.LogWarning("[StudentAPI] GetLessonQuiz FORBIDDEN | LessonId={LessonId} UserId={UserId}",
+                    lessonId, _currentUserService.UserId);
                 return Forbid(result.Error);
+            }
+            _logger.LogWarning("[StudentAPI] GetLessonQuiz NOT_FOUND | LessonId={LessonId}", lessonId);
             return NotFound(result.Error);
         }
+        _logger.LogInformation("[StudentAPI] GetLessonQuiz OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
     }
 
     [HttpGet("lessons/{lessonId}/summary")]
     public async Task<IActionResult> GetLessonSummary(Guid lessonId)
     {
+        _logger.LogInformation("[StudentAPI] GetLessonSummary REQUEST | LessonId={LessonId} UserId={UserId}",
+            lessonId, _currentUserService.UserId);
         var result = await _studentService.GetLessonSummaryAsync(lessonId, _currentUserService.UserId);
         if (!result.IsSuccess) 
         {
             if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+            {
+                _logger.LogWarning("[StudentAPI] GetLessonSummary FORBIDDEN | LessonId={LessonId} UserId={UserId}",
+                    lessonId, _currentUserService.UserId);
                 return Forbid(result.Error);
+            }
+            _logger.LogWarning("[StudentAPI] GetLessonSummary NOT_FOUND | LessonId={LessonId}", lessonId);
             return NotFound(result.Error);
         }
+        _logger.LogInformation("[StudentAPI] GetLessonSummary OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
     }
 }

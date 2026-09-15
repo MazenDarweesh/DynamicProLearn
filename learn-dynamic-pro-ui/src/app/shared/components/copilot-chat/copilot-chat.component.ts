@@ -1,6 +1,7 @@
 import { Component, inject, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { MarkdownComponent } from 'ngx-markdown';
 import { CopilotService, CopilotSource } from '../../../core/services/copilot.service';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -16,7 +17,7 @@ export interface ChatMessage {
 @Component({
   selector: 'app-copilot-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, MarkdownComponent],
   templateUrl: './copilot-chat.component.html',
   styleUrls: ['./copilot-chat.component.css']
 })
@@ -65,6 +66,70 @@ export class CopilotChatComponent implements AfterViewChecked {
     } catch (err) {}
   }
 
+  /**
+   * Removes duplicate sources based on URL + start time combination.
+   */
+  deduplicateSources(sources: CopilotSource[]): CopilotSource[] {
+    const seen = new Set<string>();
+    return sources.filter(src => {
+      const key = `${src.url ?? ''}::${src.start ?? 0}::${src.end ?? 0}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  /**
+   * Formats seconds into MM:SS display format.
+   */
+  formatTimestamp(seconds?: number): string {
+    if (seconds == null || seconds < 0) return '';
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  }
+
+  /**
+   * Builds a YouTube URL that seeks to the given start time.
+   */
+  buildSourceUrl(src: CopilotSource): string {
+    if (!src.url) return '#';
+    try {
+      const url = new URL(src.url);
+      // Only add t= if not already set by the server
+      if (src.start != null && src.start > 0 && !url.searchParams.has('t')) {
+        url.searchParams.set('t', `${src.start}s`);
+      }
+      return url.toString();
+    } catch {
+      return src.url;
+    }
+  }
+
+  /**
+   * Returns a display label for a source chip.
+   */
+  formatSourceLabel(src: CopilotSource, index: number): string {
+    if (src.lesson_title) return src.lesson_title;
+    if (src.title) return src.title;
+    if (src.url) {
+      // Extract YouTube video ID for a compact label
+      const match = src.url.match(/(?:youtu\.be\/|v=)([^?&]+)/);
+      return match ? `فيديو ${match[1].substring(0, 8)}…` : `مصدر ${index + 1}`;
+    }
+    return `مصدر ${index + 1}`;
+  }
+
+  /**
+   * Opens a source URL in a new tab.
+   */
+  openSource(src: CopilotSource): void {
+    const url = this.buildSourceUrl(src);
+    if (url && url !== '#') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  }
+
   async sendMessage() {
     const query = this.inputQuery.trim();
     if (!query || this.isStreaming) return;
@@ -91,7 +156,7 @@ export class CopilotChatComponent implements AfterViewChecked {
       query,
       undefined,
       (sources: CopilotSource[]) => {
-        this.messages[assistantMsgIndex].sources = sources;
+        this.messages[assistantMsgIndex].sources = this.deduplicateSources(sources);
       },
       (token: string) => {
         this.messages[assistantMsgIndex].text += token;

@@ -4,6 +4,14 @@ import { Observable } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export interface CopilotSource {
+  type?: 'video' | 'pdf' | string;
+  url?: string;
+  start?: number;
+  end?: number;
+  page?: number | null;
+  section?: string | null;
+  lesson_id?: string;
+  // legacy/optional display helpers returned from some endpoints
   title?: string;
   lesson_title?: string;
   timestamp?: string;
@@ -46,6 +54,9 @@ export class CopilotService {
       scope: lessonId ? 'lesson' : 'global'
     };
 
+    const startTime = Date.now();
+    console.info('%c[CoPilot SSE] STREAM_START', 'color:#6366f1;font-weight:bold', { query, lessonId });
+
     try {
       const response = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {
         method: 'POST',
@@ -68,6 +79,7 @@ export class CopilotService {
 
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
+      let tokenCount = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -82,7 +94,7 @@ export class CopilotService {
         for (const line of lines) {
           const trimmed = line.trim();
           if (!trimmed || trimmed.startsWith(':')) {
-            // Comment or heartbeat
+            // Comment or heartbeat — skip
             continue;
           }
 
@@ -92,16 +104,35 @@ export class CopilotService {
             const dataStr = trimmed.substring('data:'.length).trim();
             try {
               const data = JSON.parse(dataStr);
+
               if (currentEvent === 'sources' && onSources) {
-                onSources(Array.isArray(data) ? data : [data]);
+                // Server may send { sources: [...] } OR a direct array — handle both
+                let sourcesArray: CopilotSource[];
+                if (Array.isArray(data)) {
+                  sourcesArray = data;
+                } else if (data && Array.isArray(data.sources)) {
+                  sourcesArray = data.sources;
+                } else {
+                  sourcesArray = [data];
+                }
+                console.info('%c[CoPilot SSE] SOURCES', 'color:#10b981;font-weight:bold', sourcesArray);
+                onSources(sourcesArray);
+
               } else if (currentEvent === 'token' && onToken) {
-                onToken(typeof data === 'string' ? data : (data.text || data.token || ''));
+                tokenCount++;
+                const tokenText = typeof data === 'string' ? data : (data.text || data.token || '');
+                onToken(tokenText);
+
               } else if (currentEvent === 'done' && onDone) {
+                const elapsedMs = Date.now() - startTime;
+                console.info('%c[CoPilot SSE] DONE', 'color:#6366f1;font-weight:bold',
+                  { tokenCount, elapsedMs, meta: data });
                 onDone(data);
               }
             } catch (e) {
-              // If plain text token
+              // Plain text token (non-JSON)
               if (currentEvent === 'token' && onToken) {
+                tokenCount++;
                 onToken(dataStr);
               }
             }
@@ -109,9 +140,12 @@ export class CopilotService {
         }
       }
 
+      const totalMs = Date.now() - startTime;
+      console.info('%c[CoPilot SSE] STREAM_END', 'color:#6366f1;font-weight:bold', { tokenCount, totalMs });
       if (onDone) onDone();
     } catch (err) {
-      console.error('Copilot Stream Error:', err);
+      const elapsedMs = Date.now() - startTime;
+      console.error('[CoPilot SSE] STREAM_ERROR', { err, elapsedMs });
       if (onError) onError(err);
     }
   }

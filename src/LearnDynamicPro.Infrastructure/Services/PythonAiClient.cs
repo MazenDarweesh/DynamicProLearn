@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net.Http.Json;
 using LearnDynamicPro.Application.Dtos.Internal;
 using LearnDynamicPro.Application.Interfaces;
@@ -51,34 +52,52 @@ public class PythonAiClient : IPythonAiClient
 
     public async Task<GeneratedQuizDto?> GenerateQuizAsync(Guid lessonId)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/admin/lessons/{lessonId}/generate-quiz");
+        var endpoint = $"/v1/admin/lessons/{lessonId}/generate-quiz";
+        var sw = Stopwatch.StartNew();
+        _logger.LogInformation("[PythonAI] POST {Endpoint} | LessonId={LessonId}", endpoint, lessonId);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         AttachAuthorization(request);
 
         var response = await _httpClient.SendAsync(request);
+        sw.Stop();
+
         if (!response.IsSuccessStatusCode)
         {
             var errContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Failed to generate quiz for lesson {LessonId}. Status: {StatusCode}, Details: {Details}",
-                lessonId, response.StatusCode, errContent);
+            _logger.LogError("[PythonAI] FAIL POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
+                endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
             return null;
         }
+
+        _logger.LogInformation("[PythonAI] OK POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
+            endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds);
 
         return await response.Content.ReadFromJsonAsync<GeneratedQuizDto>();
     }
 
     public async Task<GeneratedSummaryDto?> GenerateSummaryAsync(Guid lessonId)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, $"/v1/admin/lessons/{lessonId}/generate-summary");
+        var endpoint = $"/v1/admin/lessons/{lessonId}/generate-summary";
+        var sw = Stopwatch.StartNew();
+        _logger.LogInformation("[PythonAI] POST {Endpoint} | LessonId={LessonId}", endpoint, lessonId);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
         AttachAuthorization(request);
 
         var response = await _httpClient.SendAsync(request);
+        sw.Stop();
+
         if (!response.IsSuccessStatusCode)
         {
             var errContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("Failed to generate summary for lesson {LessonId}. Status: {StatusCode}, Details: {Details}",
-                lessonId, response.StatusCode, errContent);
+            _logger.LogError("[PythonAI] FAIL POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
+                endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
             return null;
         }
+
+        _logger.LogInformation("[PythonAI] OK POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
+            endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds);
 
         return await response.Content.ReadFromJsonAsync<GeneratedSummaryDto>();
     }

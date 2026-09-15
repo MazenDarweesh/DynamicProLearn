@@ -29,47 +29,68 @@
   <!-- Body (Hidden if minimized) -->
   <ng-container *ngIf="!isMinimized">
     <div class="copilot-body" #scrollContainer>
-      <div *ngFor="let msg of messages; let idx = index" 
-           class="chat-msg" 
-           [class.user-msg]="msg.sender === 'user'" 
+      <div *ngFor="let msg of messages; let idx = index"
+           class="chat-msg"
+           [class.user-msg]="msg.sender === 'user'"
            [class.bot-msg]="msg.sender === 'assistant'">
-        
+
         <div class="msg-avatar">
           {{ msg.sender === 'user' ? '👤' : '🤖' }}
         </div>
 
         <div class="msg-bubble-container">
-          <!-- Sources Chips (Shown above or with bot message) -->
-          <div *ngIf="msg.sources && msg.sources.length > 0" class="msg-sources-box mb-2">
-            <span class="sources-label">📍 المصادر المستند إليها:</span>
-            <div class="sources-chips">
-              <span *ngFor="let src of msg.sources" class="source-chip">
-                📹 {{ src.lesson_title || src.title || 'درس تعليمي' }}
-                <small *ngIf="src.timestamp">({{ src.timestamp }})</small>
-              </span>
-            </div>
+
+          <!-- Message Bubble — Markdown rendered for assistant -->
+          <div class="msg-bubble">
+            <ng-container *ngIf="msg.sender === 'assistant'; else plainText">
+              <markdown [data]="msg.text" class="markdown-body"></markdown>
+              <span *ngIf="msg.isStreaming" class="typing-cursor">▋</span>
+            </ng-container>
+            <ng-template #plainText>
+              <p class="msg-text">{{ msg.text }}</p>
+            </ng-template>
           </div>
 
-          <!-- Message Text -->
-          <div class="msg-bubble">
-            <p class="msg-text">{{ msg.text }}</p>
-            <span *ngIf="msg.isStreaming" class="typing-cursor">▋</span>
+          <!-- Sources Panel (shown after bot response has sources) -->
+          <div *ngIf="msg.sources && msg.sources.length > 0" class="msg-sources-box">
+            <div class="sources-header">
+              <span class="sources-icon">📍</span>
+              <span class="sources-label">المصادر المستند إليها</span>
+              <span class="sources-count">{{ msg.sources.length }}</span>
+            </div>
+            <div class="sources-chips">
+              <a *ngFor="let src of msg.sources; let i = index"
+                 class="source-chip"
+                 [href]="buildSourceUrl(src)"
+                 target="_blank"
+                 rel="noopener noreferrer"
+                 [title]="formatSourceLabel(src, i)">
+                <span class="chip-index">{{ i + 1 }}</span>
+                <span class="chip-icon">{{ src.type === 'pdf' ? '📄' : '📹' }}</span>
+                <span class="chip-label">{{ formatSourceLabel(src, i) }}</span>
+                <span *ngIf="src.start != null" class="chip-timestamp">
+                  {{ formatTimestamp(src.start) }}
+                  <ng-container *ngIf="src.end != null"> – {{ formatTimestamp(src.end) }}</ng-container>
+                </span>
+                <span class="chip-open">↗</span>
+              </a>
+            </div>
           </div>
 
           <!-- Rating Bar (For completed assistant responses) -->
           <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0" class="msg-rating-bar mt-1">
             <span class="rating-label">هل كانت الإجابة مفيدة؟</span>
-            <button class="rate-btn" 
-                    [class.rated]="msg.rating === 'up'" 
+            <button class="rate-btn"
+                    [class.rated]="msg.rating === 'up'"
                     [disabled]="msg.feedbackSubmitted"
-                    (click)="rateAnswer(idx, 'up')" 
+                    (click)="rateAnswer(idx, 'up')"
                     title="إجابة دقيقة ومفيدة">
               👍
             </button>
-            <button class="rate-btn" 
-                    [class.rated]="msg.rating === 'down'" 
+            <button class="rate-btn"
+                    [class.rated]="msg.rating === 'down'"
                     [disabled]="msg.feedbackSubmitted"
-                    (click)="rateAnswer(idx, 'down')" 
+                    (click)="rateAnswer(idx, 'down')"
                     title="تحتاج تحسين">
               👎
             </button>
@@ -86,15 +107,15 @@
 
     <!-- Input Footer -->
     <div class="copilot-footer">
-      <input type="text" 
-             class="copilot-input" 
-             placeholder="اسأل عن أي موديول، شاشة، أو درس..." 
-             [(ngModel)]="inputQuery" 
-             (keyup.enter)="sendMessage()" 
+      <input type="text"
+             class="copilot-input"
+             placeholder="اسأل عن أي موديول، شاشة، أو درس..."
+             [(ngModel)]="inputQuery"
+             (keyup.enter)="sendMessage()"
              [disabled]="isStreaming">
-      <button class="copilot-send-btn" 
-              [disabled]="!inputQuery.trim() || isStreaming" 
-              (click)="sendMessage()" 
+      <button class="copilot-send-btn"
+              [disabled]="!inputQuery.trim() || isStreaming"
+              (click)="sendMessage()"
               title="إرسال">
         ➔
       </button>

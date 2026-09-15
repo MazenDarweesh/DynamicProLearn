@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace LearnDynamicPro.API.Controllers;
 
@@ -25,6 +26,7 @@ public class AdminController : ControllerBase
     private readonly IProgressAnalyticsService _progressAnalyticsService;
     private readonly IApplicationDbContext _context;
     private readonly ILessonAiService _lessonAiService;
+    private readonly ILogger<AdminController> _logger;
 
     public AdminController(
         ICompanyService companyService,
@@ -33,7 +35,8 @@ public class AdminController : ControllerBase
         ITesterService testerService,
         IProgressAnalyticsService progressAnalyticsService,
         ILessonAiService lessonAiService,
-        IApplicationDbContext context)
+        IApplicationDbContext context,
+        ILogger<AdminController> logger)
     {
         _companyService = companyService;
         _moduleService = moduleService;
@@ -42,6 +45,7 @@ public class AdminController : ControllerBase
         _progressAnalyticsService = progressAnalyticsService;
         _lessonAiService = lessonAiService;
         _context = context;
+        _logger = logger;
     }
 
     // ── Lookups ─────────────────────────────────────────────────────────────
@@ -312,16 +316,28 @@ public class AdminController : ControllerBase
     [HttpPost("lessons/{lessonId}/generate-quiz")]
     public async Task<IActionResult> GenerateLessonQuiz(Guid lessonId)
     {
+        _logger.LogInformation("[AdminAPI] GenerateLessonQuiz REQUEST | LessonId={LessonId}", lessonId);
         var result = await _lessonAiService.GenerateLessonQuizAsync(lessonId);
-        if (!result.IsSuccess) return BadRequest(result.Error);
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("[AdminAPI] GenerateLessonQuiz FAIL | LessonId={LessonId} Error={Error}", lessonId, result.Error);
+            return BadRequest(result.Error);
+        }
+        _logger.LogInformation("[AdminAPI] GenerateLessonQuiz OK | LessonId={LessonId}", lessonId);
         return Ok();
     }
 
     [HttpGet("lessons/{lessonId}/quiz")]
     public async Task<IActionResult> GetLessonQuiz(Guid lessonId)
     {
+        _logger.LogInformation("[AdminAPI] GetLessonQuiz REQUEST | LessonId={LessonId}", lessonId);
         var result = await _lessonAiService.GetAdminLessonQuizAsync(lessonId);
-        if (!result.IsSuccess) return NotFound(result.Error);
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("[AdminAPI] GetLessonQuiz NOT_FOUND | LessonId={LessonId}", lessonId);
+            return NotFound(result.Error);
+        }
+        _logger.LogInformation("[AdminAPI] GetLessonQuiz OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
     }
 
@@ -329,16 +345,28 @@ public class AdminController : ControllerBase
     [HttpPost("lessons/{lessonId}/generate-summary")]
     public async Task<IActionResult> GenerateLessonSummary(Guid lessonId)
     {
+        _logger.LogInformation("[AdminAPI] GenerateLessonSummary REQUEST | LessonId={LessonId}", lessonId);
         var result = await _lessonAiService.GenerateLessonSummaryAsync(lessonId);
-        if (!result.IsSuccess) return BadRequest(result.Error);
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("[AdminAPI] GenerateLessonSummary FAIL | LessonId={LessonId} Error={Error}", lessonId, result.Error);
+            return BadRequest(result.Error);
+        }
+        _logger.LogInformation("[AdminAPI] GenerateLessonSummary OK | LessonId={LessonId}", lessonId);
         return Ok();
     }
 
     [HttpGet("lessons/{lessonId}/summary")]
     public async Task<IActionResult> GetLessonSummary(Guid lessonId)
     {
+        _logger.LogInformation("[AdminAPI] GetLessonSummary REQUEST | LessonId={LessonId}", lessonId);
         var result = await _lessonAiService.GetAdminLessonSummaryAsync(lessonId);
-        if (!result.IsSuccess) return NotFound(result.Error);
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("[AdminAPI] GetLessonSummary NOT_FOUND | LessonId={LessonId}", lessonId);
+            return NotFound(result.Error);
+        }
+        _logger.LogInformation("[AdminAPI] GetLessonSummary OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
     }
 
