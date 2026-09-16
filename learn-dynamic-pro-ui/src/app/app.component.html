@@ -1,4 +1,7 @@
 <main>
   <router-outlet></router-outlet>
 </main>
-<app-copilot-chat></app-copilot-chat>
+@if (authService.token()) {
+  <app-copilot-chat></app-copilot-chat>
+}
+

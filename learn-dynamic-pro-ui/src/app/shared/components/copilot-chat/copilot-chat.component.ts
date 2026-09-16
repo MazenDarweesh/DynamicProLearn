@@ -59,6 +59,10 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
     return this.authService.userRole() === 'Admin';
   }
 
+  get isLoggedIn(): boolean {
+    return !!this.authService.token();
+  }
+
   messages: ChatMessage[] = [
     {
       sender: 'assistant',

@@ -1,6 +1,7 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { CopilotChatComponent } from './shared/components/copilot-chat/copilot-chat.component';
+import { AuthService } from './core/services/auth.service';
 
 @Component({
   selector: 'app-root',
@@ -11,4 +12,5 @@ import { CopilotChatComponent } from './shared/components/copilot-chat/copilot-c
 })
 export class AppComponent {
   title = 'learn-dynamic-pro-ui';
+  authService = inject(AuthService);
 }

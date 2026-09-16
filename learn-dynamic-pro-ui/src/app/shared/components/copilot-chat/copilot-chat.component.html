@@ -1,3 +1,4 @@
+<ng-container *ngIf="isLoggedIn">
 <!-- ── Floating Launcher Button ────────────────────────────────────────── -->
 <div *ngIf="!isOpen" class="copilot-launcher" (click)="toggleChat()" title="المساعد الذكي (AI Co-Pilot)">
   <div class="launcher-pulse"></div>
@@ -227,3 +228,5 @@
     </div>
   </ng-container>
 </div>
+</ng-container>
+
