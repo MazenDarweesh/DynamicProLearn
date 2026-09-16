@@ -1,7 +1,9 @@
-import { Component, inject, ElementRef, ViewChild, AfterViewChecked } from '@angular/core';
+import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { MarkdownComponent } from 'ngx-markdown';
+import { Subscription, timer } from 'rxjs';
+import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { CopilotService, CopilotSource, CopilotFeedbackRequest } from '../../../core/services/copilot.service';
 import { AuthService } from '../../../core/services/auth.service';
 
@@ -21,16 +23,19 @@ export interface ChatMessage {
   /** Stores the original user question paired with this assistant response */
   relatedUserQuery?: string;
   isRetrying?: boolean;
+  cacheHit?: boolean;
+  provenance?: string;
+  latencyMs?: number;
 }
 
 @Component({
   selector: 'app-copilot-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, MarkdownComponent],
+  imports: [CommonModule, FormsModule, MarkdownComponent, CdkDrag, CdkDragHandle],
   templateUrl: './copilot-chat.component.html',
   styleUrls: ['./copilot-chat.component.css']
 })
-export class CopilotChatComponent implements AfterViewChecked {
+export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
   private copilotService = inject(CopilotService);
   authService = inject(AuthService);
 
@@ -42,6 +47,10 @@ export class CopilotChatComponent implements AfterViewChecked {
   isStreaming = false;
   isClearingCache = false;
   clearCacheStatus: 'idle' | 'success' | 'error' = 'idle';
+
+  isAiReady = true;
+  isWarmingUp = false;
+  private readinessSub?: Subscription;
 
   get isAdmin(): boolean {
     return this.authService.userRole() === 'Admin';
@@ -58,10 +67,63 @@ export class CopilotChatComponent implements AfterViewChecked {
     this.scrollToBottom();
   }
 
+  ngOnDestroy() {
+    this.stopReadinessPolling();
+  }
+
   toggleChat() {
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
       this.isMinimized = false;
+      this.checkAiReadiness();
+    } else {
+      this.stopReadinessPolling();
+    }
+  }
+
+  checkAiReadiness() {
+    this.copilotService.checkReadiness().subscribe({
+      next: (res) => {
+        if (res && res.ready) {
+          this.isAiReady = true;
+          this.isWarmingUp = false;
+          this.stopReadinessPolling();
+        } else {
+          this.startReadinessPolling();
+        }
+      },
+      error: () => {
+        this.startReadinessPolling();
+      }
+    });
+  }
+
+  private startReadinessPolling() {
+    this.isAiReady = false;
+    this.isWarmingUp = true;
+    if (this.readinessSub) return;
+
+    this.readinessSub = timer(2000, 2000).subscribe(() => {
+      this.copilotService.checkReadiness().subscribe({
+        next: (res) => {
+          if (res && res.ready) {
+            this.isAiReady = true;
+            this.isWarmingUp = false;
+            this.stopReadinessPolling();
+          }
+        },
+        error: () => {
+          this.isAiReady = false;
+          this.isWarmingUp = true;
+        }
+      });
+    });
+  }
+
+  private stopReadinessPolling() {
+    if (this.readinessSub) {
+      this.readinessSub.unsubscribe();
+      this.readinessSub = undefined;
     }
   }
 
@@ -71,6 +133,16 @@ export class CopilotChatComponent implements AfterViewChecked {
 
   closeChat() {
     this.isOpen = false;
+    this.stopReadinessPolling();
+  }
+
+  clearHistory() {
+    this.messages = [
+      {
+        sender: 'assistant',
+        text: 'مرحباً بك! أنا مساعدك الذكي في منصة DynamicProLearn. اسألني أي سؤال عن دروس وموديولات النظام وسأجيبك مباشرة من واقع الفيديوهات والمحتوى التعليمي! ✨'
+      }
+    ];
   }
 
   scrollToBottom(): void {
@@ -214,7 +286,7 @@ export class CopilotChatComponent implements AfterViewChecked {
 
   async sendMessage(skipCache: boolean = false) {
     const query = this.inputQuery.trim();
-    if (!query || this.isStreaming) return;
+    if (!query || this.isStreaming || !this.isAiReady) return;
 
     // Add user message
     this.messages.push({
@@ -255,6 +327,11 @@ export class CopilotChatComponent implements AfterViewChecked {
         this.isStreaming = false;
         if (meta?.thread_id) {
           this.messages[assistantMsgIndex].threadId = meta.thread_id;
+        }
+        if (meta) {
+          this.messages[assistantMsgIndex].cacheHit = meta.cache_hit ?? false;
+          this.messages[assistantMsgIndex].provenance = meta.provenance;
+          this.messages[assistantMsgIndex].latencyMs = meta.metrics?.total_latency_ms ?? meta.latency_ms;
         }
       },
       (err: any) => {
@@ -304,6 +381,11 @@ export class CopilotChatComponent implements AfterViewChecked {
         msg.isRetrying = false;
         this.isStreaming = false;
         if (meta?.thread_id) msg.threadId = meta.thread_id;
+        if (meta) {
+          msg.cacheHit = meta.cache_hit ?? false;
+          msg.provenance = meta.provenance;
+          msg.latencyMs = meta.metrics?.total_latency_ms ?? meta.latency_ms;
+        }
       },
       (err) => {
         msg.text += '\n\n⚠️ تعذر إعادة المحاولة.';

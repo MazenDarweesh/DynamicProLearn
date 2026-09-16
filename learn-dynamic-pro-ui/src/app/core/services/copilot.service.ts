@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
+import { Observable, firstValueFrom } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export interface CopilotSource {
@@ -29,6 +29,14 @@ export interface CopilotFeedbackRequest {
   sources?: any[];
 }
 
+export interface AiReadinessResponse {
+  status: string;
+  ready: boolean;
+  startup_duration_seconds?: number;
+  gemini_model?: string;
+  environment?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -37,6 +45,10 @@ export class CopilotService {
   private authService = inject(AuthService);
 
   private aiBaseUrl = 'http://localhost:8000';
+
+  checkReadiness(): Observable<AiReadinessResponse> {
+    return this.http.get<AiReadinessResponse>(`${this.aiBaseUrl}/v1/ready`);
+  }
 
   async streamSearch(
     query: string,
@@ -63,7 +75,7 @@ export class CopilotService {
     console.info('%c[CoPilot SSE] STREAM_START', 'color:#6366f1;font-weight:bold', { query, lessonId });
 
     try {
-      const response = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {
+      let activeResponse = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -73,11 +85,31 @@ export class CopilotService {
         body: JSON.stringify(payload)
       });
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      if (activeResponse.status === 401) {
+        console.warn('[CoPilot SSE] 401 Unauthorized. Attempting silent token refresh...');
+        try {
+          const refreshRes = await firstValueFrom(this.authService.refreshToken());
+          const newToken = refreshRes?.token || this.authService.token() || '';
+          activeResponse = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${newToken}`,
+              'Accept': 'text/event-stream',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+          });
+        } catch (refreshErr) {
+          console.error('[CoPilot SSE] Silent refresh failed:', refreshErr);
+          throw new Error('TOKEN_EXPIRED');
+        }
       }
 
-      const reader = response.body?.getReader();
+      if (!activeResponse.ok) {
+        throw new Error(`HTTP ${activeResponse.status}: ${activeResponse.statusText}`);
+      }
+
+      const reader = activeResponse.body?.getReader();
       if (!reader) {
         throw new Error('ReadableStream not supported on this browser.');
       }

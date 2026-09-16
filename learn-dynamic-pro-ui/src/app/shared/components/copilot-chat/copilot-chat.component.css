@@ -3,7 +3,7 @@
   position: fixed;
   bottom: 25px;
   right: 25px;
-  z-index: 9998;
+  z-index: 99999 !important;
   background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
   color: white;
   padding: 12px 20px;
@@ -66,7 +66,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  z-index: 9999;
+  z-index: 99999 !important;
   border: 1px solid #c7d2fe;
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: inherit;
@@ -89,6 +89,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  cursor: grab;
+  user-select: none;
+}
+
+.copilot-header:active {
+  cursor: grabbing;
 }
 
 .header-info {
@@ -130,6 +136,50 @@
   border-radius: 50%;
   display: inline-block;
   box-shadow: 0 0 8px #4ade80;
+}
+
+.status-dot.warming {
+  background: #f59e0b;
+  box-shadow: 0 0 8px #f59e0b;
+  animation: pulseWarming 1.5s infinite;
+}
+
+@keyframes pulseWarming {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* ── AI Engine Warming Banner ─────────────────────────────────────────── */
+.ai-warming-banner {
+  background: #fffbeb;
+  border-bottom: 1px solid #fde68a;
+  padding: 8px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: #92400e;
+  animation: fadeInBanner 0.3s ease-out;
+}
+
+.warming-icon {
+  font-size: 13px;
+  animation: spinSlow 3s linear infinite;
+}
+
+@keyframes spinSlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes fadeInBanner {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.warming-text {
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .header-controls {
@@ -525,6 +575,38 @@
   flex-direction: column;
   gap: 6px;
   padding-top: 4px;
+}
+
+/* ── Provenance & Latency Badges ───────────────────────────────────────── */
+.provenance-badge-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.provenance-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.2px;
+  transition: all 0.2s ease;
+}
+
+.badge-cache {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.badge-rag {
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
 }
 
 .msg-rating-bar {

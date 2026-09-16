@@ -40,4 +40,17 @@ public class AuthController : ControllerBase
 
         return Ok(result.Value);
     }
+
+    [HttpPost("refresh-token")]
+    public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
+    {
+        var result = await _authService.RefreshTokenAsync(request);
+        
+        if (!result.IsSuccess)
+        {
+            return Unauthorized(new { message = result.Error });
+        }
+
+        return Ok(result.Value);
+    }
 }

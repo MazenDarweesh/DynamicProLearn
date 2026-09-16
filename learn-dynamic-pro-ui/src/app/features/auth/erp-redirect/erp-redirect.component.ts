@@ -56,8 +56,8 @@ export class ErpRedirectComponent implements OnInit {
 
     this.authService.erpLogin(u, p, key).subscribe({
       next: (res: any) => {
-        // Store token locally using existing logic
-        this.authService.login(res.token);
+        // Store tokens locally
+        this.authService.login(res.token, res.refreshToken);
         
         // Handle redirect
         if (res.erpRedirect && res.erpRedirect.moduleId) {

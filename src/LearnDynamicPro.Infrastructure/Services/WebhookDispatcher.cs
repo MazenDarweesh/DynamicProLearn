@@ -39,7 +39,8 @@ public class WebhookDispatcher : IWebhookDispatcher
         var payload = new
         {
             lesson_id = lessonId.ToString(),
-            action = action
+            lessonId  = lessonId.ToString(),
+            action    = action
         };
 
         var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");

@@ -43,4 +43,101 @@ public class TokenService : ITokenService
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
+
+    public string GenerateRefreshToken(User user)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new Claim("Id", user.Id.ToString()),
+            new Claim("token_type", "refresh"),
+            new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: _jwtSettings.Issuer,
+            audience: _jwtSettings.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddDays(7), // 7 days valid
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    public ClaimsPrincipal? GetPrincipalFromExpiredToken(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
+
+        var tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = false,
+            ValidateIssuer = false,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
+            ValidateLifetime = false
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        try
+        {
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
+            if (securityToken is not JwtSecurityToken jwtSecurityToken ||
+                !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return null;
+            }
+
+            return principal;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    public bool ValidateRefreshToken(string refreshToken, out Guid userId)
+    {
+        userId = Guid.Empty;
+        if (string.IsNullOrWhiteSpace(refreshToken)) return false;
+
+        var tokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateAudience = !string.IsNullOrEmpty(_jwtSettings.Audience),
+            ValidAudience = _jwtSettings.Audience,
+            ValidateIssuer = !string.IsNullOrEmpty(_jwtSettings.Issuer),
+            ValidIssuer = _jwtSettings.Issuer,
+            ValidateIssuerSigningKey = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
+            ValidateLifetime = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+
+        var tokenHandler = new JwtSecurityTokenHandler();
+        try
+        {
+            var principal = tokenHandler.ValidateToken(refreshToken, tokenValidationParameters, out var securityToken);
+            if (securityToken is not JwtSecurityToken jwtSecurityToken ||
+                !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
+            {
+                return false;
+            }
+
+            var tokenType = principal.FindFirst("token_type")?.Value;
+            if (tokenType != "refresh") return false;
+
+            var sub = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+                      ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value 
+                      ?? principal.FindFirst("Id")?.Value;
+
+            return Guid.TryParse(sub, out userId);
+        }
+        catch
+        {
+            return false;
+        }
+    }
 }

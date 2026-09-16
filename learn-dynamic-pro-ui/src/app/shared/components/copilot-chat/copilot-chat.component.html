@@ -6,19 +6,21 @@
 </div>
 
 <!-- ── Chat Window ──────────────────────────────────────────────────────── -->
-<div *ngIf="isOpen" class="copilot-window" [class.minimized]="isMinimized" dir="rtl">
-  <!-- Header -->
-  <div class="copilot-header">
+<div *ngIf="isOpen" class="copilot-window" [class.minimized]="isMinimized" dir="rtl" cdkDrag cdkDragBoundary="body">
+  <!-- Header (Drag Handle) -->
+  <div class="copilot-header" cdkDragHandle>
     <div class="header-info">
       <div class="header-avatar">🤖</div>
       <div>
         <h4 class="header-title">LMS AI Co-Pilot</h4>
         <span class="header-status">
-          <span class="status-dot"></span> متصل وجاهز للإجابة
+          <span class="status-dot" [class.warming]="isWarmingUp"></span>
+          {{ isWarmingUp ? 'جاري تهيئة المحرك... ⏳' : 'متصل وجاهز للإجابة' }}
         </span>
       </div>
     </div>
     <div class="header-controls">
+      <button class="header-btn" (click)="clearHistory()" title="مسح المحادثة">🗑️</button>
       <button class="header-btn" (click)="toggleMinimize()" title="{{ isMinimized ? 'تكبير' : 'تصغير' }}">
         {{ isMinimized ? '▲' : '▼' }}
       </button>
@@ -38,6 +40,12 @@
     </button>
     <span *ngIf="clearCacheStatus === 'success'" class="cache-status success">✅ تم التفريغ</span>
     <span *ngIf="clearCacheStatus === 'error'" class="cache-status error">❌ فشل التفريغ</span>
+  </div>
+
+  <!-- AI Warming Banner (when engine models are loading) -->
+  <div *ngIf="isWarmingUp" class="ai-warming-banner">
+    <span class="warming-icon">⏳</span>
+    <span class="warming-text">جاري تهيئة محرك الذكاء الاصطناعي وتحميل النماذج... يرجى الانتظار ثوانٍ</span>
   </div>
 
   <!-- Body (Hidden if minimized) -->
@@ -92,6 +100,16 @@
 
           <!-- Rating Bar & Feedback Popover (For completed assistant responses) -->
           <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0" class="msg-feedback-container">
+            <!-- Provenance & Latency Badge -->
+            <div *ngIf="msg.provenance" class="provenance-badge-bar">
+              <span *ngIf="msg.cacheHit" class="provenance-badge badge-cache" [title]="'المصدر: ' + msg.provenance">
+                ⚡ استجابة فورية ({{ msg.latencyMs || 1 }} ms)
+              </span>
+              <span *ngIf="!msg.cacheHit" class="provenance-badge badge-rag" [title]="'المصدر: ' + msg.provenance">
+                🧠 توليد ذكي ({{ ((msg.latencyMs || 0) / 1000).toFixed(1) }} s)
+              </span>
+            </div>
+
             <div class="msg-rating-bar">
               <span class="rating-label">هل كانت الإجابة مفيدة؟</span>
 
@@ -184,12 +202,12 @@
     <div class="copilot-footer">
       <input type="text"
              class="copilot-input"
-             placeholder="اسأل عن أي موديول، شاشة، أو درس..."
+             [placeholder]="isWarmingUp ? 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...' : 'اسأل عن أي موديول، شاشة، أو درس...'"
              [(ngModel)]="inputQuery"
              (keyup.enter)="sendMessage()"
-             [disabled]="isStreaming">
+             [disabled]="isStreaming || !isAiReady">
       <button class="copilot-send-btn"
-              [disabled]="!inputQuery.trim() || isStreaming"
+              [disabled]="!inputQuery.trim() || isStreaming || !isAiReady"
               (click)="sendMessage()"
               title="إرسال">
         ➔

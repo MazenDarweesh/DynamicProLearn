@@ -26,12 +26,12 @@ export class LoginComponent {
     this.errorMessage = '';
     this.isLoading = true;
     
-    this.http.post<{token: string}>('/api/Auth/login', {
+    this.http.post<{token: string, refreshToken?: string}>('/api/Auth/login', {
       username: this.username,
       password: this.password
     }).subscribe({
       next: (res) => {
-        this.auth.login(res.token);
+        this.auth.login(res.token, res.refreshToken);
         this.isLoading = false;
         
         const role = this.auth.userRole();

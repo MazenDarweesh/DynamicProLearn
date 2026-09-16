@@ -8,4 +8,5 @@ public interface IAuthService
 {
     Task<Result<LoginResponse>> LoginAsync(LoginRequest request);
     Task<Result<ErpLoginResponse>> ErpLoginAsync(ErpLoginRequest request);
+    Task<Result<LoginResponse>> RefreshTokenAsync(RefreshTokenRequest request);
 }

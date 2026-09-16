@@ -1,5 +1,6 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Observable, tap } from 'rxjs';
 
 @Injectable({
   providedIn: 'root'
@@ -8,6 +9,7 @@ export class AuthService {
   private http = inject(HttpClient);
   
   readonly token = signal<string | null>(localStorage.getItem('jwt_token'));
+  readonly refreshTokenValue = signal<string | null>(localStorage.getItem('refresh_token'));
   readonly userRole = signal<string | null>(this.extractRole(this.token()));
   readonly userName = signal<string | null>(this.extractName(this.token()));
 
@@ -15,18 +17,36 @@ export class AuthService {
     return this.http.post<any>('/api/Auth/erp-login', { username, password, erpKey });
   }
 
-  login(token: string) {
+  login(token: string, refreshToken?: string) {
     localStorage.setItem('jwt_token', token);
     this.token.set(token);
+    if (refreshToken) {
+      localStorage.setItem('refresh_token', refreshToken);
+      this.refreshTokenValue.set(refreshToken);
+    }
     this.userRole.set(this.extractRole(token));
     this.userName.set(this.extractName(token));
   }
 
   logout() {
     localStorage.removeItem('jwt_token');
+    localStorage.removeItem('refresh_token');
     this.token.set(null);
+    this.refreshTokenValue.set(null);
     this.userRole.set(null);
     this.userName.set(null);
+  }
+
+  refreshToken(): Observable<any> {
+    const token = this.token();
+    const refreshToken = this.refreshTokenValue();
+    return this.http.post<any>('/api/Auth/refresh-token', { token, refreshToken }).pipe(
+      tap((res: any) => {
+        if (res && res.token) {
+          this.login(res.token, res.refreshToken);
+        }
+      })
+    );
   }
 
   private decodeJwtPayload(token: string): any {

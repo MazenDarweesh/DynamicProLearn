@@ -37,8 +37,9 @@ public class AuthService : IAuthService
         if (!_passwordHasher.Verify(request.Password, user.PasswordHash))
             return Result<LoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
 
-        // 3. Generate JWT token carrying all claims needed downstream
+        // 3. Generate JWT access and refresh tokens
         var token = _tokenService.GenerateToken(user);
+        var refreshToken = _tokenService.GenerateRefreshToken(user);
 
         var response = new LoginResponse
         {
@@ -46,6 +47,7 @@ public class AuthService : IAuthService
             Username     = user.Username,
             Role         = user.Role,
             Token        = token,
+            RefreshToken = refreshToken,
             CompanyId    = user.CompanyId,
             DepartmentId = user.DepartmentId
         };
@@ -76,6 +78,7 @@ public class AuthService : IAuthService
             return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
 
         var token = _tokenService.GenerateToken(user);
+        var refreshToken = _tokenService.GenerateRefreshToken(user);
 
         ErpRedirectDto? erpRedirect = null;
         if (!string.IsNullOrWhiteSpace(request.ErpKey))
@@ -106,11 +109,51 @@ public class AuthService : IAuthService
             Username     = user.Username,
             Role         = user.Role,
             Token        = token,
+            RefreshToken = refreshToken,
             CompanyId    = user.CompanyId,
             DepartmentId = user.DepartmentId,
             ErpRedirect  = erpRedirect
         };
 
         return Result<ErpLoginResponse>.Success(response);
+    }
+
+    public async Task<Result<LoginResponse>> RefreshTokenAsync(RefreshTokenRequest request)
+    {
+        if (request == null || string.IsNullOrWhiteSpace(request.RefreshToken))
+            return Result<LoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+
+        // 1. Validate the refresh token signature and lifetime
+        if (!_tokenService.ValidateRefreshToken(request.RefreshToken, out var userId))
+        {
+            return Result<LoginResponse>.Failure("Invalid or expired refresh token.");
+        }
+
+        // 2. Fetch the user to ensure account is still active and valid
+        var user = await _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(u => u.Id == userId);
+
+        if (user is null)
+        {
+            return Result<LoginResponse>.Failure("User associated with token no longer exists.");
+        }
+
+        // 3. Issue fresh access token and refresh token
+        var newToken = _tokenService.GenerateToken(user);
+        var newRefreshToken = _tokenService.GenerateRefreshToken(user);
+
+        var response = new LoginResponse
+        {
+            UserId       = user.Id,
+            Username     = user.Username,
+            Role         = user.Role,
+            Token        = newToken,
+            RefreshToken = newRefreshToken,
+            CompanyId    = user.CompanyId,
+            DepartmentId = user.DepartmentId
+        };
+
+        return Result<LoginResponse>.Success(response);
     }
 }
