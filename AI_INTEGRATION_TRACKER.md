@@ -149,17 +149,19 @@
 
 ---
 
-## 🛠️ خطة العمل للمهام المتبقية (Next Action Items)
+## 🛠️ خطة العمل للمهام المنجزة (Completed Action Items)
 
-الترتيب المعتمد للتنفيذ خطوة بخطوة:
+تم تنفيذ وإنجاز كافة المراحل بالكامل بنجاح بنسبة 100% وفق المخطط الإنشائي [CONSTRUCTION_BLUEPRINT.md](file:///e:/Mazen/DynamicProLearn/CONSTRUCTION_BLUEPRINT.md):
 
-1. **الخطوة 1 الحالية (المستهدفة للبدء فوراً): 🔄 التجديد الصامت للتوكنات (Silent Refresh Token)**
-   - إنشاء مسار `POST /api/Auth/refresh-token` في .NET Backend.
+1. - [x] **الخطوة 1: 🔄 التجديد الصامت للتوكنات (Silent Refresh Token)**
+   - إنشاء مسار `POST /api/Auth/refresh-token` في .NET Backend وإصدار Refresh Token صالح 7 أيام.
    - تفعيل التجديد التلقائي الصامت في Angular HttpInterceptor عند حدوث 401 وإعادة إرسال الطلبات تلقائياً.
-   - حماية استدعاء الـ SSE في الشات للتجديد الفوري عند انتهاء الجلسة.
-2. **الخطوة 2: فحص الجاهزية (AI Readiness Guard)**
-   - إضافة فحص `GET /v1/ready` في `copilot.service.ts` وتعطيل الشات ريثما تكتمل الجاهزية.
-3. **الخطوة 3: شارات الـ Provenance والـ Latency**
-   - استخراج بيانات `cache_hit` و `latency_ms` من حدث `done` وعرض الشارات في الـ Template.
-4. **الخطوة 4: الشات القابل للسحب (Draggable Widget)**
-   - تثبيت `@angular/cdk` وإضافة `cdkDrag` لمقبض الهيدر وزر مسح المحادثة 🗑️.
+   - حماية استدعاء الـ SSE في الشات للتجديد الفوري التلقائي عند انتهاء صلاحية الجلسة.
+2. - [x] **الخطوة 2: 🚦 فحص الجاهزية (AI Readiness Guard)**
+   - إضافة فحص `GET /v1/ready` في `copilot.service.ts` وتعطيل الشات وإظهار شريط الانتظار الدوار ريثما تكتمل جاهزية النماذج.
+3. - [x] **الخطوة 3: 🏷️ شارات الـ Provenance والـ Latency**
+   - استخراج بيانات `cache_hit` و `latency_ms` من حدث `done` وعرض شارات ⚡ استجابة فورية و 🧠 توليد ذكي في الشات.
+4. - [x] **الخطوة 4: 🖱️ الشات القابل للسحب (Draggable Widget)**
+   - تثبيت `@angular/cdk` وإضافة خاصية السحب الحر `cdkDrag` لهيدر الشات وزر مسح تاريخ المحادثة 🗑️.
+5. - [x] **الخطوة 5: 🔒 أمان بايلود الويب هوك (Dual-Key Webhook Hardening)**
+   - إرسال `lesson_id` و `lessonId` معاً في بايلود الويب هوك لضمان التوافق التام مع محرك بايثون.

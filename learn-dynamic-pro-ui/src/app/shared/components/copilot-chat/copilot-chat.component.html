@@ -14,8 +14,8 @@
       <div>
         <h4 class="header-title">LMS AI Co-Pilot</h4>
         <span class="header-status">
-          <span class="status-dot" [class.warming]="isWarmingUp"></span>
-          {{ isWarmingUp ? 'جاري تهيئة المحرك... ⏳' : 'متصل وجاهز للإجابة' }}
+          <span class="status-dot" [class.warming]="isWarmingUp" [class.error]="hasConnectionError && !isAiReady"></span>
+          {{ (hasConnectionError && !isAiReady) ? 'تعذر الاتصال (السيرفر متوقف) 🔌' : (isWarmingUp ? 'جاري تهيئة المحرك... ⏳' : 'متصل وجاهز للإجابة') }}
         </span>
       </div>
     </div>
@@ -42,10 +42,22 @@
     <span *ngIf="clearCacheStatus === 'error'" class="cache-status error">❌ فشل التفريغ</span>
   </div>
 
-  <!-- AI Warming Banner (when engine models are loading) -->
-  <div *ngIf="isWarmingUp" class="ai-warming-banner">
-    <span class="warming-icon">⏳</span>
-    <span class="warming-text">جاري تهيئة محرك الذكاء الاصطناعي وتحميل النماذج... يرجى الانتظار ثوانٍ</span>
+  <!-- AI Status Banners -->
+  <div *ngIf="isWarmingUp" class="ai-status-banner warming">
+    <div class="status-banner-content">
+      <span class="status-banner-icon warming-icon">⏳</span>
+      <span class="status-banner-text">جاري تهيئة محرك الذكاء الاصطناعي وتحميل النماذج... (المحاولة {{ currentAttempt }} من {{ maxAttempts }})</span>
+    </div>
+  </div>
+
+  <div *ngIf="hasConnectionError && !isAiReady" class="ai-status-banner error">
+    <div class="status-banner-content">
+      <span class="status-banner-icon">🔌</span>
+      <span class="status-banner-text">تعذر الاتصال بمحرك الذكاء الاصطناعي (السيرفر متوقف)</span>
+    </div>
+    <button type="button" class="btn-retry-conn" (click)="retryReadiness()" title="إعادة فحص الاتصال">
+      <span>إعادة الاتصال</span> 🔄
+    </button>
   </div>
 
   <!-- Body (Hidden if minimized) -->
@@ -202,7 +214,7 @@
     <div class="copilot-footer">
       <input type="text"
              class="copilot-input"
-             [placeholder]="isWarmingUp ? 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...' : 'اسأل عن أي موديول، شاشة، أو درس...'"
+             [placeholder]="(hasConnectionError && !isAiReady) ? 'تعذر الاتصال بالمحرك، انقر إعادة الاتصال أعلاه...' : (isWarmingUp ? 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...' : 'اسأل عن أي موديول، شاشة، أو درس...')"
              [(ngModel)]="inputQuery"
              (keyup.enter)="sendMessage()"
              [disabled]="isStreaming || !isAiReady">

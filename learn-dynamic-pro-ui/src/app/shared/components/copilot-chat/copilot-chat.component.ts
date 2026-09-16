@@ -50,6 +50,9 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
 
   isAiReady = true;
   isWarmingUp = false;
+  hasConnectionError = false;
+  currentAttempt = 0;
+  readonly maxAttempts = 5;
   private readinessSub?: Subscription;
 
   get isAdmin(): boolean {
@@ -81,43 +84,62 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
     }
   }
 
+  /**
+   * Performs an initial check and bounds automatic polling to maxAttempts (5 times)
+   * to avoid flooding the browser console when the AI engine is completely offline.
+   */
   checkAiReadiness() {
+    this.stopReadinessPolling();
+    this.currentAttempt = 0;
+    this.hasConnectionError = false;
+
+    // Immediate initial check
+    this.executeReadinessCheck();
+
+    // Bounded polling every 2.5s
+    this.readinessSub = timer(2500, 2500).subscribe(() => {
+      this.executeReadinessCheck();
+    });
+  }
+
+  private executeReadinessCheck() {
+    this.currentAttempt++;
     this.copilotService.checkReadiness().subscribe({
       next: (res) => {
         if (res && res.ready) {
           this.isAiReady = true;
           this.isWarmingUp = false;
+          this.hasConnectionError = false;
           this.stopReadinessPolling();
         } else {
-          this.startReadinessPolling();
+          this.handleUnreadyAttempt();
         }
       },
       error: () => {
-        this.startReadinessPolling();
+        this.handleUnreadyAttempt();
       }
     });
   }
 
-  private startReadinessPolling() {
-    this.isAiReady = false;
-    this.isWarmingUp = true;
-    if (this.readinessSub) return;
+  private handleUnreadyAttempt() {
+    if (this.currentAttempt >= this.maxAttempts) {
+      // 🛑 Max retries reached: Stop polling to protect browser performance and console logs
+      this.stopReadinessPolling();
+      this.isAiReady = false;
+      this.isWarmingUp = false;
+      this.hasConnectionError = true;
+    } else {
+      this.isAiReady = false;
+      this.isWarmingUp = true;
+      this.hasConnectionError = false;
+    }
+  }
 
-    this.readinessSub = timer(2000, 2000).subscribe(() => {
-      this.copilotService.checkReadiness().subscribe({
-        next: (res) => {
-          if (res && res.ready) {
-            this.isAiReady = true;
-            this.isWarmingUp = false;
-            this.stopReadinessPolling();
-          }
-        },
-        error: () => {
-          this.isAiReady = false;
-          this.isWarmingUp = true;
-        }
-      });
-    });
+  /**
+   * Manual reconnect triggered by user clicking the retry button in the error banner
+   */
+  retryReadiness() {
+    this.checkAiReadiness();
   }
 
   private stopReadinessPolling() {
