@@ -19,7 +19,8 @@ public class WebhookDispatcher : IWebhookDispatcher
     public WebhookDispatcher(HttpClient httpClient, IConfiguration configuration, ILogger<WebhookDispatcher> logger)
     {
         _httpClient = httpClient;
-        _webhookUrl = configuration["AiCoPilot:WebhookUrl"] ?? "http://localhost:8000/v1/webhooks/lesson-updated";
+        var url = configuration["AiCoPilot:WebhookUrl"];
+        _webhookUrl = !string.IsNullOrWhiteSpace(url) ? url : "http://localhost:8000/v1/webhooks/lesson-updated";
         _serviceToken = configuration["AiCoPilot:ServiceToken"] ?? "default_service_token";
         _logger = logger;
     }
@@ -43,46 +44,45 @@ public class WebhookDispatcher : IWebhookDispatcher
             action    = action
         };
 
-        var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
-        
-        var request = new HttpRequestMessage(HttpMethod.Post, _webhookUrl)
-        {
-            Content = content
-        };
-        request.Headers.Add("X-Service-Token", _serviceToken);
+        _logger.LogInformation("[WebhookDispatcher] START | TargetUrl={Url} LessonId={LessonId} Action={Action}",
+            _webhookUrl, lessonId, action);
 
         int maxRetries = 3;
         for (int i = 0; i < maxRetries; i++)
         {
             try
             {
+                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var request = new HttpRequestMessage(HttpMethod.Post, _webhookUrl)
+                {
+                    Content = content
+                };
+                request.Headers.Add("X-Service-Token", _serviceToken);
+                request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_serviceToken}");
+
                 var response = await _httpClient.SendAsync(request);
                 if (response.IsSuccessStatusCode)
                 {
-                    _logger.LogInformation("Webhook sent successfully for lesson {LessonId} with action {Action}", lessonId, action);
+                    _logger.LogInformation("[WebhookDispatcher] OK | LessonId={LessonId} Action={Action} StatusCode={StatusCode}",
+                        lessonId, action, (int)response.StatusCode);
                     return;
                 }
-                _logger.LogWarning("Webhook failed for lesson {LessonId}. Status Code: {StatusCode}. Retry {RetryCount}/{MaxRetries}", lessonId, response.StatusCode, i + 1, maxRetries);
+                var errBody = await response.Content.ReadAsStringAsync();
+                _logger.LogWarning("[WebhookDispatcher] FAIL | LessonId={LessonId} StatusCode={StatusCode} Retry={Retry}/{Max} Details={Details}",
+                    lessonId, (int)response.StatusCode, i + 1, maxRetries, errBody);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Exception while sending webhook for lesson {LessonId}. Retry {RetryCount}/{MaxRetries}", lessonId, i + 1, maxRetries);
+                _logger.LogWarning(ex, "[WebhookDispatcher] EXCEPTION | LessonId={LessonId} Retry={Retry}/{Max}",
+                    lessonId, i + 1, maxRetries);
             }
 
             if (i < maxRetries - 1)
             {
                 await Task.Delay(TimeSpan.FromSeconds(2 * (i + 1)));
-                
-                // Clone the request because HttpRequestMessage cannot be reused
-                var newRequest = new HttpRequestMessage(HttpMethod.Post, _webhookUrl)
-                {
-                    Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json")
-                };
-                newRequest.Headers.Add("X-Service-Token", _serviceToken);
-                request = newRequest;
             }
         }
         
-        _logger.LogError("Webhook ultimately failed after {MaxRetries} retries for lesson {LessonId}", maxRetries, lessonId);
+        _logger.LogError("[WebhookDispatcher] ULTIMATELY_FAILED | Retries={Max} LessonId={LessonId}", maxRetries, lessonId);
     }
 }
