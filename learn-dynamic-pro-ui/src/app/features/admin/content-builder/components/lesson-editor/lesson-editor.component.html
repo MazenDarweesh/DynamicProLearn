@@ -88,6 +88,57 @@
       </div>
     </div>
 
+    <!-- ── AI Ingestion Status Banners ──────────────────────────────────────── -->
+    <div *ngIf="isAiProcessing()" class="ai-status-banner ai-status-processing mt-3 p-3">
+      <div class="d-flex align-center justify-between">
+        <div class="d-flex align-center gap-2">
+          <span class="ai-spin-loader">⏳</span>
+          <div>
+            <strong>جاري تفريغ ومعالجة محتوى الفيديو بالذكاء الاصطناعي...</strong>
+            <p class="text-xs text-secondary mb-0">يقوم المحرك الآن بتحميل الصوت وتجزئته وفهرسته في قاعدة المعرفة. ستتاح أزرار الاختبار والملخص تلقائياً فور اكتمال المعالجة.</p>
+          </div>
+        </div>
+        <span class="ai-badge ai-badge-pending">قيد المعالجة</span>
+      </div>
+    </div>
+
+    <div *ngIf="isAiFailed()" class="ai-status-banner ai-status-failed mt-3 p-3">
+      <div class="d-flex align-center justify-between">
+        <div class="d-flex align-center gap-2">
+          <span class="fs-5">❌</span>
+          <div>
+            <strong class="text-danger">تعذرت معالجة محتوى الفيديو</strong>
+            <p class="text-xs text-secondary mb-0">{{ lesson.aiError || 'حدث خطأ أثناء معالجة الفيديو في محرك الذكاء الاصطناعي.' }}</p>
+          </div>
+        </div>
+        <button class="btn-ai btn-ai-outline" [disabled]="isRetryingIngest" (click)="retryIngest()" title="إعادة إرسال الفيديو لمحرك الذكاء الاصطناعي">
+          <span>{{ isRetryingIngest ? '⏳ جاري الإرسال...' : '🔄 إعادة المحاولة' }}</span>
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="isAiReady()" class="ai-status-banner ai-status-completed mt-3 p-3">
+      <div class="d-flex align-center justify-between">
+        <div class="d-flex align-center gap-2">
+          <span class="fs-5">✅</span>
+          <div>
+            <strong class="text-success">محتوى الدرس معالج ومفهرس بنجاح</strong>
+            <p class="text-xs text-secondary mb-0">
+              تم تجهيز وتضمين {{ lesson.aiChunksCount ? (lesson.aiChunksCount + ' مقاطع تعليمية') : 'محتوى الفيديو' }} في قاعدة المعرفة. استوديو الذكاء الاصطناعي جاهز للاستخدام.
+            </p>
+          </div>
+        </div>
+        <span class="ai-badge ai-badge-success">جاهز للذكاء الاصطناعي</span>
+      </div>
+    </div>
+
+    <div *ngIf="!lesson?.videoUrl" class="ai-status-banner ai-status-none mt-3 p-3">
+      <div class="d-flex align-center gap-2">
+        <span>ℹ️</span>
+        <span class="text-xs text-secondary">يرجى حفظ رابط فيديو للدرس لبدء التحليل والتفريغ الصوتي التلقائي وتفعيل أدوات الذكاء الاصطناعي.</span>
+      </div>
+    </div>
+
     <div class="ai-cards-grid mt-3">
       <!-- Quiz Card -->
       <div class="ai-feature-card">
@@ -103,7 +154,7 @@
         <p class="text-secondary text-sm mb-3">أسئلة اختيار من متعدد ذكية متكيفة مع طول الدرس والمحتوى لقياس فهم واستيعاب الطالب.</p>
         
         <div class="d-flex gap-2">
-          <button *ngIf="!quizData" class="btn-ai btn-ai-primary flex-1" [disabled]="isGeneratingQuiz" (click)="generateQuiz()">
+          <button *ngIf="!quizData" class="btn-ai btn-ai-primary flex-1" [disabled]="isGeneratingQuiz || !isAiReady()" (click)="generateQuiz()" [title]="isAiReady() ? 'توليد اختبار ذكي' : 'يجب اكتمال معالجة محتوى الفيديو أولاً'">
             {{ isGeneratingQuiz ? '⏳ جاري التوليد بالذكاء الاصطناعي...' : '🧠 توليد اختبار ذكي' }}
           </button>
           
@@ -111,11 +162,12 @@
             <button class="btn-ai btn-ai-secondary flex-1" (click)="openQuizModal()">
               👁️ معاينة ومراجعة ({{ quizData.questions.length }})
             </button>
-            <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingQuiz" (click)="generateQuiz()" title="إعادة التوليد وتحديث الأسئلة">
+            <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingQuiz || !isAiReady()" (click)="generateQuiz()" title="إعادة التوليد وتحديث الأسئلة">
               {{ isGeneratingQuiz ? '⏳...' : '🔄 إعادة التوليد' }}
             </button>
           </ng-container>
         </div>
+        <small *ngIf="!isAiReady() && !quizData" class="ai-disabled-hint">⚠️ يتطلب اكتمال معالجة الفيديو أولاً لتفعيل التوليد</small>
       </div>
 
       <!-- Summary Card -->
@@ -132,7 +184,7 @@
         <p class="text-secondary text-sm mb-3">نظرة عامة هرمية ونقاط رئيسية تلخص جوهر المحتوى التعليمي.</p>
         
         <div class="d-flex gap-2">
-          <button *ngIf="!summaryData" class="btn-ai btn-ai-primary flex-1" [disabled]="isGeneratingSummary" (click)="generateSummary()">
+          <button *ngIf="!summaryData" class="btn-ai btn-ai-primary flex-1" [disabled]="isGeneratingSummary || !isAiReady()" (click)="generateSummary()" [title]="isAiReady() ? 'توليد ملخص الدرس' : 'يجب اكتمال معالجة محتوى الفيديو أولاً'">
             {{ isGeneratingSummary ? '⏳ جاري التوليد بالذكاء الاصطناعي...' : '📝 توليد ملخص الدرس' }}
           </button>
           
@@ -140,11 +192,12 @@
             <button class="btn-ai btn-ai-secondary flex-1" (click)="openSummaryModal()">
               👁️ معاينة وقراءة الملخص
             </button>
-            <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingSummary" (click)="generateSummary()" title="إعادة التوليد وتحديث الملخص">
+            <button class="btn-ai btn-ai-outline" [disabled]="isGeneratingSummary || !isAiReady()" (click)="generateSummary()" title="إعادة التوليد وتحديث الملخص">
               {{ isGeneratingSummary ? '⏳...' : '🔄 إعادة التوليد' }}
             </button>
           </ng-container>
         </div>
+        <small *ngIf="!isAiReady() && !summaryData" class="ai-disabled-hint">⚠️ يتطلب اكتمال معالجة الفيديو أولاً لتفعيل التوليد</small>
       </div>
     </div>
   </div>

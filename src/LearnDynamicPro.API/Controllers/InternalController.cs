@@ -30,16 +30,26 @@ public class InternalController : ControllerBase
 
     private bool ValidateServiceToken()
     {
-        var authHeader = Request.Headers["Authorization"].FirstOrDefault();
-        if (string.IsNullOrEmpty(authHeader) || !authHeader.StartsWith("Bearer "))
-            return false;
-
-        var token = authHeader.Substring("Bearer ".Length).Trim();
         var expectedToken = _configuration["AiCoPilot:ServiceToken"];
         if (string.IsNullOrWhiteSpace(expectedToken))
             return false;
 
-        return token == expectedToken;
+        // Support Authorization: Bearer <token>
+        var authHeader = Request.Headers["Authorization"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(authHeader) && authHeader.StartsWith("Bearer "))
+        {
+            var token = authHeader.Substring("Bearer ".Length).Trim();
+            if (token == expectedToken) return true;
+        }
+
+        // Support X-Service-Token: <token>
+        var customHeader = Request.Headers["X-Service-Token"].FirstOrDefault();
+        if (!string.IsNullOrEmpty(customHeader) && customHeader.Trim() == expectedToken)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     [HttpGet("user-permissions/{userId}")]
@@ -173,5 +183,48 @@ public class InternalController : ControllerBase
         };
 
         return Ok(context);
+    }
+
+    [HttpPost("lessons/{lessonId}/ai-status")]
+    public async Task<IActionResult> UpdateLessonAiStatus(Guid lessonId, [FromBody] LessonAiStatusCallbackDto callback)
+    {
+        if (!ValidateServiceToken())
+        {
+            return Unauthorized(new { message = "Invalid Service Token" });
+        }
+
+        var lesson = await _context.Lessons.FirstOrDefaultAsync(l => l.Id == lessonId);
+        if (lesson == null) return NotFound(new { message = "Lesson not found" });
+
+        if (string.Equals(callback.Status, "Completed", StringComparison.OrdinalIgnoreCase))
+        {
+            lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Completed;
+            lesson.AiError = null;
+            lesson.AiProcessedAt = DateTime.UtcNow;
+            if (callback.ChunksCount.HasValue && callback.ChunksCount.Value > 0)
+            {
+                lesson.AiChunksCount = callback.ChunksCount.Value;
+            }
+        }
+        else if (string.Equals(callback.Status, "Failed", StringComparison.OrdinalIgnoreCase))
+        {
+            lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Failed;
+            lesson.AiError = callback.Error ?? "فشلت معالجة محتوى الفيديو بواسطة الذكاء الاصطناعي.";
+            lesson.AiProcessedAt = DateTime.UtcNow;
+        }
+        else if (string.Equals(callback.Status, "Processing", StringComparison.OrdinalIgnoreCase))
+        {
+            lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Processing;
+        }
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new 
+        { 
+            success = true, 
+            lessonId = lesson.Id, 
+            status = lesson.AiStatus.ToString(),
+            chunksCount = lesson.AiChunksCount
+        });
     }
 }

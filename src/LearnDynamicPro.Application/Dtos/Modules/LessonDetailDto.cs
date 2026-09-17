@@ -18,4 +18,8 @@ public class LessonDetailDto
     public int OrderIndex { get; set; }
     public int LevelOrderIndex { get; set; }
     public bool IsCompleted { get; set; }
+    public string AiStatus { get; set; } = "None";
+    public string? AiError { get; set; }
+    public int AiChunksCount { get; set; }
+    public DateTime? AiProcessedAt { get; set; }
 }

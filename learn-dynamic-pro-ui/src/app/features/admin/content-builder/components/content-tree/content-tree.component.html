@@ -60,7 +60,12 @@
              [class.active]="selectedLesson === lesson"
              (click)="onSelectLesson(lesson)">
           <div class="d-flex justify-between align-center w-100">
-            <span class="text-sm text-truncate" style="max-width: 70%;">{{ uIndex + 1 }}.{{ lIndex + 1 }} {{ lesson.title || 'درس جديد' }}</span>
+            <div class="d-flex align-center gap-1 text-truncate" style="max-width: 75%;">
+              <span class="text-sm text-truncate">{{ uIndex + 1 }}.{{ lIndex + 1 }} {{ lesson.title || 'درس جديد' }}</span>
+              <span *ngIf="lesson.aiStatus === 'Completed'" title="الذكاء الاصطناعي: جاهز ومكتمل" style="font-size: 11px;">✨</span>
+              <span *ngIf="lesson.aiStatus === 'Processing' || lesson.aiStatus === 'Queued'" title="الذكاء الاصطناعي: قيد المعالجة" style="font-size: 11px;">⏳</span>
+              <span *ngIf="lesson.aiStatus === 'Failed'" title="الذكاء الاصطناعي: تعذرت المعالجة" style="font-size: 11px;">❌</span>
+            </div>
             <button class="btn-icon-danger btn-sm" (click)="onDeleteLesson(unit, lesson, $event)" title="حذف الدرس"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
           </div>
         </div>

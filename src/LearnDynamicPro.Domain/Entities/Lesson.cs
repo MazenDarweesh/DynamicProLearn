@@ -28,4 +28,11 @@ public class Lesson : BaseEntity
     // AI-Generated Content (nullable — generated on demand by Admin)
     public LessonQuiz? Quiz { get; set; }
     public LessonSummary? Summary { get; set; }
+
+    // AI Ingestion & Processing Lifecycle
+    public LearnDynamicPro.Domain.Enums.LessonAiStatus AiStatus { get; set; } = LearnDynamicPro.Domain.Enums.LessonAiStatus.None;
+    public string? AiError { get; set; }
+    public int AiChunksCount { get; set; } = 0;
+    public DateTime? AiProcessedAt { get; set; }
+    public int AiRetryCount { get; set; } = 0;
 }

@@ -372,3 +372,52 @@ input[type="file"]::file-selector-button:hover {
   border-radius: 8px;
   padding: 14px;
 }
+
+/* ── AI Ingestion Status Banners ─────────────────────────────────────────── */
+.ai-status-banner {
+  border-radius: 10px;
+  border: 1px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.ai-status-processing {
+  background: #f0f9ff;
+  border-color: #bae6fd;
+  color: #0369a1;
+}
+
+.ai-status-failed {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
+.ai-status-completed {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+
+.ai-status-none {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+  color: #64748b;
+}
+
+.ai-spin-loader {
+  display: inline-block;
+  animation: spinLoader 2s linear infinite;
+  font-size: 18px;
+}
+
+@keyframes spinLoader {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.ai-disabled-hint {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 6px;
+  display: block;
+}

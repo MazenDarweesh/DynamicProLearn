@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges, inject } from '@angular/core';
+import { Component, Input, OnChanges, OnDestroy, SimpleChanges, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { LookupDto } from '../../../../../core/models/admin.models';
@@ -12,7 +12,7 @@ import { Dialog } from '../../../../../core/utils/dialog';
   templateUrl: './lesson-editor.component.html',
   styleUrls: ['./lesson-editor.component.css']
 })
-export class LessonEditorComponent implements OnChanges {
+export class LessonEditorComponent implements OnChanges, OnDestroy {
   @Input() lesson: any;
   @Input() lookups!: { levels: LookupDto[], types: LookupDto[] };
 
@@ -26,15 +26,85 @@ export class LessonEditorComponent implements OnChanges {
   isGeneratingSummary = false;
   isLoadingQuiz = false;
   isLoadingSummary = false;
+  isRetryingIngest = false;
   quizData: any = null;
   summaryData: any = null;
   showQuizModal = false;
   showSummaryModal = false;
+  private pollInterval: any = null;
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes['lesson'] && this.lesson?.id) {
       this.fetchExistingAiContent();
+      this.checkAndStartPolling();
     }
+  }
+
+  ngOnDestroy(): void {
+    this.stopPolling();
+  }
+
+  isAiReady(): boolean {
+    return this.lesson?.aiStatus === 'Completed';
+  }
+
+  isAiProcessing(): boolean {
+    return this.lesson?.aiStatus === 'Processing' || this.lesson?.aiStatus === 'Queued';
+  }
+
+  isAiFailed(): boolean {
+    return this.lesson?.aiStatus === 'Failed';
+  }
+
+  checkAndStartPolling(): void {
+    this.stopPolling();
+    if (this.isAiProcessing() && this.lesson?.id) {
+      this.pollInterval = setInterval(() => {
+        this.adminService.getLessonDetail(this.lesson.id).subscribe({
+          next: (detail) => {
+            if (!detail) return;
+            this.lesson.aiStatus = detail.aiStatus;
+            this.lesson.aiError = detail.aiError;
+            this.lesson.aiChunksCount = detail.aiChunksCount;
+            this.lesson.aiProcessedAt = detail.aiProcessedAt;
+
+            if (detail.aiStatus === 'Completed') {
+              this.stopPolling();
+              this.fetchExistingAiContent();
+            } else if (detail.aiStatus === 'Failed') {
+              this.stopPolling();
+            }
+          },
+          error: () => this.stopPolling()
+        });
+      }, 4000);
+    }
+  }
+
+  stopPolling(): void {
+    if (this.pollInterval) {
+      clearInterval(this.pollInterval);
+      this.pollInterval = null;
+    }
+  }
+
+  retryIngest(): void {
+    if (!this.lesson?.id) return;
+    this.isRetryingIngest = true;
+    this.adminService.retryLessonAiIngest(this.lesson.id).subscribe({
+      next: () => {
+        this.isRetryingIngest = false;
+        this.lesson.aiStatus = 'Queued';
+        this.lesson.aiError = null;
+        Dialog.alert('تمت جدولة إعادة معالجة الدرس بالذكاء الاصطناعي بنجاح.', 'نجاح', 'success');
+        this.checkAndStartPolling();
+      },
+      error: (err) => {
+        this.isRetryingIngest = false;
+        const msg = typeof err?.error === 'string' ? err.error : (err?.error?.message || 'تعذر إعادة محاولة المعالجة.');
+        Dialog.alert(msg, 'خطأ', 'error');
+      }
+    });
   }
 
   fetchExistingAiContent(): void {

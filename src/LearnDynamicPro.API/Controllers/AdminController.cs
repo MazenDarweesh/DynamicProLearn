@@ -315,6 +315,20 @@ public class AdminController : ControllerBase
         return NoContent();
     }
 
+    [HttpPost("lessons/{lessonId}/retry-ai-ingest")]
+    public async Task<IActionResult> RetryLessonAiIngest(Guid lessonId)
+    {
+        _logger.LogInformation("[AdminAPI] RetryLessonAiIngest REQUEST | LessonId={LessonId}", lessonId);
+        var result = await _moduleService.RetryLessonAiIngestAsync(lessonId);
+        if (!result.IsSuccess)
+        {
+            _logger.LogWarning("[AdminAPI] RetryLessonAiIngest FAIL | LessonId={LessonId} Error={Error}", lessonId, result.Error);
+            return BadRequest(result.Error);
+        }
+        _logger.LogInformation("[AdminAPI] RetryLessonAiIngest OK | LessonId={LessonId}", lessonId);
+        return Ok(new { success = true, lessonId });
+    }
+
     [EnableRateLimiting("AiGenerationLimit")]
     [HttpPost("lessons/{lessonId}/generate-quiz")]
     public async Task<IActionResult> GenerateLessonQuiz(Guid lessonId)

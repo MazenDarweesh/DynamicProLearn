@@ -279,6 +279,22 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<int>("AiChunksCount")
+                        .HasColumnType("int");
+
+                    b.Property<string>("AiError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("AiProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("AiRetryCount")
+                        .HasColumnType("int");
+
+                    b.Property<int>("AiStatus")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -335,6 +351,8 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .HasColumnType("nvarchar(2000)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AiStatus");
 
                     b.HasIndex("LevelId");
 

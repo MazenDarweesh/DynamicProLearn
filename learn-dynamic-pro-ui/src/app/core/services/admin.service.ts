@@ -68,6 +68,14 @@ export class AdminService {
     return this.http.delete(`${this.apiUrl}/lessons/${id}`);
   }
 
+  getLessonDetail(lessonId: string): Observable<any> {
+    return this.http.get(`${this.apiUrl}/lessons/${lessonId}`);
+  }
+
+  retryLessonAiIngest(lessonId: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/lessons/${lessonId}/retry-ai-ingest`, {});
+  }
+
   // ── Files ─────────────────────────────────────────────────────────────────
   uploadFile(file: File): Observable<{fileUrl: string}> {
     const formData = new FormData();

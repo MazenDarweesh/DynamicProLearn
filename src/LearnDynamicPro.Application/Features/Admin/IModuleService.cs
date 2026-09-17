@@ -23,4 +23,5 @@ public interface IModuleService
     Task<Result> DeleteLessonAsync(Guid id);
     Task<Result<PagedList<LessonDto>>> GetLessonsByUnitAsync(Guid unitId, int page = 1, int pageSize = 10);
     Task<Result<LessonDetailDto>> GetLessonDetailAsync(Guid lessonId);
+    Task<Result<bool>> RetryLessonAiIngestAsync(Guid lessonId);
 }

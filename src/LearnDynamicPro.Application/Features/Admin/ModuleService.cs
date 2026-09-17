@@ -137,6 +137,7 @@ public class ModuleService : IModuleService
         if (!await _unitOfWork.Repository<TypeOption>().Query().AnyAsync(t => t.Id == typeId))
             typeId = (await _unitOfWork.Repository<TypeOption>().Query().FirstOrDefaultAsync())?.Id ?? typeId;
 
+        var hasVideo = !string.IsNullOrWhiteSpace(request.VideoUrl);
         var lesson = new Lesson 
         { 
             Title = request.Title, 
@@ -148,16 +149,22 @@ public class ModuleService : IModuleService
             TypeId = typeId,
             Description = request.Description,
             OrderIndex = request.OrderIndex,
-            LevelOrderIndex = request.LevelOrderIndex
+            LevelOrderIndex = request.LevelOrderIndex,
+            AiStatus = hasVideo ? LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued : LearnDynamicPro.Domain.Enums.LessonAiStatus.None
         };
         await _unitOfWork.Repository<Lesson>().AddAsync(lesson);
         await _unitOfWork.SaveChangesAsync();
+
+        if (hasVideo)
+        {
+            _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
+        }
 
         return Result<LessonDto>.Success(new LessonDto 
         { 
             Id = lesson.Id, 
             Title = lesson.Title, 
-            VideoUrl = lesson.VideoUrl,
+            VideoUrl = lesson.VideoUrl, 
             PdfUrl = lesson.PdfUrl,
             ExternalLink = lesson.ExternalLink,
             UnitId = lesson.UnitId, 
@@ -166,7 +173,11 @@ public class ModuleService : IModuleService
             TypeId = lesson.TypeId,
             Description = lesson.Description,
             OrderIndex = lesson.OrderIndex,
-            LevelOrderIndex = lesson.LevelOrderIndex
+            LevelOrderIndex = lesson.LevelOrderIndex,
+            AiStatus = lesson.AiStatus.ToString(),
+            AiError = lesson.AiError,
+            AiChunksCount = lesson.AiChunksCount,
+            AiProcessedAt = lesson.AiProcessedAt
         });
     }
 
@@ -183,6 +194,7 @@ public class ModuleService : IModuleService
         if (!await _unitOfWork.Repository<TypeOption>().Query().AnyAsync(t => t.Id == typeId))
             typeId = (await _unitOfWork.Repository<TypeOption>().Query().FirstOrDefaultAsync())?.Id ?? typeId;
 
+        var videoChanged = !string.Equals(lesson.VideoUrl, request.VideoUrl, StringComparison.OrdinalIgnoreCase);
         lesson.Title = request.Title;
         lesson.VideoUrl = request.VideoUrl;
         lesson.PdfUrl = request.PdfUrl;
@@ -193,16 +205,32 @@ public class ModuleService : IModuleService
         lesson.OrderIndex = request.OrderIndex;
         lesson.LevelOrderIndex = request.LevelOrderIndex;
         
+        var hasVideo = !string.IsNullOrWhiteSpace(lesson.VideoUrl);
+        if (hasVideo && (videoChanged || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.None || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Failed))
+        {
+            lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued;
+            lesson.AiError = null;
+        }
+        else if (!hasVideo)
+        {
+            lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.None;
+            lesson.AiError = null;
+            lesson.AiChunksCount = 0;
+        }
+
         _unitOfWork.Repository<Lesson>().Update(lesson);
         await _unitOfWork.SaveChangesAsync();
         
-        _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
+        if (hasVideo && lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued)
+        {
+            _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
+        }
 
         return Result<LessonDto>.Success(new LessonDto 
         { 
             Id = lesson.Id, 
             Title = lesson.Title, 
-            VideoUrl = lesson.VideoUrl,
+            VideoUrl = lesson.VideoUrl, 
             PdfUrl = lesson.PdfUrl,
             ExternalLink = lesson.ExternalLink,
             UnitId = lesson.UnitId, 
@@ -211,7 +239,11 @@ public class ModuleService : IModuleService
             TypeId = lesson.TypeId,
             Description = lesson.Description,
             OrderIndex = lesson.OrderIndex,
-            LevelOrderIndex = lesson.LevelOrderIndex
+            LevelOrderIndex = lesson.LevelOrderIndex,
+            AiStatus = lesson.AiStatus.ToString(),
+            AiError = lesson.AiError,
+            AiChunksCount = lesson.AiChunksCount,
+            AiProcessedAt = lesson.AiProcessedAt
         });
     }
 
@@ -259,7 +291,11 @@ public class ModuleService : IModuleService
                 TypeId = l.TypeId,
                 TypeLabel = l.Type != null ? l.Type.Label : string.Empty,
                 OrderIndex = l.OrderIndex,
-                LevelOrderIndex = l.LevelOrderIndex
+                LevelOrderIndex = l.LevelOrderIndex,
+                AiStatus = l.AiStatus.ToString(),
+                AiError = l.AiError,
+                AiChunksCount = l.AiChunksCount,
+                AiProcessedAt = l.AiProcessedAt
             })
             .ToListAsync();
             
@@ -289,8 +325,34 @@ public class ModuleService : IModuleService
             TypeId = lesson.TypeId,
             TypeLabel = lesson.Type != null ? lesson.Type.Label : string.Empty,
             OrderIndex = lesson.OrderIndex,
-            LevelOrderIndex = lesson.LevelOrderIndex
+            LevelOrderIndex = lesson.LevelOrderIndex,
+            AiStatus = lesson.AiStatus.ToString(),
+            AiError = lesson.AiError,
+            AiChunksCount = lesson.AiChunksCount,
+            AiProcessedAt = lesson.AiProcessedAt
         });
+    }
+
+    public async Task<Result<bool>> RetryLessonAiIngestAsync(Guid lessonId)
+    {
+        var lesson = await _unitOfWork.Repository<Lesson>().GetByIdAsync(lessonId);
+        if (lesson == null) return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        if (string.IsNullOrWhiteSpace(lesson.VideoUrl))
+        {
+            return Result<bool>.Failure("لا يمكن بدء معالجة الذكاء الاصطناعي لدرس لا يحتوي على رابط فيديو.");
+        }
+
+        lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued;
+        lesson.AiError = null;
+        lesson.AiRetryCount++;
+
+        _unitOfWork.Repository<Lesson>().Update(lesson);
+        await _unitOfWork.SaveChangesAsync();
+
+        _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
+
+        return Result<bool>.Success(true);
     }
 }
 

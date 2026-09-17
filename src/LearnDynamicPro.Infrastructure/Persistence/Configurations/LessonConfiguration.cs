@@ -20,9 +20,13 @@ public class LessonConfiguration : IEntityTypeConfiguration<Lesson>
                .IsRequired()
                .HasMaxLength(2000);
 
+        builder.Property(l => l.AiError)
+               .HasMaxLength(2000);
+
         // ── Performance Indexes ──────────────────────────────────────
         // Used for filtering lessons by Unit + Level + Type + order
         builder.HasIndex(l => new { l.UnitId, l.LevelId, l.TypeId, l.OrderIndex });
+        builder.HasIndex(l => l.AiStatus);
 
         // ── Relationships ─────────────────────────────────────────────
         builder.HasOne(l => l.Unit)

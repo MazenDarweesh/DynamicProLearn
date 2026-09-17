@@ -20,4 +20,8 @@ public class LessonDto
     public bool IsCompleted { get; set; }
     public bool HasQuiz { get; set; }
     public bool HasSummary { get; set; }
+    public string AiStatus { get; set; } = "None";
+    public string? AiError { get; set; }
+    public int AiChunksCount { get; set; }
+    public DateTime? AiProcessedAt { get; set; }
 }
