@@ -594,10 +594,10 @@ public class StudentService : IStudentService
 
     public async Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>> GetLessonQuizAsync(Guid lessonId, Guid userId)
     {
-        // 1. Validate Access using existing business logic
-        var detailResult = await GetLessonDetailAsync(lessonId, userId);
-        if (!detailResult.IsSuccess)
-            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>.Failure(detailResult.Error);
+        // 1. Validate Access (read-only, non-tracking)
+        var accessResult = await ValidateLessonAccessAsync(lessonId, userId);
+        if (!accessResult.IsSuccess)
+            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonQuizDto>.Failure(accessResult.Error);
 
         // 2. Fetch Quiz from SQL Server (NO HTTP call to Python)
         var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
@@ -625,10 +625,10 @@ public class StudentService : IStudentService
 
     public async Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>> GetLessonSummaryAsync(Guid lessonId, Guid userId)
     {
-        // 1. Validate Access
-        var detailResult = await GetLessonDetailAsync(lessonId, userId);
-        if (!detailResult.IsSuccess)
-            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>.Failure(detailResult.Error);
+        // 1. Validate Access (read-only, non-tracking)
+        var accessResult = await ValidateLessonAccessAsync(lessonId, userId);
+        if (!accessResult.IsSuccess)
+            return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>.Failure(accessResult.Error);
 
         // 2. Fetch Summary from SQL Server
         var summary = await _context.LessonSummaries.AsNoTracking().FirstOrDefaultAsync(s => s.LessonId == lessonId);
@@ -653,10 +653,10 @@ public class StudentService : IStudentService
 
     public async Task<Result<StudentQuizStateDto>> GetQuizStateAsync(Guid lessonId, Guid userId)
     {
-        // 1. Validate Access
-        var detailResult = await GetLessonDetailAsync(lessonId, userId);
-        if (!detailResult.IsSuccess)
-            return Result<StudentQuizStateDto>.Failure(detailResult.Error);
+        // 1. Validate Access (read-only, non-tracking)
+        var accessResult = await ValidateLessonAccessAsync(lessonId, userId);
+        if (!accessResult.IsSuccess)
+            return Result<StudentQuizStateDto>.Failure(accessResult.Error);
 
         // 2. Fetch Quiz to know total questions
         var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
@@ -707,10 +707,10 @@ public class StudentService : IStudentService
 
     public async Task<Result<QuestionEvaluationResultDto>> CheckQuizAnswerAsync(Guid lessonId, CheckQuizAnswerRequest request, Guid userId)
     {
-        // 1. Validate Access
-        var detailResult = await GetLessonDetailAsync(lessonId, userId);
-        if (!detailResult.IsSuccess)
-            return Result<QuestionEvaluationResultDto>.Failure(detailResult.Error);
+        // 1. Validate Access (read-only, non-tracking)
+        var accessResult = await ValidateLessonAccessAsync(lessonId, userId);
+        if (!accessResult.IsSuccess)
+            return Result<QuestionEvaluationResultDto>.Failure(accessResult.Error);
 
         // 2. Fetch Quiz
         var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
@@ -796,10 +796,10 @@ public class StudentService : IStudentService
 
     public async Task<Result<QuizSubmissionResultDto>> SubmitQuizAsync(Guid lessonId, SubmitQuizRequest request, Guid userId)
     {
-        // 1. Validate Access
-        var detailResult = await GetLessonDetailAsync(lessonId, userId);
-        if (!detailResult.IsSuccess)
-            return Result<QuizSubmissionResultDto>.Failure(detailResult.Error);
+        // 1. Validate Access (read-only, non-tracking)
+        var accessResult = await ValidateLessonAccessAsync(lessonId, userId);
+        if (!accessResult.IsSuccess)
+            return Result<QuizSubmissionResultDto>.Failure(accessResult.Error);
 
         // 2. Fetch Quiz
         var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
@@ -889,15 +889,32 @@ public class StudentService : IStudentService
 
     public async Task<Result<bool>> ResetQuizAsync(Guid lessonId, Guid userId)
     {
-        // 1. Validate Access
-        var detailResult = await GetLessonDetailAsync(lessonId, userId);
-        if (!detailResult.IsSuccess)
-            return Result<bool>.Failure(detailResult.Error);
+        // 1. Validate Access (read-only, non-tracking)
+        var accessResult = await ValidateLessonAccessAsync(lessonId, userId);
+        if (!accessResult.IsSuccess)
+            return Result<bool>.Failure(accessResult.Error);
 
         // 2. Direct Delete (avoids EF Core change tracker synthesized ordinal bug on JSON collections)
         await _context.StudentQuizProgresses
             .Where(p => p.UserId == userId && p.LessonId == lessonId)
             .ExecuteDeleteAsync();
+
+        return Result<bool>.Success(true);
+    }
+
+    private async Task<Result<bool>> ValidateLessonAccessAsync(Guid lessonId, Guid userId)
+    {
+        var lesson = await _unitOfWork.Repository<Lesson>().Query()
+            .AsNoTracking()
+            .Select(l => new { l.Id, l.UnitId })
+            .FirstOrDefaultAsync(l => l.Id == lessonId);
+
+        if (lesson == null)
+            return Result<bool>.Failure(AppErrors.General.NotFound);
+
+        var accessibleLessonsResult = await GetLessonsByUnitAsync(lesson.UnitId, userId);
+        if (!accessibleLessonsResult.IsSuccess || !accessibleLessonsResult.Value!.Any(l => l.Id == lessonId))
+            return Result<bool>.Failure(AppErrors.Authorization.AccessDenied);
 
         return Result<bool>.Success(true);
     }

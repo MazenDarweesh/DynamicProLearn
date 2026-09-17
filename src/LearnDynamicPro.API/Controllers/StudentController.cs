@@ -5,6 +5,7 @@ using LearnDynamicPro.Application.Features.Student;
 using LearnDynamicPro.Application.Interfaces;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Logging;
 
 namespace LearnDynamicPro.API.Controllers;
@@ -180,6 +181,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost("lessons/{lessonId}/quiz/check-answer")]
+    [EnableRateLimiting("QuizInteractionLimit")]
     public async Task<IActionResult> CheckQuizAnswer(Guid lessonId, [FromBody] CheckQuizAnswerRequest request)
     {
         _logger.LogInformation("[StudentAPI] CheckQuizAnswer REQUEST | LessonId={LessonId} QNum={QNum} UserId={UserId}",
@@ -195,6 +197,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost("lessons/{lessonId}/quiz/submit")]
+    [EnableRateLimiting("QuizInteractionLimit")]
     public async Task<IActionResult> SubmitQuiz(Guid lessonId, [FromBody] SubmitQuizRequest request)
     {
         _logger.LogInformation("[StudentAPI] SubmitQuiz REQUEST | LessonId={LessonId} UserId={UserId}",
@@ -210,6 +213,7 @@ public class StudentController : ControllerBase
     }
 
     [HttpPost("lessons/{lessonId}/quiz/reset")]
+    [EnableRateLimiting("QuizInteractionLimit")]
     public async Task<IActionResult> ResetQuiz(Guid lessonId)
     {
         _logger.LogInformation("[StudentAPI] ResetQuiz REQUEST | LessonId={LessonId} UserId={UserId}",
