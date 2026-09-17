@@ -140,4 +140,30 @@ public class TokenService : ITokenService
             return false;
         }
     }
+
+    public string GenerateServiceCallToken(Guid userId, string role)
+    {
+        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
+        var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var claims = new[]
+        {
+            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim("Id", userId.ToString()),
+            new Claim(JwtRegisteredClaimNames.UniqueName, "system"),
+            new Claim(ClaimTypes.Role, role),
+            new Claim("Role", role),
+            new Claim("token_type", "service_call"),
+        };
+
+        var token = new JwtSecurityToken(
+            issuer: _jwtSettings.Issuer,
+            audience: _jwtSettings.Audience,
+            claims: claims,
+            expires: DateTime.UtcNow.AddMinutes(5), // Short-lived for immediate backend-to-backend call
+            signingCredentials: credentials
+        );
+
+        return new JwtSecurityTokenHandler().WriteToken(token);
+    }
 }

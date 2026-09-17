@@ -57,7 +57,7 @@ public class LessonAiService : ILessonAiService
         {
             _logger.LogError("[Quiz.Generate] PYTHON_EMPTY | LessonId={LessonId} ElapsedMs={ElapsedMs}",
                 lessonId, sw.ElapsedMilliseconds);
-            return Result<bool>.Failure("AI.GenerationFailed: Failed to generate quiz from AI engine.");
+            return Result<bool>.Failure("لم يتمكن محرك الذكاء الاصطناعي من توليد الاختبار. تأكد من أن الدرس تمت معالجته ورفع محتواه مسبقاً، وأن خدمة الذكاء الاصطناعي تعمل.");
         }
 
         _logger.LogInformation("[Quiz.Generate] PYTHON_OK | LessonId={LessonId} QuestionCount={Count} ElapsedMs={ElapsedMs}",
@@ -125,7 +125,7 @@ public class LessonAiService : ILessonAiService
         {
             _logger.LogError("[Summary.Generate] PYTHON_EMPTY | LessonId={LessonId} ElapsedMs={ElapsedMs}",
                 lessonId, sw.ElapsedMilliseconds);
-            return Result<bool>.Failure("AI.GenerationFailed: Failed to generate summary from AI engine.");
+            return Result<bool>.Failure("لم يتمكن محرك الذكاء الاصطناعي من توليد الملخص. تأكد من أن الدرس تمت معالجته ورفع محتواه مسبقاً، وأن خدمة الذكاء الاصطناعي تعمل.");
         }
 
         _logger.LogInformation("[Summary.Generate] PYTHON_OK | LessonId={LessonId} TopicCount={Count} ElapsedMs={ElapsedMs}",

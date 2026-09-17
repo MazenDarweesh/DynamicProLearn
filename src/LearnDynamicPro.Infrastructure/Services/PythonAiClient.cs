@@ -13,16 +13,22 @@ public class PythonAiClient : IPythonAiClient
     private readonly HttpClient _httpClient;
     private readonly string _serviceToken;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ITokenService _tokenService;
+    private readonly ICurrentUserService _currentUserService;
     private readonly ILogger<PythonAiClient> _logger;
 
     public PythonAiClient(
         HttpClient httpClient,
         IConfiguration configuration,
         IHttpContextAccessor httpContextAccessor,
+        ITokenService tokenService,
+        ICurrentUserService currentUserService,
         ILogger<PythonAiClient> logger)
     {
         _httpClient = httpClient;
         _httpContextAccessor = httpContextAccessor;
+        _tokenService = tokenService;
+        _currentUserService = currentUserService;
         _logger = logger;
         
         var baseUrl = configuration["AiCoPilot:BaseUrl"];
@@ -42,19 +48,21 @@ public class PythonAiClient : IPythonAiClient
 
     private void AttachAuthorization(HttpRequestMessage request)
     {
-        var authHeader = _httpContextAccessor.HttpContext?.Request.Headers["Authorization"].FirstOrDefault();
-        if (!string.IsNullOrWhiteSpace(authHeader))
-        {
-            request.Headers.TryAddWithoutValidation("Authorization", authHeader);
-        }
-        else
-        {
-            request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_serviceToken}");
-        }
+        // Generate a fresh short-lived JWT for each Backend->Backend call.
+        // This avoids 401 "Token expired" caused by the ClockSkew gap between
+        // .NET (tolerant) and Python FastAPI (strict). Both services share the same
+        // JWT_SECRET/Issuer/Audience so Python validates this token identically.
+        var userId = _currentUserService.UserId != Guid.Empty
+            ? _currentUserService.UserId
+            : Guid.NewGuid(); // Fallback for system-level calls
 
-        var roleHeader = _httpContextAccessor.HttpContext?.Request.Headers["X-Role"].FirstOrDefault();
-        var userRole = _httpContextAccessor.HttpContext?.User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-        var role = !string.IsNullOrWhiteSpace(roleHeader) ? roleHeader : (!string.IsNullOrWhiteSpace(userRole) ? userRole : "Admin");
+        var role = _httpContextAccessor.HttpContext?.User
+                       ?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                   ?? _httpContextAccessor.HttpContext?.Request.Headers["X-Role"].FirstOrDefault()
+                   ?? (_currentUserService.IsAuthenticated ? _currentUserService.Role.ToString() : "Admin");
+
+        var freshToken = _tokenService.GenerateServiceCallToken(userId, role);
+        request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {freshToken}");
         request.Headers.TryAddWithoutValidation("X-Role", role);
     }
 
