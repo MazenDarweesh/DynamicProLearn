@@ -21,6 +21,7 @@ public interface IApplicationDbContext
     // ── AI Generated Content ──────────────────────────────────────────
     DbSet<LessonQuiz> LessonQuizzes { get; }
     DbSet<LessonSummary> LessonSummaries { get; }
+    DbSet<StudentQuizProgress> StudentQuizProgresses { get; }
 
     DbSet<ErpVersion> ErpVersions { get; }
     DbSet<TesterActiveVersion> TesterActiveVersions { get; }

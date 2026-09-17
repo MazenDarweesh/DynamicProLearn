@@ -25,4 +25,16 @@ public interface IStudentService
     
     /// <summary>Retrieves the AI-generated summary for a lesson.</summary>
     Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>> GetLessonSummaryAsync(Guid lessonId, Guid userId);
+
+    /// <summary>Gets the current persistent quiz attempt/state for a student to support cross-device resumption.</summary>
+    Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentQuizStateDto>> GetQuizStateAsync(Guid lessonId, Guid userId);
+
+    /// <summary>Instantly evaluates a single quiz answer, persists the answer state, and returns the result with explanation.</summary>
+    Task<Result<LearnDynamicPro.Application.Dtos.Student.QuestionEvaluationResultDto>> CheckQuizAnswerAsync(Guid lessonId, LearnDynamicPro.Application.Dtos.Student.CheckQuizAnswerRequest request, Guid userId);
+
+    /// <summary>Finalizes a quiz attempt, calculates the final score, marks it completed, and persists to DB.</summary>
+    Task<Result<LearnDynamicPro.Application.Dtos.Student.QuizSubmissionResultDto>> SubmitQuizAsync(Guid lessonId, LearnDynamicPro.Application.Dtos.Student.SubmitQuizRequest request, Guid userId);
+
+    /// <summary>Resets a student's quiz attempt so they can retake the quiz from scratch.</summary>
+    Task<Result<bool>> ResetQuizAsync(Guid lessonId, Guid userId);
 }

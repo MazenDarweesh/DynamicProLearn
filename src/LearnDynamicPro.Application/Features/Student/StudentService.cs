@@ -4,6 +4,8 @@ using LearnDynamicPro.Application.Common;
 using Microsoft.EntityFrameworkCore;
 using LearnDynamicPro.Application.Interfaces.Repositories;
 using LearnDynamicPro.Domain.Entities;
+using LearnDynamicPro.Domain.Entities.AI;
+using LearnDynamicPro.Application.Dtos.Student;
 
 namespace LearnDynamicPro.Application.Features.Student;
 
@@ -192,6 +194,16 @@ public class StudentService : IStudentService
             .Select(lp => lp.LessonId)
             .ToHashSetAsync();
 
+        var quizLessonIds = await _context.LessonQuizzes.AsNoTracking()
+            .Where(q => lessonIds.Contains(q.LessonId))
+            .Select(q => q.LessonId)
+            .ToHashSetAsync();
+
+        var summaryLessonIds = await _context.LessonSummaries.AsNoTracking()
+            .Where(s => lessonIds.Contains(s.LessonId))
+            .Select(s => s.LessonId)
+            .ToHashSetAsync();
+
         var dtos = lessonProjections.Select(l => new LessonDto
         {
             Id          = l.Id,
@@ -206,6 +218,8 @@ public class StudentService : IStudentService
             OrderIndex  = l.OrderIndex,
             LevelOrderIndex = l.LevelOrderIndex,
             IsCompleted = completedLessonIds.Contains(l.Id),
+            HasQuiz     = quizLessonIds.Contains(l.Id),
+            HasSummary  = summaryLessonIds.Contains(l.Id),
             PdfUrl      = l.PdfUrl,
             ExternalLink = l.ExternalLink
         }).ToList();
@@ -367,6 +381,16 @@ public class StudentService : IStudentService
             .Select(lp => lp.LessonId)
             .ToHashSetAsync();
 
+        var quizLessonIds = await _context.LessonQuizzes.AsNoTracking()
+            .Where(q => lessonIds.Contains(q.LessonId))
+            .Select(q => q.LessonId)
+            .ToHashSetAsync();
+
+        var summaryLessonIds = await _context.LessonSummaries.AsNoTracking()
+            .Where(s => lessonIds.Contains(s.LessonId))
+            .Select(s => s.LessonId)
+            .ToHashSetAsync();
+
         var dtos = lessonProjections.Select(l => new LessonDto
         {
             Id          = l.Id,
@@ -380,6 +404,8 @@ public class StudentService : IStudentService
             OrderIndex  = l.OrderIndex,
             LevelOrderIndex = l.LevelOrderIndex,
             IsCompleted = completedLessonIds.Contains(l.Id),
+            HasQuiz     = quizLessonIds.Contains(l.Id),
+            HasSummary  = summaryLessonIds.Contains(l.Id),
             PdfUrl      = l.PdfUrl,
             ExternalLink = l.ExternalLink
         }).ToList();
@@ -470,6 +496,16 @@ public class StudentService : IStudentService
             .Select(lp => lp.LessonId)
             .ToHashSetAsync();
 
+        var quizLessonIds = await _context.LessonQuizzes.AsNoTracking()
+            .Where(q => lessonIds.Contains(q.LessonId))
+            .Select(q => q.LessonId)
+            .ToHashSetAsync();
+
+        var summaryLessonIds = await _context.LessonSummaries.AsNoTracking()
+            .Where(s => lessonIds.Contains(s.LessonId))
+            .Select(s => s.LessonId)
+            .ToHashSetAsync();
+
         var dtos = lessonProjections.Select(l => new LessonDto
         {
             Id          = l.Id,
@@ -483,6 +519,8 @@ public class StudentService : IStudentService
             OrderIndex  = l.OrderIndex,
             LevelOrderIndex = l.LevelOrderIndex,
             IsCompleted = completedLessonIds.Contains(l.Id),
+            HasQuiz     = quizLessonIds.Contains(l.Id),
+            HasSummary  = summaryLessonIds.Contains(l.Id),
             PdfUrl      = l.PdfUrl,
             ExternalLink = l.ExternalLink
         }).ToList();
@@ -611,5 +649,261 @@ public class StudentService : IStudentService
         };
 
         return Result<LearnDynamicPro.Application.Dtos.Student.StudentLessonSummaryDto>.Success(dto);
+    }
+
+    public async Task<Result<StudentQuizStateDto>> GetQuizStateAsync(Guid lessonId, Guid userId)
+    {
+        // 1. Validate Access
+        var detailResult = await GetLessonDetailAsync(lessonId, userId);
+        if (!detailResult.IsSuccess)
+            return Result<StudentQuizStateDto>.Failure(detailResult.Error);
+
+        // 2. Fetch Quiz to know total questions
+        var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
+        if (quiz == null)
+            return Result<StudentQuizStateDto>.Failure(AppErrors.General.NotFound);
+
+        // 3. Fetch Student's existing Progress
+        var progress = await _context.StudentQuizProgresses
+            .AsNoTracking()
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == lessonId);
+
+        if (progress == null)
+        {
+            return Result<StudentQuizStateDto>.Success(new StudentQuizStateDto
+            {
+                LessonId = lessonId,
+                TotalQuestions = quiz.Questions.Count,
+                AnsweredCount = 0,
+                CorrectCount = 0,
+                ScorePercentage = 0,
+                IsCompleted = false,
+                CompletedAt = null,
+                AnsweredQuestions = new List<QuestionEvaluationResultDto>()
+            });
+        }
+
+        var dto = new StudentQuizStateDto
+        {
+            LessonId = lessonId,
+            TotalQuestions = quiz.Questions.Count,
+            AnsweredCount = progress.Answers.Count,
+            CorrectCount = progress.CorrectCount,
+            ScorePercentage = progress.ScorePercentage,
+            IsCompleted = progress.IsCompleted,
+            CompletedAt = progress.CompletedAt,
+            AnsweredQuestions = progress.Answers.Select(a => new QuestionEvaluationResultDto
+            {
+                QuestionNumber = a.QuestionNumber,
+                SelectedOptionId = a.SelectedOptionId,
+                IsCorrect = a.IsCorrect,
+                CorrectAnswerId = a.CorrectAnswerId,
+                Explanation = a.Explanation
+            }).OrderBy(a => a.QuestionNumber).ToList()
+        };
+
+        return Result<StudentQuizStateDto>.Success(dto);
+    }
+
+    public async Task<Result<QuestionEvaluationResultDto>> CheckQuizAnswerAsync(Guid lessonId, CheckQuizAnswerRequest request, Guid userId)
+    {
+        // 1. Validate Access
+        var detailResult = await GetLessonDetailAsync(lessonId, userId);
+        if (!detailResult.IsSuccess)
+            return Result<QuestionEvaluationResultDto>.Failure(detailResult.Error);
+
+        // 2. Fetch Quiz
+        var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
+        if (quiz == null)
+            return Result<QuestionEvaluationResultDto>.Failure(AppErrors.General.NotFound);
+
+        // 3. Find Question
+        var question = quiz.Questions.FirstOrDefault(q => q.QuestionNumber == request.QuestionNumber);
+        if (question == null)
+            return Result<QuestionEvaluationResultDto>.Failure(AppErrors.General.NotFound);
+
+        // 4. Instant Evaluation
+        bool isCorrect = string.Equals(request.SelectedOptionId, question.CorrectAnswerId, StringComparison.OrdinalIgnoreCase);
+
+        // 5. Retrieve or Create Student Progress Record (Tracking)
+        var progress = await _context.StudentQuizProgresses
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == lessonId);
+
+        if (progress == null)
+        {
+            progress = new StudentQuizProgress
+            {
+                UserId = userId,
+                LessonId = lessonId,
+                TotalQuestions = quiz.Questions.Count,
+                CorrectCount = 0,
+                ScorePercentage = 0,
+                IsCompleted = false,
+                LastAccessedAt = DateTime.UtcNow
+            };
+            _context.StudentQuizProgresses.Add(progress);
+        }
+
+        // 6. Update Answer State
+        var existingAnswer = progress.Answers.FirstOrDefault(a => a.QuestionNumber == request.QuestionNumber);
+        if (existingAnswer != null)
+        {
+            existingAnswer.SelectedOptionId = request.SelectedOptionId;
+            existingAnswer.IsCorrect = isCorrect;
+            existingAnswer.CorrectAnswerId = question.CorrectAnswerId;
+            existingAnswer.Explanation = question.Explanation;
+            existingAnswer.AnsweredAt = DateTime.UtcNow;
+        }
+        else
+        {
+            progress.Answers.Add(new StudentQuizAnswerState
+            {
+                QuestionNumber = request.QuestionNumber,
+                SelectedOptionId = request.SelectedOptionId,
+                IsCorrect = isCorrect,
+                CorrectAnswerId = question.CorrectAnswerId,
+                Explanation = question.Explanation,
+                AnsweredAt = DateTime.UtcNow
+            });
+        }
+
+        // 7. Update Aggregates
+        progress.TotalQuestions = quiz.Questions.Count;
+        progress.CorrectCount = progress.Answers.Count(a => a.IsCorrect);
+        progress.ScorePercentage = progress.TotalQuestions > 0 ? Math.Round(progress.CorrectCount * 100.0 / progress.TotalQuestions, 1) : 0;
+        progress.LastAccessedAt = DateTime.UtcNow;
+
+        // Auto-mark completed if all questions are answered
+        if (progress.Answers.Count >= quiz.Questions.Count && !progress.IsCompleted)
+        {
+            progress.IsCompleted = true;
+            progress.CompletedAt = DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        var resultDto = new QuestionEvaluationResultDto
+        {
+            QuestionNumber = request.QuestionNumber,
+            SelectedOptionId = request.SelectedOptionId,
+            IsCorrect = isCorrect,
+            CorrectAnswerId = question.CorrectAnswerId,
+            Explanation = question.Explanation
+        };
+
+        return Result<QuestionEvaluationResultDto>.Success(resultDto);
+    }
+
+    public async Task<Result<QuizSubmissionResultDto>> SubmitQuizAsync(Guid lessonId, SubmitQuizRequest request, Guid userId)
+    {
+        // 1. Validate Access
+        var detailResult = await GetLessonDetailAsync(lessonId, userId);
+        if (!detailResult.IsSuccess)
+            return Result<QuizSubmissionResultDto>.Failure(detailResult.Error);
+
+        // 2. Fetch Quiz
+        var quiz = await _context.LessonQuizzes.AsNoTracking().FirstOrDefaultAsync(q => q.LessonId == lessonId);
+        if (quiz == null)
+            return Result<QuizSubmissionResultDto>.Failure(AppErrors.General.NotFound);
+
+        // 3. Fetch or Create Progress
+        var progress = await _context.StudentQuizProgresses
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == lessonId);
+
+        if (progress == null)
+        {
+            progress = new StudentQuizProgress
+            {
+                UserId = userId,
+                LessonId = lessonId,
+                TotalQuestions = quiz.Questions.Count,
+                CorrectCount = 0,
+                ScorePercentage = 0,
+                IsCompleted = false,
+                LastAccessedAt = DateTime.UtcNow
+            };
+            _context.StudentQuizProgresses.Add(progress);
+        }
+
+        // 4. If batch answers provided, evaluate them
+        if (request.Answers != null && request.Answers.Count > 0)
+        {
+            foreach (var ans in request.Answers)
+            {
+                var q = quiz.Questions.FirstOrDefault(x => x.QuestionNumber == ans.QuestionNumber);
+                if (q == null) continue;
+
+                bool isCorrect = string.Equals(ans.SelectedOptionId, q.CorrectAnswerId, StringComparison.OrdinalIgnoreCase);
+                var existing = progress.Answers.FirstOrDefault(a => a.QuestionNumber == ans.QuestionNumber);
+                if (existing != null)
+                {
+                    existing.SelectedOptionId = ans.SelectedOptionId;
+                    existing.IsCorrect = isCorrect;
+                    existing.CorrectAnswerId = q.CorrectAnswerId;
+                    existing.Explanation = q.Explanation;
+                    existing.AnsweredAt = DateTime.UtcNow;
+                }
+                else
+                {
+                    progress.Answers.Add(new StudentQuizAnswerState
+                    {
+                        QuestionNumber = ans.QuestionNumber,
+                        SelectedOptionId = ans.SelectedOptionId,
+                        IsCorrect = isCorrect,
+                        CorrectAnswerId = q.CorrectAnswerId,
+                        Explanation = q.Explanation,
+                        AnsweredAt = DateTime.UtcNow
+                    });
+                }
+            }
+        }
+
+        // 5. Finalize Progress
+        progress.TotalQuestions = quiz.Questions.Count;
+        progress.CorrectCount = progress.Answers.Count(a => a.IsCorrect);
+        progress.ScorePercentage = progress.TotalQuestions > 0 ? Math.Round(progress.CorrectCount * 100.0 / progress.TotalQuestions, 1) : 0;
+        progress.IsCompleted = true;
+        progress.CompletedAt = DateTime.UtcNow;
+        progress.LastAccessedAt = DateTime.UtcNow;
+
+        await _context.SaveChangesAsync();
+
+        var resultDto = new QuizSubmissionResultDto
+        {
+            TotalQuestions = progress.TotalQuestions,
+            CorrectCount = progress.CorrectCount,
+            ScorePercentage = progress.ScorePercentage,
+            Passed = progress.ScorePercentage >= 50.0,
+            Results = progress.Answers.Select(a => new QuestionEvaluationResultDto
+            {
+                QuestionNumber = a.QuestionNumber,
+                SelectedOptionId = a.SelectedOptionId,
+                IsCorrect = a.IsCorrect,
+                CorrectAnswerId = a.CorrectAnswerId,
+                Explanation = a.Explanation
+            }).OrderBy(r => r.QuestionNumber).ToList()
+        };
+
+        return Result<QuizSubmissionResultDto>.Success(resultDto);
+    }
+
+    public async Task<Result<bool>> ResetQuizAsync(Guid lessonId, Guid userId)
+    {
+        // 1. Validate Access
+        var detailResult = await GetLessonDetailAsync(lessonId, userId);
+        if (!detailResult.IsSuccess)
+            return Result<bool>.Failure(detailResult.Error);
+
+        // 2. Fetch Progress
+        var progress = await _context.StudentQuizProgresses
+            .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == lessonId);
+
+        if (progress != null)
+        {
+            _context.StudentQuizProgresses.Remove(progress);
+            await _context.SaveChangesAsync();
+        }
+
+        return Result<bool>.Success(true);
     }
 }

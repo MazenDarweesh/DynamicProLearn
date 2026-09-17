@@ -46,6 +46,8 @@
 
         <span *ngIf="type === 'units'">{{ i + 1 }}.{{ lIndex + 1 }} {{ lesson.title }}</span>
         <span *ngIf="type === 'levels'">{{ lesson.title }}</span>
+        <span *ngIf="lesson.hasSummary" class="ai-badge-indicator" title="يحتوي على ملخص ذكي">📝</span>
+        <span *ngIf="lesson.hasQuiz" class="ai-badge-indicator" title="يحتوي على اختبار تفاعلي">🧠</span>
       </div>
 
       <div class="lesson-status" [class.completed]="lesson.isCompleted">

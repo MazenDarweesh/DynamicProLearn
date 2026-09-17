@@ -1,8 +1,8 @@
-# 🏗️ Blueprint: LMS & AI Co-Pilot Full Integration Construction Plan
+# 🏗️ Blueprint: Student AI Quiz & Summary Interactive Learning Experience
 
-> **مشروع العمل:** `LearnDynamicPro` (.NET 10 Web API & Angular 19 UI)  
-> **الهدف الفني:** إنجاز كافة المتطلبات المتبقية في [AI_INTEGRATION_TRACKER.md](file:///e:/Mazen/DynamicProLearn/AI_INTEGRATION_TRACKER.md) بدقة معيارية عالية وتأمين تجربة مستخدم سلسة بدون أي انقطاع للجلسات وبأعلى درجات الموثوقية.  
-> **مبدأ Blueprint:** كل خطوة مصممة لتكون **مستقلة بذاتها (Cold-Start Executable)** وتحتوي على سياقها الكامل بحيث يمكن لأي مطور أو وكيل ذكاء اصطناعي البدء بها واختبارها فوراً.
+> **مشروع العمل:** `DynamicProLearn` (.NET 10 Web API & Angular 19 UI)  
+> **الهدف الفني:** تفعيل وعرض ملخص واختبار الذكاء الاصطناعي في شاشة الطالب (`lesson-viewer`)، مع تطبيق مبدأ **(Zero-Cheat Initial State)** بحيث تظهر الأسئلة والخيارات فقط في البداية، وبمجرد اختيار الطالب للإجابة يتم **التصحيح اللحظي والتفاعلي (Instant Interactive Grading)** بكشف صحة الإجابة (أخضر/أحمر)، وإظهار الشرح والتوضيح (`Explanation`)، وحساب النتيجة الإجمالية وتثبيتها.  
+> **مبدأ Blueprint:** كل خطوة مصممة لتكون **مستقلة بذاتها (Cold-Start Executable)** وتحتوي على سياقها الفني الكامل وعقود الـ DTOs وكافة مسارات الملفات بحيث يمكن لأي وكيل برمجي أو مطور البدء بها وتنفيذها واختبارها فوراً.
 
 ---
 
@@ -10,32 +10,32 @@
 
 ```mermaid
 flowchart TD
-    subgraph Phase 1: Security & Auth
-        Step1[Step 1: .NET Backend - Refresh Token Endpoint & Crypto Service]
-        Step2[Step 2: Angular - Silent Refresh Interceptor & AuthService State]
+    subgraph Phase 1: Backend Evaluation Engine [.NET 10 API]
+        Step1["Step 1: Evaluation DTOs & Contracts (CheckAnswer & QuizResult)"]
+        Step2["Step 2: StudentService Business Logic (Answer Checking & Scoring)"]
+        Step3["Step 3: StudentController Endpoints (POST check-answer & submit)"]
         Step1 --> Step2
+        Step2 --> Step3
     end
 
-    subgraph Phase 2: AI Engine Readiness
-        Step3[Step 3: Angular - AI Readiness Guard & Polling Service]
+    subgraph Phase 2: Frontend Service & Types [Angular 19]
+        Step4["Step 4: StudentService API Client & TypeScript Interfaces"]
+        Step3 --> Step4
     end
 
-    subgraph Phase 3: Provenance & Transparency
-        Step4[Step 4: Angular - Answer Provenance, Latency & Cache Badges]
+    subgraph Phase 3: Interactive UI & Instant Grading [Angular 19]
+        Step5["Step 5: LessonViewer Component Logic (Instant Grading & State Mutex)"]
+        Step6["Step 6: LessonViewer HTML Template (Interactive Quiz & Rich Summary)"]
+        Step7["Step 7: LessonViewer CSS Design System (Feedback Animation & Badges)"]
+        Step4 --> Step5
+        Step5 --> Step6
+        Step6 --> Step7
     end
 
-    subgraph Phase 4: UX & Widget Ergonomics
-        Step5[Step 5: Angular - Draggable Floating Widget with @angular/cdk & History Clear]
+    subgraph Phase 4: Curriculum Awareness [Sidebar & Navigation]
+        Step8["Step 8: Curriculum Navigation AI Badges (Summary 📝 & Quiz 🧠 indicators)"]
+        Step6 --> Step8
     end
-
-    subgraph Phase 5: Webhook Dual-Key Hardening
-        Step6[Step 6: .NET - WebhookDispatcher Dual-Key Serialization Robustness]
-    end
-
-    Step2 --> Step3
-    Step3 --> Step4
-    Step4 --> Step5
-    Step1 --> Step6
 ```
 
 ---
@@ -44,230 +44,270 @@ flowchart TD
 
 ---
 
-### 🔹 الخطوة 1: مسار تجديد التوكنات في الباك إند (.NET Silent Refresh Token) - [x] (تم الإنجاز بنجاح ✅)
+### 🔹 الخطوة 1: عقود الـ DTOs للتقييم والتصحيح في الباك إند (.NET Evaluation DTOs)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `src/LearnDynamicPro.Application/Dtos/Student/StudentAiContentDtos.cs`
 
-#### 🎯 الهدف:
-إنشاء نقطة نهاية عامة `POST /api/Auth/refresh-token` تصدر زوجاً جديداً من التوكنات (Access Token جديد + Refresh Token جديد) عند تقديم Refresh Token ساري المفعول، دون الحاجة لأي تعديل في جداول قاعدة البيانات (Stateless Cryptographic Token).
-
-#### 📦 الملفات المعنية:
-- **[NEW]** `src/LearnDynamicPro.Application/Dtos/Auth/RefreshTokenRequest.cs`
-- **[MODIFY]** `src/LearnDynamicPro.Application/Dtos/Auth/LoginResponse.cs`
-- **[MODIFY]** `src/LearnDynamicPro.Application/Interfaces/ITokenService.cs`
-- **[MODIFY]** `src/LearnDynamicPro.Infrastructure/Identity/TokenService.cs`
-- **[MODIFY]** `src/LearnDynamicPro.Application/Interfaces/IAuthService.cs`
-- **[MODIFY]** `src/LearnDynamicPro.Application/Features/Auth/AuthService.cs`
-- **[MODIFY]** `src/LearnDynamicPro.API/Controllers/AuthController.cs`
+#### 🎯 الهدف الفني:
+تعريف كائنات نقل البيانات (DTOs) اللازمة لفحص إجابة سؤال فردي لحظياً، ولتأكيد وإنهاء الاختبار بالكامل وحفظ النتيجة في قاعدة البيانات.
 
 #### 📝 تفاصيل التنفيذ الهندسي:
-1. **DTOs:**
-   - إنشاء `RefreshTokenRequest` بحقلين: `Token` (الـ Access Token المنتهي) و `RefreshToken`.
-   - إضافة خاصية `public string RefreshToken { get; set; } = string.Empty;` في `LoginResponse` (والتي يرث منها `ErpLoginResponse`).
-2. **TokenService:**
-   - إضافة دالة توليد Refresh Token مشفر وموقّع بنفس المفتاح السري وبمدة صلاحية 7 أيام مع إضافة Claim صريح: `Claim("token_type", "refresh")`.
-   - إضافة دالة للتحقق من الـ Refresh Token واستخراج الـ `UserId` أو الـ Claims بأمان مع تجاوز التحقق من تاريخ انتهاء الـ Access Token القديم عبر `TokenValidationParameters { ValidateLifetime = false }`.
-3. **AuthService:**
-   - تحديث `LoginAsync` و `ErpLoginAsync` لتوليد وإرجاع الـ `RefreshToken` جنباً إلى جنب مع الـ Access Token.
-   - تطبيق دالة `RefreshTokenAsync(RefreshTokenRequest request)`: التحقق من صحة الـ Refresh Token، التأكد من وجود المستخدم في قاعدة البيانات عبر `_unitOfWork.Repository<User>()`، إصدار Access Token جديد و Refresh Token جديد وإرجاعهما في `LoginResponse`.
-4. **AuthController:**
-   - إضافة مسار:
-     ```csharp
-     [HttpPost("refresh-token")]
-     public async Task<IActionResult> RefreshToken([FromBody] RefreshTokenRequest request)
-     ```
-     يعيد `200 OK` مع التوكنات الجديدة، أو `401 Unauthorized` في حال بطلان أو انتهاء الـ Refresh Token.
+إضافة الكائنات التالية في `StudentAiContentDtos.cs`:
+1. `CheckQuizAnswerRequest`:
+   - `int QuestionNumber { get; set; }`
+   - `string SelectedOptionId { get; set; } = string.Empty;`
+2. `QuestionEvaluationResultDto`:
+   - `int QuestionNumber { get; set; }`
+   - `bool IsCorrect { get; set; }`
+   - `string CorrectAnswerId { get; set; } = string.Empty;`
+   - `string Explanation { get; set; } = string.Empty;`
+3. `SubmitQuizRequest`:
+   - `List<CheckQuizAnswerRequest> Answers { get; set; } = new();`
+4. `QuizSubmissionResultDto`:
+   - `int TotalQuestions { get; set; }`
+   - `int CorrectCount { get; set; }`
+   - `double ScorePercentage { get; set; }`
+   - `bool Passed { get; set; }`
+   - `List<QuestionEvaluationResultDto> Results { get; set; } = new();`
 
-#### 🧪 معايير القبول والتحقق (Verification):
+#### 🧪 معايير القبول والتحقق:
 ```bash
 dotnet build
 ```
-- يجب أن ينتهي البناء بـ `0 Errors, 0 Warnings`.
-- اختبار استدعاء `POST /api/Auth/login` والتأكد من وجود `token` و `refreshToken` في الاستجابة.
-- اختبار استدعاء `POST /api/Auth/refresh-token` والتأكد من إرجاع توكنات جديدة بنجاح.
+- ينتهي البناء بـ `0 Errors, 0 Warnings`.
 
 ---
 
-### 🔹 الخطوة 2: التجديد التلقائي الصامت في الفرونت إند (Angular Silent Refresh Interceptor) - [x] (تم الإنجاز بنجاح ✅)
+### 🔹 الخطوة 2: منطق التصحيح والتقييم في خدمة الطلاب (StudentService Logic)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `src/LearnDynamicPro.Application/Features/Student/IStudentService.cs`
+  - **[MODIFY]** `src/LearnDynamicPro.Application/Features/Student/StudentService.cs`
 
-#### 🎯 الهدف:
-التقاط خطأ `401 Unauthorized` تلقائياً لأي طلب HTTP، وتجديد التوكن في الخلفية صامتاً عبر `POST /api/Auth/refresh-token`، ثم إعادة إرسال الطلب الأصلي بسلاسة دون تسجيل خروج المستخدم أو مقاطعة عمله.
-
-#### 📦 الملفات المعنية:
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/core/services/auth.service.ts`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/core/interceptors/jwt.interceptor.ts`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/core/services/copilot.service.ts`
+#### 🎯 الهدف الفني:
+إضافة دالتين في `StudentService`:
+1. دالة لفحص إجابة سؤال محدد لحظياً بالرجوع لسجل `LessonQuiz` المخزن في SQL Server.
+2. دالة لتقييم الاختبار كاملاً وتحديث نسبة نجاح الطالب في `LessonProgress`.
 
 #### 📝 تفاصيل التنفيذ الهندسي:
-1. **AuthService:**
-   - إضافة Signal لإدارة الـ Refresh Token: `readonly refreshTokenValue = signal<string | null>(localStorage.getItem('refresh_token'));`.
-   - تعديل `login(token: string, refreshToken?: string)` لحفظ `refresh_token` في `localStorage` وتحديث الـ Signal.
-   - تعديل `logout()` لمسح `jwt_token` و `refresh_token` وتصفير الـ Signals.
-   - إضافة دالة `refreshToken(): Observable<any>` ترسل `POST /api/Auth/refresh-token` مع `{ token: this.token(), refreshToken: this.refreshTokenValue() }` وتحدث التوكنات فور نجاحها عبر `tap()`.
-2. **jwt.interceptor.ts:**
-   - تطبيق نمط إدارة طابور التجديد (Token Refresh Mutex / Queue) باستخدام `isRefreshing` و `BehaviorSubject<string | null>`:
-     - إذا كان الطلب الفاشل هو طلب `refresh-token` نفسه: تنفيذ `authService.logout()` فوراً والتحويل لـ `/login`.
-     - إذا لم يكن هناك تجديد قيد التنفيذ: بدء التجديد وتمرير التوكن الجديد للطلبات المعلقة.
-     - إذا كان هناك تجديد قيد التنفيذ: تعليق الطلبات في الطابور عبر `filter(token => token !== null).pipe(take(1), switchMap(...))` حتى يصدر التوكن الجديد.
-3. **copilot.service.ts (حماية البث المباشر SSE):**
-   - داخل `streamSearch`: إذا استجاب الـ `fetch` بـ `response.status === 401`:
-     - استدعاء `firstValueFrom(this.authService.refreshToken())`.
-     - إعادة إرسال طلب الـ `fetch` للـ SSE بالتوكن الجديد فوراً لمرة واحدة دون إيقاف الشات.
+1. في `IStudentService.cs`:
+   ```csharp
+   Task<Result<QuestionEvaluationResultDto>> CheckQuizAnswerAsync(Guid lessonId, CheckQuizAnswerRequest request, Guid userId);
+   Task<Result<QuizSubmissionResultDto>> SubmitQuizAsync(Guid lessonId, SubmitQuizRequest request, Guid userId);
+   ```
+2. في `StudentService.cs`:
+   - التحقق من صلاحية وصول الطالب للدرس عبر `GetLessonDetailAsync(lessonId, userId)`.
+   - جلب `LessonQuiz` الخاص بالدرس من `_context.LessonQuizzes`.
+   - في `CheckQuizAnswerAsync`:
+     - مطابقة `QuestionNumber` والتحقق مما إذا كان `SelectedOptionId == question.CorrectAnswerId`.
+     - إرجاع `QuestionEvaluationResultDto` متضمناً `IsCorrect` و `CorrectAnswerId` و `Explanation`.
+   - في `SubmitQuizAsync`:
+     - تصحيح كافة الأسئلة وحساب `ScorePercentage = (correctCount / total) * 100`.
+     - جلب أو إنشاء سجل `LessonProgress` الخاص بالطالب وتحديث `QuizScore`.
+     - إرجاع النتيجة الكاملة مع قائمة التصحيح التفصيلية.
 
-#### 🧪 معايير القبول والتحقق (Verification):
+#### 🧪 معايير القبول والتحقق:
 ```bash
+dotnet build
+```
+- نجاح بناء المشروع وخلوه من أي أخطاء.
+
+---
+
+### 🔹 الخطوة 3: نقاط النهاية في StudentController (.NET Web API Endpoints)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `src/LearnDynamicPro.API/Controllers/StudentController.cs`
+
+#### 🎯 الهدف الفني:
+تعريض مسارين مؤمنين بصلاحية `StudentOrAbove`:
+1. `POST /api/Student/lessons/{lessonId}/quiz/check-answer`
+2. `POST /api/Student/lessons/{lessonId}/quiz/submit`
+
+#### 📝 تفاصيل التنفيذ الهندسي:
+```csharp
+[HttpPost("lessons/{lessonId}/quiz/check-answer")]
+public async Task<IActionResult> CheckQuizAnswer(Guid lessonId, [FromBody] CheckQuizAnswerRequest request)
+{
+    var result = await _studentService.CheckQuizAnswerAsync(lessonId, request, _currentUserService.UserId);
+    if (!result.IsSuccess) return BadRequest(result.Error);
+    return Ok(result.Value);
+}
+
+[HttpPost("lessons/{lessonId}/quiz/submit")]
+public async Task<IActionResult> SubmitQuiz(Guid lessonId, [FromBody] SubmitQuizRequest request)
+{
+    var result = await _studentService.SubmitQuizAsync(lessonId, request, _currentUserService.UserId);
+    if (!result.IsSuccess) return BadRequest(result.Error);
+    return Ok(result.Value);
+}
+```
+
+#### 🧪 معايير القبول والتحقق:
+- تشغيل `dotnet build` والتأكد من `0 Errors`.
+- اختبار المسار عبر Swagger أو Postman والتحقق من إرجاع النتيجة والشرح فور إرسال الإجابة.
+
+---
+
+### 🔹 الخطوة 4: تكامل عميل الواجهة الأمامية (Angular StudentService)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/core/services/student.service.ts`
+
+#### 🎯 الهدف الفني:
+توسيع `StudentService` في Angular بإضافة الدوال والـ Interfaces اللازمة لاستدعاء مسارات الفحص والتقييم.
+
+#### 📝 تفاصيل التنفيذ الهندسي:
+1. إضافة الواجهات:
+   ```typescript
+   export interface CheckAnswerRequest {
+     questionNumber: number;
+     selectedOptionId: string;
+   }
+
+   export interface QuestionEvaluationResult {
+     questionNumber: number;
+     isCorrect: boolean;
+     correctAnswerId: string;
+     explanation: string;
+   }
+
+   export interface QuizSubmissionResult {
+     totalQuestions: number;
+     correctCount: number;
+     scorePercentage: number;
+     passed: boolean;
+     results: QuestionEvaluationResult[];
+   }
+   ```
+2. إضافة الدوال:
+   ```typescript
+   checkQuizAnswer(lessonId: string, req: CheckAnswerRequest): Observable<QuestionEvaluationResult> {
+     return this.http.post<QuestionEvaluationResult>(`/api/Student/lessons/${lessonId}/quiz/check-answer`, req);
+   }
+
+   submitQuiz(lessonId: string, answers: CheckAnswerRequest[]): Observable<QuizSubmissionResult> {
+     return this.http.post<QuizSubmissionResult>(`/api/Student/lessons/${lessonId}/quiz/submit`, { answers });
+   }
+   ```
+
+#### 🧪 معايير القبول والتحقق:
+```bash
+cd learn-dynamic-pro-ui
 npm run build
 ```
-- اكتمال بناء تطبيق Angular بنجاح بدون أخطاء.
-- فتح الصفحة والشات، والتأكد من تجديد التوكن تلقائياً في الخلفية عند انتهاء الـ Access Token دون انقطاع الاتصال.
+- التأكد من خلو ملفات TypeScript من أي أخطاء بناء.
 
 ---
 
-### 🔹 الخطوة 3: حارس جاهزية الذكاء الاصطناعي (AI Readiness Guard) - [x] (تم الإنجاز بنجاح ✅)
+### 🔹 الخطوة 5: منطق التصحيح التفاعلي في مكون المشاهد (LessonViewer Component Logic)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/features/student/lesson-viewer/lesson-viewer.ts`
 
-#### 🎯 الهدف:
-فحص مسار `GET /v1/ready` عند فتح ويدجت الشات، وتعطيل حقل الإدخال وزر الإرسال وإظهار مؤشر تهيئة ناعم ريثما تنتهي خوادم بايثون من تحميل الموديلات والاتصال بـ Qdrant.
-
-#### 📦 الملفات المعنية:
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/core/services/copilot.service.ts`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.ts`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.html`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.css`
+#### 🎯 الهدف الفني:
+تحديث حالة الكويز في `LessonViewer` لتدعم:
+1. تتبع فحص كل سؤال على حدة بمجرد اختيار الخيار (`selectOptionAndCheck`).
+2. قفل خيارات السؤال المجاب عنه لمنع التلاعب بعد ظهور التصحيح.
+3. حفظ وتخزين التقييم (`isCorrect`, `correctAnswerId`, `explanation`) لكل سؤال.
+4. حساب الإحصائيات اللحظية (عدد الإجابات الصحيحة، النسبة المئوية).
+5. زر إعادة المحاولة (`resetQuiz`) لتصفير الحالة وبدء الاختبار من جديد.
 
 #### 📝 تفاصيل التنفيذ الهندسي:
-1. **CopilotService:**
-   - إضافة دالة `checkReadiness(): Observable<{ ready: boolean; status: string }>` تستدعي `GET ${this.aiBaseUrl}/v1/ready`.
-2. **CopilotChatComponent:**
-   - تعريف حالة `isAiReady = true;` (افتراضياً) و `isWarmingUp = false;`.
-   - عند فتح الشات `toggleChat()`: استدعاء `checkReadiness()`. في حال كانت النتيجة `ready: false` أو رمز `503`:
-     - ضبط `isAiReady = false;` و `isWarmingUp = true;`.
-     - تشغيل Polling دوري كل ثانيتين عبر `timer(0, 2000)` يتوقف تلقائياً بمجرد استلام `ready: true`.
-3. **HTML & CSS:**
-   - تعطيل زر الإرسال وحقل الإدخال: `[disabled]="!isAiReady || isStreaming"`.
-   - شريط تنبيه لطيف أسفل الهيدر أثناء التهيئة: *"جاري تهيئة محرك الذكاء الاصطناعي... ⏳"*.
-   - تحديث مؤشر الاتصال (`.status-dot`) ليعكس اللون الأصفر أثناء التهيئة والأخضر عند الجاهزية.
+- إضافة متغيرات الحالة:
+  ```typescript
+  evaluations: { [questionNumber: number]: QuestionEvaluationResult } = {};
+  checkingQuestions: { [questionNumber: number]: boolean } = {};
+  correctCount = 0;
+  totalAnswered = 0;
+  quizCompleted = false;
+  ```
+- تطبيق دالة `selectOptionAndCheck(qNumber: number, optionId: string)`:
+  - إذا كان السؤال تم تقييمه مسبقاً، تجاهل الضغط (Locking).
+  - تعيين حالة التحميل للسؤال `checkingQuestions[qNumber] = true`.
+  - استدعاء `studentService.checkQuizAnswer(this.activeLesson.id, { questionNumber: qNumber, selectedOptionId: optionId })`.
+  - عند النجاح: تخزين النتيجة في `evaluations[qNumber]`، وتحديث `correctCount` إذا كانت الإجابة صحيحة، وزيادة `totalAnswered`.
+  - إذا اكتملت جميع الأسئلة: تعيين `quizCompleted = true` واستدعاء `submitQuiz` صامتاً لحفظ النتيجة في قاعدة البيانات.
 
 #### 🧪 معايير القبول والتحقق:
-- عند إيقاف أو إعادة إقلاع سيرفر بايثون، يظهر الشات مؤشر التهيئة ويمنع إرسال الرسائل قبل الجاهزية التامة.
-- بمجرد اكتمال إقلاع بايثون (`ready: true`)، يتحول المؤشر للأخضر ويصبح الشات جاهزاً فوراً.
+- تجربة اختبار أسئلة الدرس في الواجهة والتأكد من عدم حدوث أخطاء runtime في الكونسول.
 
 ---
 
-### 🔹 الخطوة 4: شارات مصدر الإجابة وزمن الاستجابة (Answer Provenance Badges) - [x] (تم الإنجاز بنجاح ✅)
+### 🔹 الخطوة 6: القالب التفاعلي للاختبار والملخص (LessonViewer HTML Overhaul)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/features/student/lesson-viewer/lesson-viewer.html`
 
-#### 🎯 الهدف:
-استخراج حقول `provenance`, `cache_hit`, و `metrics.total_latency_ms` من حدث `done` في البث المباشر، وعرض شارة بصرية واضحة ومميزة بجانب كل رد للمساعد توضح ما إذا كانت الإجابة فورية من الكاش أو تم توليدها حياً عبر Gemini مع توضيح زمن الاستجابة.
-
-#### 📦 الملفات المعنية:
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.ts`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.html`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.css`
-
-#### 📝 تفاصيل التنفيذ الهندسي:
-1. **ChatMessage Interface:**
-   - إضافة الخصائص:
-     ```typescript
-     cacheHit?: boolean;
-     provenance?: string;
-     latencyMs?: number;
-     ```
-2. **Component Logic:**
-   - في معالج حدث `onDone: (meta?: any)`:
-     ```typescript
-     if (meta) {
-       msg.cacheHit = meta.cache_hit ?? false;
-       msg.provenance = meta.provenance;
-       msg.latencyMs = meta.metrics?.total_latency_ms ?? meta.latency_ms;
-     }
-     ```
-3. **HTML Template:**
-   - داخل حاوية الرسالة:
-     ```html
-     <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.provenance" class="provenance-badge-container">
-       <span *ngIf="msg.cacheHit" class="badge badge-cache" [title]="'المصدر: ' + msg.provenance">
-         ⚡ استجابة فورية ({{ msg.latencyMs }} ms)
-       </span>
-       <span *ngIf="!msg.cacheHit" class="badge badge-rag" [title]="'المصدر: ' + msg.provenance">
-         🧠 توليد ذكي ({{ ((msg.latencyMs || 0) / 1000).toFixed(1) }} s)
-       </span>
-     </div>
-     ```
-4. **CSS Styling:**
-   - بادجات بتصميم عصري (Glassmorphism خفيف، خط صغير وواضح، ألوان مميزة: أخضر/بنفسجي للكاش وأزرق هادئ للتوليد الحي).
+#### 🎯 الهدف الفني:
+إعادة هيكلة تبويبي ملخص واختبار الذكاء الاصطناعي:
+1. **تبويب الكويز (Interactive Quiz):**
+   - في البداية: عرض نص السؤال والخيارات فقط دون أي تلميحات أو حلول.
+   - عند الاختيار:
+     - الخيار الصحيح يضيء بالأخضر ✅.
+     - الخيار الخاطئ (إذا اختاره الطالب) يضيء بالأحمر ❌ ويتم تظليل الخيار الصحيح تلقائياً بالأخضر.
+     - ظهور كارت الشرح الأنيق أسفل السؤال:
+       `💡 الشرح والتوضيح: [نص الشرح القادم من الذكاء الاصطناعي]`.
+   - شريط النتيجة العلوي: يوضح نسبة الإنجاز والدرجة الحالية.
+   - كارت التهنئة النهائي عند إنهاء جميع الأسئلة مع زر `إعادة الاختبار 🔄`.
+2. **تبويب الملخص (AI Summary):**
+   - كارت النظرة العامة (Overview).
+   - كروت المحاور الأساسية (Topics) مع نقاط الاستيعاب وقائمة الـ Key Points مع زر نسخ الملخص.
 
 #### 🧪 معايير القبول والتحقق:
-- عند سؤال نفس السؤال للمرة الثانية: تظهر شارة ⚡ فورية مع زمن استجابة سريع جداً (< 50ms).
-- عند الضغط على زر 🔄 Retry: تظهر شارة 🧠 توليد ذكي مع وقت التوليد الحي.
+- فتح صفحة الدرس والتأكد من أن الكويز لا يسرب أي إجابات أو شروحات قبل النقر.
+- التأكد من تجربة التصحيح السلسة وظهور الشرح فور النقر.
 
 ---
 
-### 🔹 الخطوة 5: الشات العائم القابل للسحب الحر وزر مسح المحادثة (Draggable Widget & History Clear) - [x] (تم الإنجاز بنجاح ✅)
+### 🔹 الخطوة 7: التصميم والألوان الحركية التفاعلية (LessonViewer CSS Enhancement)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/features/student/lesson-viewer/lesson-viewer.css`
 
-#### 🎯 الهدف:
-تمكين المستخدم من سحب نافذة الشات لأي مكان على الشاشة بحرية تامة دون حجب محتوى الدروس أو الفيديو، مع رفع طبقة العرض (`z-index: 99999`) لضمان عدم اختفائها خلف أي نوافذ منبثقة، وإضافة زر مسح المحادثة 🗑️ في الهيدر.
-
-#### 📦 الملفات المعنية:
-- **[MODIFY]** `learn-dynamic-pro-ui/package.json` (إضافة `@angular/cdk`)
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.ts`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.html`
-- **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/copilot-chat/copilot-chat.component.css`
-
-#### 📝 تفاصيل التنفيذ الهندسي:
-1. **تثبيت الحزمة:**
-   ```bash
-   npm install @angular/cdk
-   ```
-2. **استيراد الـ Directives في الكومبوننت:**
-   - إضافة `CdkDrag`, `CdkDragHandle` إلى مصفوفة `imports` في `@Component` (باعتباره Standalone).
-3. **HTML Template:**
-   - إضافة `cdkDrag` و `cdkDragBoundary="body"` إلى الحاوية الرئيسية `.copilot-window`.
-   - إضافة `cdkDragHandle` إلى رأس النافذة `.copilot-header`.
-   - إضافة زر تفريغ الشات في `header-controls`:
-     ```html
-     <button class="header-btn" (click)="clearHistory()" title="مسح المحادثة">🗑️</button>
-     ```
-4. **Component Logic:**
-   - دالة `clearHistory()`: إعادة تعيين مصفوفة `messages` للرسالة الترحيبية الأولى فقط وإعادة تعيين الـ `threadId`.
-5. **CSS Styling:**
-   - `.copilot-header { cursor: grab; }` و `.copilot-header:active { cursor: grabbing; }`.
-   - `.copilot-window { z-index: 99999 !important; }`.
+#### 🎯 الهدف الفني:
+إضافة مؤثرات بصرية مريحة للعين وفخمة:
+- `.student-opt-row.correct`: خلفية خضراء هادئة `#ecfdf5`، إطار زمردي `#10b981`، أيقونة صح خضراء.
+- `.student-opt-row.incorrect`: خلفية حمراء هادئة `#fef2f2`، إطار أحمر `#ef4444`، أيقونة خطأ حمراء.
+- `.explanation-box`: حركة انزلاق وانسياب ناعمة `slideDown` مع خلفية زرقاء فاتحة `#eff6ff` وإطار أزرق `#bfdbfe`.
+- `.score-summary-bar`: شريط تقدم تفاعلي أنيق يوضح النتيجة الحالية بلون مميز.
 
 #### 🧪 معايير القبول والتحقق:
-- إمكانية سحب نافذة الشات بسلاسة من الهيدر ووضعها في أي مكان داخل حدود الشاشة.
-- زر مسح المحادثة 🗑️ يقوم بتفريغ الشات وبدء جلسة جديدة بنجاح.
+- فحص التجاوبية (Responsive Design) والتأكد من عدم وجود أخطاء في الـ CSS Budgets.
 
 ---
 
-### 🔹 الخطوة 6: تأمين توافق مفاتيح الويب هوك (.NET Webhook Dual-Key Robustness) - [x] (تم الإنجاز بنجاح ✅)
+### 🔹 الخطوة 8: إشارات الدروس الذكية في القائمة الجانبية (Sidebar Curriculum Badges)
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `src/LearnDynamicPro.Application/Dtos/Modules/LessonDto.cs`
+  - **[MODIFY]** `src/LearnDynamicPro.Application/Features/Student/StudentService.cs`
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/lesson-sidebar/lesson-sidebar.component.html`
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/shared/components/lesson-sidebar/lesson-sidebar.component.css`
 
-#### 🎯 الهدف:
-ضمان توافق بايلود إشعار تحديث وحذف الدروس مع محرك بايثون بنسبة 100% سواء كان السيرفر يتوقع المفتاح بصيغة CamelCase (`lessonId`) أو SnakeCase (`lesson_id`).
+#### 🎯 الهدف الفني:
+إظهار شارات صغيرة لطيفة بجانب عنوان الدرس في القائمة الجانبية:
+- علامة 📝 إذا كان الدرس يملك ملخصاً ذكياً.
+- علامة 🧠 إذا كان الدرس يملك اختباراً تفاعلياً.
+ليعرف الطالب مسبقاً أي الدروس تحتوي على محتوى ذكي جاهز للاستفادة منه فوراً.
 
-#### 📦 الملفات المعنية:
-- **[MODIFY]** `src/LearnDynamicPro.Infrastructure/Services/WebhookDispatcher.cs`
+#### 🧪 معايير القبول والتحقق:
+- مراجعة القائمة الجانبية والتأكد من ظهور الشارات للدروس المولدة فقط.
 
-#### 📝 تفاصيل التنفيذ الهندسي:
-تحديث كائن الـ Payload في دالة `SendWebhookAsync` ليشمل كلا المفتاحين معاً:
-```csharp
-var payload = new
-{
-    lesson_id = lessonId.ToString(),
-    lessonId  = lessonId.ToString(),
-    action    = action
-};
+---
+
+## 🛡️ استراتيجية التراجع والأمان (Rollback & Safety Guidelines)
+
+1. **سلامة قاعدة البيانات:** التعديل لا يتطلب أي Migrations جديدة، فالبيانات مخزنة بالفعل في جدولي `LessonQuizzes` و `LessonSummaries`.
+2. **منع الغش في الاختبار:** لن يتم إرسال `CorrectAnswerId` أو `Explanation` في طلب جلب الكويز الأولي `GET /quiz`؛ ويتم إرجاعها فقط للسؤال المحدد بعد إرسال الطالب لإجابته عبر `POST /check-answer`.
+3. **التوافق التام:** الدروس التي لم يُولّد لها كويز أو ملخص ستستمر في عرض الصندوق التوضيحي الهادئ: *"لم يتم نشر ملخص/اختبار لهذا الدرس بعد"*.
+
+---
+
+## 🏁 أمر البدء بالتنفيذ (Execution Command)
+
+بمجرد مراجعة واعتماد هذه الخطة من قِبل المستخدم، يمكن البدء في تنفيذ الخطوات فوراً عبر الأمر:
+```bash
+/executing-plans
 ```
-
-#### 🧪 معايير القبول والتحقق:
-- تشغيل `dotnet build` والتأكد من نجاحه بـ 0 أخطاء.
-
----
-
-## 🚀 خطة التحقق الشاملة للمنظومة (Full System Smoke Test)
-
-1. **الباك إند (.NET):** `dotnet build`
-2. **الفرونت إند (Angular):** `npm run build`
-3. **سيناريو المستخدم المتكامل:**
-   - تسجيل الدخول ➔ استلام الـ Refresh Token.
-   - فتح شات المساعد الذكي ➔ فحص الجاهزية تلقائياً وعرض الشات الأخضر.
-   - سحب نافذة الشات بالماوس بحرية على الشاشة.
-   - طرح سؤال ➔ استلام المصادر أولاً ثم استلام النص بالدفق الحي.
-   - عرض شارة الـ Provenance (كاش أو توليد حي مع المللي ثانية).
-   - تجربة انتهاء التوكن (401) ➔ التجديد الصامت التلقائي واستمرار الشات دون أي رسالة خطأ للمستخدم.

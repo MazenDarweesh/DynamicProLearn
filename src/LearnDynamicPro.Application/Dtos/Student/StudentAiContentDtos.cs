@@ -34,3 +34,45 @@ public class StudentLessonSummaryDto
     public string Overview { get; set; } = string.Empty;
     public List<StudentSummaryTopicDto> Topics { get; set; } = new();
 }
+
+public class CheckQuizAnswerRequest
+{
+    public int QuestionNumber { get; set; }
+    public string SelectedOptionId { get; set; } = string.Empty;
+}
+
+public class QuestionEvaluationResultDto
+{
+    public int QuestionNumber { get; set; }
+    public string SelectedOptionId { get; set; } = string.Empty;
+    public bool IsCorrect { get; set; }
+    public string CorrectAnswerId { get; set; } = string.Empty;
+    public string Explanation { get; set; } = string.Empty;
+}
+
+public class StudentQuizStateDto
+{
+    public Guid LessonId { get; set; }
+    public int TotalQuestions { get; set; }
+    public int AnsweredCount { get; set; }
+    public int CorrectCount { get; set; }
+    public double ScorePercentage { get; set; }
+    public bool IsCompleted { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    public List<QuestionEvaluationResultDto> AnsweredQuestions { get; set; } = new();
+}
+
+public class SubmitQuizRequest
+{
+    public List<CheckQuizAnswerRequest>? Answers { get; set; }
+}
+
+public class QuizSubmissionResultDto
+{
+    public int TotalQuestions { get; set; }
+    public int CorrectCount { get; set; }
+    public double ScorePercentage { get; set; }
+    public bool Passed { get; set; }
+    public List<QuestionEvaluationResultDto> Results { get; set; } = new();
+}
+

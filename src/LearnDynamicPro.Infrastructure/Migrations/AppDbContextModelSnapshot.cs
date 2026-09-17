@@ -531,6 +531,61 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                     b.ToTable("Modules");
                 });
 
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.StudentQuizProgress", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("CorrectCount")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("CreatedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsCompleted")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("LastAccessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("LastModifiedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("LastModifiedBy")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<Guid>("LessonId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<double>("ScorePercentage")
+                        .HasColumnType("float");
+
+                    b.Property<int>("TotalQuestions")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("LessonId");
+
+                    b.HasIndex("UserId", "LessonId")
+                        .IsUnique();
+
+                    b.ToTable("StudentQuizProgresses");
+                });
+
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TesterActiveVersion", b =>
                 {
                     b.Property<Guid>("UserId")
@@ -1053,6 +1108,61 @@ namespace LearnDynamicPro.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("CreatedByAdmin");
+                });
+
+            modelBuilder.Entity("LearnDynamicPro.Domain.Entities.StudentQuizProgress", b =>
+                {
+                    b.HasOne("LearnDynamicPro.Domain.Entities.Lesson", "Lesson")
+                        .WithMany()
+                        .HasForeignKey("LessonId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("LearnDynamicPro.Domain.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.OwnsMany("LearnDynamicPro.Domain.Entities.AI.StudentQuizAnswerState", "Answers", b1 =>
+                        {
+                            b1.Property<Guid>("StudentQuizProgressId");
+
+                            b1.Property<int>("__synthesizedOrdinal")
+                                .ValueGeneratedOnAddOrUpdate();
+
+                            b1.Property<DateTime>("AnsweredAt");
+
+                            b1.Property<string>("CorrectAnswerId")
+                                .IsRequired();
+
+                            b1.Property<string>("Explanation")
+                                .IsRequired();
+
+                            b1.Property<bool>("IsCorrect");
+
+                            b1.Property<int>("QuestionNumber");
+
+                            b1.Property<string>("SelectedOptionId")
+                                .IsRequired();
+
+                            b1.HasKey("StudentQuizProgressId", "__synthesizedOrdinal");
+
+                            b1.ToTable("StudentQuizProgresses");
+
+                            b1
+                                .ToJson("Answers")
+                                .HasColumnType("nvarchar(max)");
+
+                            b1.WithOwner()
+                                .HasForeignKey("StudentQuizProgressId");
+                        });
+
+                    b.Navigation("Answers");
+
+                    b.Navigation("Lesson");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("LearnDynamicPro.Domain.Entities.TesterActiveVersion", b =>

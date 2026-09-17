@@ -24,6 +24,8 @@ export interface LessonDto {
   levelOrderIndex: number;
   levelSortOrder: number;
   isCompleted: boolean;
+  hasQuiz?: boolean;
+  hasSummary?: boolean;
   pdfUrl?: string;
   externalLink?: string;
   erpKey?: string;
@@ -33,6 +35,70 @@ export interface LessonDetailDto extends LessonDto {
   videoUrl: string;
   pdfUrl?: string;
   externalLink?: string;
+}
+
+export interface StudentQuizOptionDto {
+  optionId: string;
+  text: string;
+}
+
+export interface StudentQuizQuestionDto {
+  questionNumber: number;
+  questionText: string;
+  options: StudentQuizOptionDto[];
+}
+
+export interface StudentLessonQuizDto {
+  lessonId: string;
+  questions: StudentQuizQuestionDto[];
+}
+
+export interface StudentSummaryTopicDto {
+  topicName: string;
+  explanation: string;
+  keyPoints: string[];
+}
+
+export interface StudentLessonSummaryDto {
+  lessonId: string;
+  overview: string;
+  topics: StudentSummaryTopicDto[];
+}
+
+export interface CheckQuizAnswerRequest {
+  questionNumber: number;
+  selectedOptionId: string;
+}
+
+export interface QuestionEvaluationResultDto {
+  questionNumber: number;
+  selectedOptionId: string;
+  isCorrect: boolean;
+  correctAnswerId: string;
+  explanation: string;
+}
+
+export interface StudentQuizStateDto {
+  lessonId: string;
+  totalQuestions: number;
+  answeredCount: number;
+  correctCount: number;
+  scorePercentage: number;
+  isCompleted: boolean;
+  completedAt?: string | null;
+  answeredQuestions: QuestionEvaluationResultDto[];
+}
+
+export interface SubmitQuizRequest {
+  answers?: CheckQuizAnswerRequest[];
+}
+
+export interface QuizSubmissionResultDto {
+  totalQuestions: number;
+  correctCount: number;
+  scorePercentage: number;
+  passed: boolean;
+  results: QuestionEvaluationResultDto[];
 }
 
 @Injectable({
@@ -82,11 +148,27 @@ export class StudentService {
     return this.http.get<any>(`${this.apiUrl}/next-lesson`);
   }
 
-  getLessonQuiz(lessonId: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/lessons/${lessonId}/quiz`);
+  getLessonQuiz(lessonId: string): Observable<StudentLessonQuizDto> {
+    return this.http.get<StudentLessonQuizDto>(`${this.apiUrl}/lessons/${lessonId}/quiz`);
   }
 
-  getLessonSummary(lessonId: string): Observable<any> {
-    return this.http.get<any>(`${this.apiUrl}/lessons/${lessonId}/summary`);
+  getLessonSummary(lessonId: string): Observable<StudentLessonSummaryDto> {
+    return this.http.get<StudentLessonSummaryDto>(`${this.apiUrl}/lessons/${lessonId}/summary`);
+  }
+
+  getQuizState(lessonId: string): Observable<StudentQuizStateDto> {
+    return this.http.get<StudentQuizStateDto>(`${this.apiUrl}/lessons/${lessonId}/quiz/state`);
+  }
+
+  checkQuizAnswer(lessonId: string, req: CheckQuizAnswerRequest): Observable<QuestionEvaluationResultDto> {
+    return this.http.post<QuestionEvaluationResultDto>(`${this.apiUrl}/lessons/${lessonId}/quiz/check-answer`, req);
+  }
+
+  submitQuiz(lessonId: string, req?: SubmitQuizRequest): Observable<QuizSubmissionResultDto> {
+    return this.http.post<QuizSubmissionResultDto>(`${this.apiUrl}/lessons/${lessonId}/quiz/submit`, req || {});
+  }
+
+  resetQuiz(lessonId: string): Observable<boolean> {
+    return this.http.post<boolean>(`${this.apiUrl}/lessons/${lessonId}/quiz/reset`, {});
   }
 }

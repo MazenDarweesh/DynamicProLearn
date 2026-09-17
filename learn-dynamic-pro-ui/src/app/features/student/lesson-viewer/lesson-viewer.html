@@ -88,27 +88,52 @@
                     [class.active]="activeAiTab === 'quiz'" 
                     (click)="activeAiTab = 'quiz'">
               🧠 اختبار تقييم الفهم
-              <span *ngIf="quizData" class="tab-count-badge">{{ quizData.questions?.length }}</span>
+              <span *ngIf="quizData" class="tab-count-badge">{{ quizData.questions.length }}</span>
             </button>
           </div>
 
           <!-- Tab Content: Summary -->
           <div *ngIf="activeAiTab === 'summary'" class="ai-tab-panel">
             <div *ngIf="summaryData" class="ai-summary-container">
+              <div class="d-flex justify-between align-center mb-3">
+                <span class="text-secondary text-sm">تم إعداد هذا الملخص الذكي تلقائياً بناءً على محتوى المحاضرة</span>
+                <button class="btn-copy-summary" (click)="copySummaryToClipboard()" [class.copied]="copiedSummarySuccess">
+                  <span *ngIf="!copiedSummarySuccess">📋 نسخ الملخص للمذاكرة</span>
+                  <span *ngIf="copiedSummarySuccess">✅ تم النسخ بنجاح!</span>
+                </button>
+              </div>
+
+              <!-- Overview Card -->
               <div class="ai-overview-card mb-4">
                 <div class="d-flex align-center gap-2 mb-2">
-                  <span style="font-size: 20px;">💡</span>
+                  <span style="font-size: 22px;">💡</span>
                   <h3 class="overview-title">النظرة العامة على الدرس</h3>
                 </div>
                 <p class="overview-text">{{ summaryData.overview }}</p>
               </div>
 
+              <!-- Topics Breakdown -->
               <h4 class="topics-heading mb-3">🔹 أهم المفاهيم والمحاور المشروحة:</h4>
-              <div *ngFor="let topic of summaryData.topics" class="ai-topic-block mb-3">
-                <h5 class="topic-name">{{ topic.topicName }}</h5>
-                <ul class="topic-points">
-                  <li *ngFor="let pt of topic.keyPoints">{{ pt }}</li>
-                </ul>
+              <div *ngFor="let topic of summaryData.topics; let i = index" class="ai-topic-block mb-3">
+                <div class="d-flex align-center justify-between mb-2">
+                  <h5 class="topic-name">
+                    <span class="topic-index-badge">{{ i + 1 }}</span>
+                    {{ topic.topicName }}
+                  </h5>
+                </div>
+                
+                <!-- Topic Detailed Explanation -->
+                <p *ngIf="topic.explanation" class="topic-explanation-text">
+                  {{ topic.explanation }}
+                </p>
+
+                <!-- Key Points List -->
+                <div *ngIf="topic.keyPoints && topic.keyPoints.length > 0" class="topic-keypoints-wrap mt-2">
+                  <div class="keypoints-title">النقاط المستفادة:</div>
+                  <ul class="topic-points">
+                    <li *ngFor="let pt of topic.keyPoints">{{ pt }}</li>
+                  </ul>
+                </div>
               </div>
             </div>
 
@@ -119,40 +144,111 @@
             </div>
           </div>
 
-          <!-- Tab Content: Quiz -->
+          <!-- Tab Content: Quiz (Interactive Zero-Cheat & Server-Synced) -->
           <div *ngIf="activeAiTab === 'quiz'" class="ai-tab-panel">
-            <div *ngIf="quizData && quizData.questions?.length > 0" class="ai-quiz-container">
-              <div *ngFor="let q of quizData.questions" class="ai-student-q-card mb-3">
-                <div class="d-flex align-center gap-2 mb-3">
-                  <span class="student-q-badge">سؤال {{ q.questionNumber }}</span>
-                  <span class="student-q-text">{{ q.questionText }}</span>
+            <div *ngIf="quizData && quizData.questions.length > 0" class="ai-quiz-container">
+              
+              <!-- Resumed Attempt Banner -->
+              <div *ngIf="hasResumedAttempt" class="quiz-resumed-banner mb-3">
+                <span class="banner-icon">🔄</span>
+                <span>تم استعادة إجاباتك السابقة تلقائياً من الخادم؛ يمكنك متابعة حل باقي الأسئلة.</span>
+              </div>
+
+              <!-- Live Score & Progress Header -->
+              <div class="quiz-status-card mb-4">
+                <div class="d-flex justify-between align-center mb-2">
+                  <div class="d-flex align-center gap-2">
+                    <span class="status-label">إنجاز الاختبار:</span>
+                    <strong class="status-value">{{ totalAnswered }} / {{ quizData.questions.length }} أسئلة</strong>
+                  </div>
+                  <div class="d-flex align-center gap-2">
+                    <span class="status-label">الدرجة الحالية:</span>
+                    <strong class="status-score" [class.high-score]="scorePercentage >= 50" [class.low-score]="scorePercentage < 50 && totalAnswered > 0">
+                      {{ correctCount }} صحيحة ({{ scorePercentage }}%)
+                    </strong>
+                  </div>
+                </div>
+                <div class="quiz-progress-track">
+                  <div class="quiz-progress-fill" [style.width.%]="(totalAnswered / quizData.questions.length) * 100"></div>
+                </div>
+              </div>
+
+              <!-- Questions List -->
+              <div *ngFor="let q of quizData.questions" class="ai-student-q-card mb-3" [class.answered-card]="evaluations[q.questionNumber]">
+                <div class="d-flex align-center justify-between mb-3">
+                  <div class="d-flex align-center gap-2">
+                    <span class="student-q-badge">سؤال {{ q.questionNumber }}</span>
+                    <span class="student-q-text">{{ q.questionText }}</span>
+                  </div>
+                  
+                  <!-- Question Evaluation Result Badge -->
+                  <div *ngIf="evaluations[q.questionNumber]">
+                    <span *ngIf="evaluations[q.questionNumber].isCorrect" class="eval-badge correct">
+                      إجابة صحيحة ✅
+                    </span>
+                    <span *ngIf="!evaluations[q.questionNumber].isCorrect" class="eval-badge incorrect">
+                      إجابة خاطئة ❌
+                    </span>
+                  </div>
                 </div>
 
+                <!-- Answer Options List -->
                 <div class="student-options-list">
                   <div *ngFor="let opt of q.options" 
                        class="student-opt-row" 
                        [class.selected]="selectedOptions[q.questionNumber] === opt.optionId"
-                       (click)="selectOption(q.questionNumber, opt.optionId)">
+                       [class.correct-option]="evaluations[q.questionNumber] && evaluations[q.questionNumber].correctAnswerId === opt.optionId"
+                       [class.wrong-option]="evaluations[q.questionNumber] && !evaluations[q.questionNumber].isCorrect && selectedOptions[q.questionNumber] === opt.optionId"
+                       [class.disabled]="evaluations[q.questionNumber] || checkingQuestions[q.questionNumber] || quizCompleted"
+                       (click)="selectOptionAndCheck(q.questionNumber, opt.optionId)">
+                    
                     <span class="opt-radio">
-                      <span *ngIf="selectedOptions[q.questionNumber] === opt.optionId" class="radio-inner"></span>
+                      <span *ngIf="checkingQuestions[q.questionNumber] && selectedOptions[q.questionNumber] === opt.optionId" class="opt-spinner"></span>
+                      <span *ngIf="!checkingQuestions[q.questionNumber] && evaluations[q.questionNumber] && evaluations[q.questionNumber].correctAnswerId === opt.optionId" class="opt-status-icon">✓</span>
+                      <span *ngIf="!checkingQuestions[q.questionNumber] && evaluations[q.questionNumber] && !evaluations[q.questionNumber].isCorrect && selectedOptions[q.questionNumber] === opt.optionId" class="opt-status-icon">✗</span>
+                      <span *ngIf="!checkingQuestions[q.questionNumber] && !evaluations[q.questionNumber] && selectedOptions[q.questionNumber] === opt.optionId" class="radio-inner"></span>
                     </span>
+                    
                     <span class="opt-text">{{ opt.text }}</span>
                   </div>
                 </div>
+
+                <!-- Instant Explanation Reveal Box -->
+                <div *ngIf="evaluations[q.questionNumber]" class="explanation-box mt-3 slide-down">
+                  <div class="d-flex align-center gap-2 mb-1">
+                    <span class="exp-icon">💡</span>
+                    <strong class="exp-title">الشرح والتوضيح:</strong>
+                  </div>
+                  <p class="exp-text">{{ evaluations[q.questionNumber].explanation }}</p>
+                </div>
               </div>
 
-              <div class="d-flex justify-between align-center mt-4">
-                <button *ngIf="!quizSubmitted" 
-                        class="btn-accent" 
-                        (click)="submitQuiz()">
-                  ✅ تأكيد إجابات الاختبار وحفظ النتيجة
-                </button>
-                <button *ngIf="quizSubmitted" 
-                        class="btn-resource link-btn" 
-                        (click)="resetQuiz()">
-                  🔄 إعادة محاولة الاختبار
-                </button>
+              <!-- Completion Summary & Reset Actions -->
+              <div *ngIf="quizCompleted" class="quiz-completion-card mt-4 slide-down">
+                <div class="completion-header">
+                  <span class="trophy-icon">🏆</span>
+                  <h3 class="completion-title">اكتمل الاختبار بنجاح!</h3>
+                  <p class="completion-subtitle">
+                    درجتك النهائية هي <strong>{{ correctCount }}</strong> من أصل <strong>{{ quizData.questions.length }}</strong> (<strong>{{ scorePercentage }}%</strong>)
+                  </p>
+                  <p *ngIf="scorePercentage >= 50" class="completion-feedback success">
+                    🎉 ممتاز! لقد اجتزت اختبار هذا الدرس بنجاح، وتم تسجيل النتيجة في ملفك التعليمي.
+                  </p>
+                  <p *ngIf="scorePercentage < 50" class="completion-feedback retry">
+                    📚 يمكنك مراجعة الشروحات أعلاه وإعادة المحاولة لتحسين نتيجتك.
+                  </p>
+                </div>
+
+                <div class="d-flex justify-center align-center mt-3">
+                  <button class="btn-reset-quiz" 
+                          [disabled]="isResettingQuiz" 
+                          (click)="resetQuiz()">
+                    <span *ngIf="!isResettingQuiz">🔄 إعادة محاولة الاختبار</span>
+                    <span *ngIf="isResettingQuiz">جارٍ إعادة التعيين...</span>
+                  </button>
+                </div>
               </div>
+
             </div>
 
             <div *ngIf="!quizData && !isLoadingAi" class="ai-empty-box">

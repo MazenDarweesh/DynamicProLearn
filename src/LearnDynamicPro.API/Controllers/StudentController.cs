@@ -1,4 +1,5 @@
 using LearnDynamicPro.Application.Dtos.Progress;
+using LearnDynamicPro.Application.Dtos.Student;
 using LearnDynamicPro.Application.Features.Progress;
 using LearnDynamicPro.Application.Features.Student;
 using LearnDynamicPro.Application.Interfaces;
@@ -155,6 +156,71 @@ public class StudentController : ControllerBase
             return NotFound(result.Error);
         }
         _logger.LogInformation("[StudentAPI] GetLessonSummary OK | LessonId={LessonId}", lessonId);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("lessons/{lessonId}/quiz/state")]
+    public async Task<IActionResult> GetQuizState(Guid lessonId)
+    {
+        _logger.LogInformation("[StudentAPI] GetQuizState REQUEST | LessonId={LessonId} UserId={UserId}",
+            lessonId, _currentUserService.UserId);
+        var result = await _studentService.GetQuizStateAsync(lessonId, _currentUserService.UserId);
+        if (!result.IsSuccess)
+        {
+            if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+            {
+                _logger.LogWarning("[StudentAPI] GetQuizState FORBIDDEN | LessonId={LessonId} UserId={UserId}",
+                    lessonId, _currentUserService.UserId);
+                return Forbid(result.Error);
+            }
+            _logger.LogWarning("[StudentAPI] GetQuizState NOT_FOUND | LessonId={LessonId}", lessonId);
+            return NotFound(result.Error);
+        }
+        return Ok(result.Value);
+    }
+
+    [HttpPost("lessons/{lessonId}/quiz/check-answer")]
+    public async Task<IActionResult> CheckQuizAnswer(Guid lessonId, [FromBody] CheckQuizAnswerRequest request)
+    {
+        _logger.LogInformation("[StudentAPI] CheckQuizAnswer REQUEST | LessonId={LessonId} QNum={QNum} UserId={UserId}",
+            lessonId, request.QuestionNumber, _currentUserService.UserId);
+        var result = await _studentService.CheckQuizAnswerAsync(lessonId, request, _currentUserService.UserId);
+        if (!result.IsSuccess)
+        {
+            if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+                return Forbid(result.Error);
+            return BadRequest(result.Error);
+        }
+        return Ok(result.Value);
+    }
+
+    [HttpPost("lessons/{lessonId}/quiz/submit")]
+    public async Task<IActionResult> SubmitQuiz(Guid lessonId, [FromBody] SubmitQuizRequest request)
+    {
+        _logger.LogInformation("[StudentAPI] SubmitQuiz REQUEST | LessonId={LessonId} UserId={UserId}",
+            lessonId, _currentUserService.UserId);
+        var result = await _studentService.SubmitQuizAsync(lessonId, request, _currentUserService.UserId);
+        if (!result.IsSuccess)
+        {
+            if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+                return Forbid(result.Error);
+            return BadRequest(result.Error);
+        }
+        return Ok(result.Value);
+    }
+
+    [HttpPost("lessons/{lessonId}/quiz/reset")]
+    public async Task<IActionResult> ResetQuiz(Guid lessonId)
+    {
+        _logger.LogInformation("[StudentAPI] ResetQuiz REQUEST | LessonId={LessonId} UserId={UserId}",
+            lessonId, _currentUserService.UserId);
+        var result = await _studentService.ResetQuizAsync(lessonId, _currentUserService.UserId);
+        if (!result.IsSuccess)
+        {
+            if (result.Error == LearnDynamicPro.Application.Common.AppErrors.Authorization.AccessDenied)
+                return Forbid(result.Error);
+            return BadRequest(result.Error);
+        }
         return Ok(result.Value);
     }
 }

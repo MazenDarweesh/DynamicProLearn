@@ -38,6 +38,21 @@
   color: var(--color-primary); 
   font-weight: 600; 
 }
+
+.ai-badge-indicator {
+  font-size: 13px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  margin-right: 4px;
+  opacity: 0.85;
+  transition: transform 0.15s ease;
+}
+
+.lesson-item:hover .ai-badge-indicator {
+  transform: scale(1.15);
+  opacity: 1;
+}
 .lesson-status {
   width: 18px;
   height: 18px;

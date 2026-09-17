@@ -220,6 +220,8 @@ npm start
 
 ## 📚 Documentation Index
 
+- [📘 Project Overview & Business Spec](docs/PROJECT_OVERVIEW.md) — Comprehensive business goals, user personas, and complete functional specification.
+- [🎯 Technical Interview Preparation](docs/INTERVIEW_PREP.md) — Architectural defense questions, system design deep-dives, and STAR behavioral scenarios.
 - [🏛️ Architecture Blueprint](docs/ARCHITECTURE.md) — Comprehensive design, data flow diagrams, and security specifications.
 - [📡 REST API Reference](docs/API_REFERENCE.md) — Exhaustive contract specifications for all 40+ endpoints.
 - [🤝 AI Co-Pilot Handoff Brief](AI_COPILOT_HANDOFF_BRIEF.md) — Coordination guide between .NET/Angular and the Python AI engine.

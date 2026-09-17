@@ -2,7 +2,16 @@ import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
-import { StudentService, UnitDto, LessonDto, LessonDetailDto } from '../../../core/services/student.service';
+import { 
+  StudentService, 
+  UnitDto, 
+  LessonDto, 
+  LessonDetailDto,
+  StudentLessonQuizDto,
+  StudentLessonSummaryDto,
+  StudentQuizStateDto,
+  QuestionEvaluationResultDto 
+} from '../../../core/services/student.service';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { LessonSidebarComponent } from '../../../shared/components/lesson-sidebar/lesson-sidebar.component';
@@ -34,10 +43,24 @@ export class LessonViewer implements OnInit {
   // ── AI Smart Content State ───────────────────────────────────────────────
   activeAiTab: 'summary' | 'quiz' = 'summary';
   isLoadingAi = false;
-  quizData: any = null;
-  summaryData: any = null;
+  quizData: StudentLessonQuizDto | null = null;
+  summaryData: StudentLessonSummaryDto | null = null;
+  quizState: StudentQuizStateDto | null = null;
+
   selectedOptions: { [questionNumber: number]: string } = {};
-  quizSubmitted = false;
+  evaluations: { [questionNumber: number]: QuestionEvaluationResultDto } = {};
+  checkingQuestions: { [questionNumber: number]: boolean } = {};
+
+  correctCount = 0;
+  totalAnswered = 0;
+  scorePercentage = 0;
+  quizCompleted = false;
+  isResettingQuiz = false;
+  hasResumedAttempt = false;
+
+  // Summary copy state
+  isCopyingSummary = false;
+  copiedSummarySuccess = false;
 
   ngOnInit() {
     const moduleId = this.route.snapshot.paramMap.get('id');
@@ -79,8 +102,15 @@ export class LessonViewer implements OnInit {
     this.isLoadingLesson = true;
     this.quizData = null;
     this.summaryData = null;
+    this.quizState = null;
     this.selectedOptions = {};
-    this.quizSubmitted = false;
+    this.evaluations = {};
+    this.checkingQuestions = {};
+    this.correctCount = 0;
+    this.totalAnswered = 0;
+    this.scorePercentage = 0;
+    this.quizCompleted = false;
+    this.hasResumedAttempt = false;
 
     this.studentService.getLessonDetail(lessonId).subscribe({
       next: (detail: any) => {
@@ -117,35 +147,133 @@ export class LessonViewer implements OnInit {
       error: () => this.summaryData = null
     });
 
-    // 2. Fetch Quiz
+    // 2. Fetch Quiz & Quiz State for Cross-Device Resumption
     this.studentService.getLessonQuiz(lessonId).subscribe({
-      next: (data) => this.quizData = data,
+      next: (quiz) => {
+        this.quizData = quiz;
+        
+        // Check student's persistent progress state from SQL Server
+        this.studentService.getQuizState(lessonId).subscribe({
+          next: (state) => {
+            this.quizState = state;
+            if (state && state.answeredQuestions && state.answeredQuestions.length > 0) {
+              this.hasResumedAttempt = true;
+              this.correctCount = state.correctCount;
+              this.totalAnswered = state.answeredCount;
+              this.scorePercentage = state.scorePercentage;
+              this.quizCompleted = state.isCompleted;
+
+              // Restore each answered question into evaluations and selectedOptions
+              for (const ans of state.answeredQuestions) {
+                this.evaluations[ans.questionNumber] = ans;
+                this.selectedOptions[ans.questionNumber] = ans.selectedOptionId;
+              }
+            }
+          },
+          error: (err) => console.warn('Could not fetch quiz state', err)
+        });
+      },
       error: () => this.quizData = null,
       complete: () => this.isLoadingAi = false
     });
   }
 
-  selectOption(questionNumber: number, optionId: string) {
-    if (this.quizSubmitted) return;
-    this.selectedOptions[questionNumber] = optionId;
-  }
-
-  submitQuiz() {
-    if (!this.quizData || !this.quizData.questions) return;
-    
-    const answeredCount = Object.keys(this.selectedOptions).length;
-    if (answeredCount < this.quizData.questions.length) {
-      Dialog.alert('يرجى الإجابة على جميع الأسئلة قبل تأكيد الاختبار.', 'اختبار غير مكتمل', 'info');
+  selectOptionAndCheck(questionNumber: number, optionId: string) {
+    if (!this.activeLesson) return;
+    // Locking mutex: prevent changing answer if already evaluated, checking, or completed
+    if (this.evaluations[questionNumber] || this.checkingQuestions[questionNumber] || this.quizCompleted) {
       return;
     }
 
-    this.quizSubmitted = true;
-    Dialog.alert('تم استلام إجاباتك بنجاح! يمكنك الآن مراجعة إجاباتك وتثبيت الفهم.', 'أحسنت!', 'success');
+    this.selectedOptions[questionNumber] = optionId;
+    this.checkingQuestions[questionNumber] = true;
+
+    this.studentService.checkQuizAnswer(this.activeLesson.id, {
+      questionNumber,
+      selectedOptionId: optionId
+    }).subscribe({
+      next: (res) => {
+        this.evaluations[questionNumber] = res;
+        if (res.isCorrect) {
+          this.correctCount++;
+        }
+        this.totalAnswered++;
+
+        const total = this.quizData?.questions?.length || 1;
+        this.scorePercentage = Math.round((this.correctCount * 100) / total);
+
+        // Auto-finalize if all questions are answered
+        if (this.totalAnswered >= total) {
+          this.quizCompleted = true;
+          this.studentService.submitQuiz(this.activeLesson!.id).subscribe();
+        }
+        this.checkingQuestions[questionNumber] = false;
+      },
+      error: (err) => {
+        console.error('Failed to evaluate answer', err);
+        delete this.selectedOptions[questionNumber];
+        this.checkingQuestions[questionNumber] = false;
+        Dialog.alert('حدث خطأ أثناء فحص الإجابة. يرجى المحاولة مرة أخرى.', 'خطأ', 'error');
+      }
+    });
   }
 
   resetQuiz() {
-    this.selectedOptions = {};
-    this.quizSubmitted = false;
+    if (!this.activeLesson) return;
+
+    if (!confirm('هل أنت متأكد من رغبتك في إعادة بدء الاختبار من الصفر؟ ستتم إعادة تعيين نتيجتك.')) {
+      return;
+    }
+
+    this.isResettingQuiz = true;
+    this.studentService.resetQuiz(this.activeLesson.id).subscribe({
+      next: () => {
+        this.selectedOptions = {};
+        this.evaluations = {};
+        this.checkingQuestions = {};
+        this.correctCount = 0;
+        this.totalAnswered = 0;
+        this.scorePercentage = 0;
+        this.quizCompleted = false;
+        this.hasResumedAttempt = false;
+        this.isResettingQuiz = false;
+        Dialog.alert('تمت إعادة تهيئة الاختبار بنجاح. حظاً موفقاً!', 'تمت الإعادة', 'success');
+      },
+      error: (err) => {
+        console.error('Failed to reset quiz', err);
+        this.isResettingQuiz = false;
+        Dialog.alert('فشل في إعادة ضبط الاختبار. يرجى المحاولة لاحقاً.', 'خطأ', 'error');
+      }
+    });
+  }
+
+  copySummaryToClipboard() {
+    if (!this.summaryData) return;
+
+    let text = `📌 ملخص درس: ${this.activeLesson?.title || ''}\n\n`;
+    text += `💡 نظرة عامة:\n${this.summaryData.overview}\n\n`;
+    text += `🔹 المحاور الرئيسية والملخص:\n`;
+    
+    for (const topic of this.summaryData.topics) {
+      text += `\n▪️ ${topic.topicName}\n`;
+      if (topic.explanation) {
+        text += `   الشرح: ${topic.explanation}\n`;
+      }
+      if (topic.keyPoints && topic.keyPoints.length > 0) {
+        text += `   النقاط الجوهرية:\n`;
+        for (const pt of topic.keyPoints) {
+          text += `   - ${pt}\n`;
+        }
+      }
+    }
+
+    navigator.clipboard.writeText(text).then(() => {
+      this.copiedSummarySuccess = true;
+      setTimeout(() => this.copiedSummarySuccess = false, 3000);
+    }).catch(err => {
+      console.error('Failed to copy to clipboard', err);
+      Dialog.alert('تعذر نسخ الملخص إلى الحافظة.', 'تنبيه', 'info');
+    });
   }
 
   goBack() {
