@@ -76,3 +76,41 @@ public class QuizSubmissionResultDto
     public List<QuestionEvaluationResultDto> Results { get; set; } = new();
 }
 
+public class CopilotFilterOptionDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public int SortOrder { get; set; }
+}
+
+public class CopilotFilterLessonDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public Guid LevelId { get; set; }
+    public Guid TypeId { get; set; }
+}
+
+public class CopilotFilterUnitDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public List<CopilotFilterLessonDto> Lessons { get; set; } = new();
+}
+
+public class CopilotFilterModuleDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Code { get; set; } = string.Empty;
+    public List<CopilotFilterUnitDto> Units { get; set; } = new();
+}
+
+public class StudentCopilotFilterDataDto
+{
+    public List<CopilotFilterModuleDto> Modules { get; set; } = new();
+    public List<CopilotFilterOptionDto> Levels { get; set; } = new();
+    public List<CopilotFilterOptionDto> Types { get; set; } = new();
+}
+
+

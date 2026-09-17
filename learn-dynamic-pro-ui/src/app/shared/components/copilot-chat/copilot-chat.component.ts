@@ -1,11 +1,13 @@
-import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy } from '@angular/core';
+import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
-import { CopilotService, CopilotSource, CopilotFeedbackRequest } from '../../../core/services/copilot.service';
+import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState } from '../../../core/services/copilot.service';
 import { AuthService } from '../../../core/services/auth.service';
+import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 
 export interface ChatMessage {
   sender: 'user' | 'assistant';
@@ -20,6 +22,7 @@ export interface ChatMessage {
   isStreaming?: boolean;
   threadId?: string;
   lessonId?: string;
+  filters?: CopilotFilterState;
   /** Stores the original user question paired with this assistant response */
   relatedUserQuery?: string;
   isRetrying?: boolean;
@@ -31,12 +34,13 @@ export interface ChatMessage {
 @Component({
   selector: 'app-copilot-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, MarkdownComponent, CdkDrag, CdkDragHandle],
+  imports: [CommonModule, FormsModule, MarkdownComponent, CdkDrag, CdkDragHandle, CopilotTopFilterBarComponent],
   templateUrl: './copilot-chat.component.html',
   styleUrls: ['./copilot-chat.component.css']
 })
-export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
+export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy {
   private copilotService = inject(CopilotService);
+  private router = inject(Router);
   authService = inject(AuthService);
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
@@ -47,6 +51,12 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
   isStreaming = false;
   isClearingCache = false;
   clearCacheStatus: 'idle' | 'success' | 'error' = 'idle';
+
+  // ── Smart Top Filter Bar State ───────────────────────────────────────────
+  activeFilter: CopilotFilterState = { scope: 'all' };
+  activeLessonId?: string;
+  isFilterBarCollapsed = false;
+  private lessonSub?: Subscription;
 
   isAiReady = true;
   isWarmingUp = false;
@@ -70,21 +80,58 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
     }
   ];
 
+  ngOnInit() {
+    this.lessonSub = this.copilotService.activeLessonId$.subscribe(lessonId => {
+      if (lessonId) {
+        this.activeLessonId = lessonId;
+      }
+    });
+    this.detectLessonFromRoute();
+  }
+
   ngAfterViewChecked() {
     this.scrollToBottom();
   }
 
   ngOnDestroy() {
     this.stopReadinessPolling();
+    this.lessonSub?.unsubscribe();
   }
 
   toggleChat() {
     this.isOpen = !this.isOpen;
     if (this.isOpen) {
       this.isMinimized = false;
+      this.detectLessonFromRoute();
       this.checkAiReadiness();
     } else {
       this.stopReadinessPolling();
+    }
+  }
+
+  onFilterChange(newFilter: CopilotFilterState) {
+    this.activeFilter = newFilter;
+  }
+
+  onFilterCollapseChange(collapsed: boolean) {
+    this.isFilterBarCollapsed = collapsed;
+  }
+
+  detectLessonFromRoute() {
+    try {
+      const url = this.router.url;
+      const queryParams = new URLSearchParams(window.location.search);
+      const queryLessonId = queryParams.get('lessonId');
+      if (queryLessonId) {
+        this.activeLessonId = queryLessonId;
+        return;
+      }
+      const match = url.match(/\/lessons\/([a-f0-9\-]{36})/i);
+      if (match && match[1]) {
+        this.activeLessonId = match[1];
+      }
+    } catch (e) {
+      // Safe fallback
     }
   }
 
@@ -335,12 +382,14 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
       text: '',
       sources: [],
       isStreaming: true,
-      relatedUserQuery: query
+      relatedUserQuery: query,
+      filters: { ...this.activeFilter },
+      lessonId: this.activeFilter.lessonId
     });
 
     await this.copilotService.streamSearch(
       query,
-      undefined,
+      this.activeFilter.lessonId,
       (sources: CopilotSource[]) => {
         this.messages[assistantMsgIndex].sources = this.deduplicateSources(sources);
       },
@@ -366,7 +415,8 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
         this.messages[assistantMsgIndex].isRetrying = false;
         this.isStreaming = false;
       },
-      skipCache
+      skipCache,
+      this.activeFilter
     );
   }
 
@@ -419,7 +469,8 @@ export class CopilotChatComponent implements AfterViewChecked, OnDestroy {
         msg.isRetrying = false;
         this.isStreaming = false;
       },
-      true   // skip_cache = true
+      true,   // skip_cache = true
+      msg.filters || this.activeFilter
     );
   }
 

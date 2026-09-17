@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, firstValueFrom } from 'rxjs';
+import { Observable, firstValueFrom, shareReplay, BehaviorSubject } from 'rxjs';
 import { AuthService } from './auth.service';
 
 export interface CopilotSource {
@@ -37,6 +37,47 @@ export interface AiReadinessResponse {
   environment?: string;
 }
 
+export interface CopilotFilterOption {
+  id: string;
+  name: string;
+  sortOrder: number;
+}
+
+export interface CopilotFilterLesson {
+  id: string;
+  title: string;
+  levelId: string;
+  typeId: string;
+}
+
+export interface CopilotFilterUnit {
+  id: string;
+  title: string;
+  lessons: CopilotFilterLesson[];
+}
+
+export interface CopilotFilterModule {
+  id: string;
+  title: string;
+  code: string;
+  units: CopilotFilterUnit[];
+}
+
+export interface StudentCopilotFilterData {
+  modules: CopilotFilterModule[];
+  levels: CopilotFilterOption[];
+  types: CopilotFilterOption[];
+}
+
+export interface CopilotFilterState {
+  scope: 'all' | 'module' | 'unit' | 'lesson';
+  moduleId?: string;
+  unitId?: string;
+  lessonId?: string;
+  levelId?: string;
+  typeId?: string;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -45,9 +86,30 @@ export class CopilotService {
   private authService = inject(AuthService);
 
   private aiBaseUrl = 'http://localhost:8000';
+  private filterData$?: Observable<StudentCopilotFilterData>;
+
+  private activeLessonIdSubject = new BehaviorSubject<string | undefined>(undefined);
+  activeLessonId$ = this.activeLessonIdSubject.asObservable();
+
+  setActiveLessonId(lessonId: string | undefined) {
+    this.activeLessonIdSubject.next(lessonId);
+  }
 
   checkReadiness(): Observable<AiReadinessResponse> {
     return this.http.get<AiReadinessResponse>(`${this.aiBaseUrl}/v1/ready`);
+  }
+
+  /**
+   * Fetches the student's authorized modules, units, lessons, levels, and types tree.
+   * Cached with shareReplay(1) so subsequent calls do not repeat the HTTP request.
+   */
+  getCopilotFilters(forceRefresh = false): Observable<StudentCopilotFilterData> {
+    if (!this.filterData$ || forceRefresh) {
+      this.filterData$ = this.http.get<StudentCopilotFilterData>('/api/student/copilot-filters').pipe(
+        shareReplay(1)
+      );
+    }
+    return this.filterData$;
   }
 
   async streamSearch(
@@ -57,22 +119,53 @@ export class CopilotService {
     onToken?: (token: string) => void,
     onDone?: (meta?: any) => void,
     onError?: (err: any) => void,
-    skipCache: boolean = false
+    skipCache: boolean = false,
+    filters?: CopilotFilterState,
+    threadId?: string
   ): Promise<void> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
 
     const payload: Record<string, any> = {
       query: query,
-      lesson_id: lessonId || null,
-      scope: lessonId ? 'lesson' : 'global'
+      skip_cache: skipCache,
+      skipCache: skipCache
     };
 
-    if (skipCache) {
-      payload['skip_cache'] = true;
+    if (threadId) {
+      payload['thread_id'] = threadId;
+      payload['threadId'] = threadId;
+    }
+
+    if (filters) {
+      payload['scope'] = filters.scope;
+      if (filters.moduleId) {
+        payload['module_id'] = filters.moduleId;
+        payload['moduleId'] = filters.moduleId;
+      }
+      if (filters.unitId) {
+        payload['unit_id'] = filters.unitId;
+        payload['unitId'] = filters.unitId;
+      }
+      if (filters.lessonId) {
+        payload['lesson_id'] = filters.lessonId;
+        payload['lessonId'] = filters.lessonId;
+      }
+      if (filters.levelId) {
+        payload['level_id'] = filters.levelId;
+        payload['levelId'] = filters.levelId;
+      }
+      if (filters.typeId) {
+        payload['type_id'] = filters.typeId;
+        payload['typeId'] = filters.typeId;
+      }
+    } else {
+      payload['lesson_id'] = lessonId || null;
+      payload['lessonId'] = lessonId || null;
+      payload['scope'] = lessonId ? 'lesson' : 'all';
     }
 
     const startTime = Date.now();
-    console.info('%c[CoPilot SSE] STREAM_START', 'color:#6366f1;font-weight:bold', { query, lessonId });
+    console.info('%c[CoPilot SSE] STREAM_START', 'color:#6366f1;font-weight:bold', { query, lessonId, filters });
 
     try {
       let activeResponse = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {

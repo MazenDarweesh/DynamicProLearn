@@ -15,8 +15,12 @@ import {
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { LessonSidebarComponent } from '../../../shared/components/lesson-sidebar/lesson-sidebar.component';
+import { CopilotService } from '../../../core/services/copilot.service';
 
-export interface UnitWithLessons extends UnitDto {
+export interface UnitWithLessons {
+  id: string;
+  name: string;
+  orderIndex: number;
   lessons: LessonDto[];
 }
 
@@ -32,6 +36,7 @@ export class LessonViewer implements OnInit {
   private route = inject(ActivatedRoute);
   private sanitizer = inject(DomSanitizer);
   private studentService = inject(StudentService);
+  private copilotService = inject(CopilotService);
   
   units: UnitWithLessons[] = [];
   isLoading = true;
@@ -100,6 +105,7 @@ export class LessonViewer implements OnInit {
   
   loadLesson(lessonId: string) {
     this.isLoadingLesson = true;
+    this.copilotService.setActiveLessonId(lessonId);
     this.quizData = null;
     this.summaryData = null;
     this.quizState = null;

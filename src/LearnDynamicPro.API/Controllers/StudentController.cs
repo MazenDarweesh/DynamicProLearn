@@ -40,6 +40,15 @@ public class StudentController : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpGet("copilot-filters")]
+    public async Task<IActionResult> GetCopilotFilters()
+    {
+        _logger.LogInformation("[StudentAPI] GetCopilotFilters REQUEST | UserId={UserId}", _currentUserService.UserId);
+        var result = await _studentService.GetCopilotFiltersAsync(_currentUserService.UserId);
+        if (!result.IsSuccess) return BadRequest(result.Error);
+        return Ok(result.Value);
+    }
+
     [HttpGet("modules/{moduleId}/units")]
     public async Task<IActionResult> GetUnits(Guid moduleId)
     {
@@ -228,3 +237,5 @@ public class StudentController : ControllerBase
         return Ok(result.Value);
     }
 }
+
+

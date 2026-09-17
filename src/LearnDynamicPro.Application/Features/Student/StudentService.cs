@@ -902,6 +902,130 @@ public class StudentService : IStudentService
         return Result<bool>.Success(true);
     }
 
+    public async Task<Result<StudentCopilotFilterDataDto>> GetCopilotFiltersAsync(Guid userId)
+    {
+        var userInfo = await _unitOfWork.Repository<User>().Query()
+            .AsNoTracking()
+            .Where(u => u.Id == userId)
+            .Select(u => new { u.DepartmentId, u.Role })
+            .FirstOrDefaultAsync();
+
+        if (userInfo == null)
+            return Result<StudentCopilotFilterDataDto>.Failure(AppErrors.Authentication.UserNotFound);
+
+        IQueryable<Lesson> accessibleLessonsQuery;
+
+        if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+        {
+            var assignedModuleIds = await _unitOfWork.Repository<VersionTester>().Query()
+                .AsNoTracking()
+                .Where(tc => tc.TesterId == userId)
+                .SelectMany(tc => tc.AssignedModules)
+                .Select(am => am.ModuleId)
+                .ToListAsync();
+
+            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Where(l => assignedModuleIds.Contains(l.Unit!.ModuleId));
+        }
+        else
+        {
+            var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+                .Where(a => a.DepartmentId == userInfo.DepartmentId);
+
+            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Where(l => assignments.Any(a =>
+                    a.ModuleId == l.Unit!.ModuleId &&
+                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))
+                ));
+        }
+
+        // 1. Single efficient projection of accessible lessons with Unit and Module details
+        var lessonItems = await accessibleLessonsQuery
+            .Select(l => new
+            {
+                LessonId = l.Id,
+                LessonTitle = l.Title,
+                l.LevelId,
+                l.TypeId,
+                l.OrderIndex,
+                l.LevelOrderIndex,
+                UnitId = l.UnitId,
+                UnitTitle = l.Unit!.Name,
+                UnitOrder = l.Unit.OrderIndex,
+                ModuleId = l.Unit.ModuleId,
+                ModuleTitle = l.Unit.Module!.Name,
+                ModuleCode = string.Empty
+            })
+            .ToListAsync();
+
+        // 2. Group into Modules -> Units -> Lessons hierarchy in memory
+        var modulesDto = lessonItems
+            .GroupBy(x => new { x.ModuleId, x.ModuleTitle, x.ModuleCode })
+            .Select(mGroup => new CopilotFilterModuleDto
+            {
+                Id = mGroup.Key.ModuleId,
+                Title = mGroup.Key.ModuleTitle,
+                Code = mGroup.Key.ModuleCode,
+                Units = mGroup
+                    .GroupBy(u => new { u.UnitId, u.UnitTitle, u.UnitOrder })
+                    .OrderBy(u => u.Key.UnitOrder)
+                    .Select(uGroup => new CopilotFilterUnitDto
+                    {
+                        Id = uGroup.Key.UnitId,
+                        Title = uGroup.Key.UnitTitle,
+                        Lessons = uGroup
+                            .OrderBy(l => l.LevelOrderIndex)
+                            .ThenBy(l => l.OrderIndex)
+                            .Select(l => new CopilotFilterLessonDto
+                            {
+                                Id = l.LessonId,
+                                Title = l.LessonTitle,
+                                LevelId = l.LevelId,
+                                TypeId = l.TypeId
+                            })
+                            .ToList()
+                    })
+                    .ToList()
+            })
+            .OrderBy(m => m.Title)
+            .ToList();
+
+        // 3. Fetch LevelOptions and TypeOptions
+        var levelsDto = await _context.LevelOptions
+            .AsNoTracking()
+            .OrderBy(l => l.SortOrder)
+            .Select(l => new CopilotFilterOptionDto
+            {
+                Id = l.Id,
+                Name = l.Label,
+                SortOrder = l.SortOrder
+            })
+            .ToListAsync();
+
+        var typesDto = await _context.TypeOptions
+            .AsNoTracking()
+            .OrderBy(t => t.Label)
+            .Select(t => new CopilotFilterOptionDto
+            {
+                Id = t.Id,
+                Name = t.Label,
+                SortOrder = 0
+            })
+            .ToListAsync();
+
+        var filterData = new StudentCopilotFilterDataDto
+        {
+            Modules = modulesDto,
+            Levels = levelsDto,
+            Types = typesDto
+        };
+
+        return Result<StudentCopilotFilterDataDto>.Success(filterData);
+    }
+
     private async Task<Result<bool>> ValidateLessonAccessAsync(Guid lessonId, Guid userId)
     {
         var lesson = await _unitOfWork.Repository<Lesson>().Query()

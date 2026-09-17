@@ -1,0 +1,192 @@
+<div class="copilot-filter-bar" [class.collapsed]="isCollapsed">
+  <!-- ── Top Status & Summary Ribbon ────────────────────────────────────── -->
+  <div class="filter-ribbon">
+    <div class="ribbon-summary" (click)="onToggleCollapse()" title="انقر لتوسيع / طي الفلاتر">
+      <span class="ribbon-icon">🔍</span>
+      <span class="ribbon-title">نطاق البحث:</span>
+
+      <!-- Scope Pill -->
+      <span class="scope-pill" [ngClass]="currentFilter.scope">
+        <ng-container [ngSwitch]="currentFilter.scope">
+          <span *ngSwitchCase="'all'">🌐 كامل المحتوى</span>
+          <span *ngSwitchCase="'module'">📚 موديول: {{ selectedModuleName || 'اختر موديول' }}</span>
+          <span *ngSwitchCase="'unit'">📑 وحدة: {{ selectedUnitName || 'اختر وحدة' }}</span>
+          <span *ngSwitchCase="'lesson'">🎯 درس: {{ selectedLessonTitle || 'اختر درس' }}</span>
+        </ng-container>
+      </span>
+
+      <!-- Active Level/Type Badges -->
+      <span *ngIf="currentFilter.levelId" class="extra-pill level-pill">
+        🎖️ {{ selectedLevelName }}
+      </span>
+      <span *ngIf="currentFilter.typeId" class="extra-pill type-pill">
+        🏷️ {{ selectedTypeName }}
+      </span>
+
+      <span *ngIf="isAutoDetectedLesson" class="auto-badge" title="تم تحديد الدرس المتصفح حالياً تلقائياً">
+        ⚡ سياق نشط
+      </span>
+    </div>
+
+    <div class="ribbon-actions">
+      <!-- Reset button -->
+      <button *ngIf="hasActiveFilters()"
+              type="button"
+              class="btn-reset-filter"
+              (click)="resetAllFilters()"
+              title="إعادة تعيين كافة الفلاتر والبحث في الكل">
+        ↺ تصفير
+      </button>
+
+      <!-- Toggle Collapse -->
+      <button type="button"
+              class="btn-collapse"
+              (click)="onToggleCollapse()"
+              [title]="isCollapsed ? 'توسيع شريط الفلاتر' : 'طي شريط الفلاتر'">
+        {{ isCollapsed ? '▼' : '▲' }}
+      </button>
+    </div>
+  </div>
+
+  <!-- ── Auto-Detected Context Alert (if applicable) ──────────────────────── -->
+  <div *ngIf="isAutoDetectedLesson && !isCollapsed" class="auto-context-banner">
+    <div class="auto-context-text">
+      <span class="auto-icon">🎯</span>
+      <span>تم توجيه الأسئلة تلقائياً إلى درس <strong>"{{ selectedLessonTitle }}"</strong></span>
+    </div>
+    <button type="button" class="btn-detach" (click)="detachAutoLesson()">
+      توسيع للكل 🌐
+    </button>
+  </div>
+
+  <!-- ── Collapsible Filter Controls ────────────────────────────────────── -->
+  <div *ngIf="!isCollapsed" class="filter-body">
+    <!-- Loading State -->
+    <div *ngIf="isLoading" class="filter-loading">
+      <span class="spinner"></span>
+      <span>جاري تحميل هيكل الدروس والمحتوى المصرح به...</span>
+    </div>
+
+    <!-- Error State -->
+    <div *ngIf="loadError" class="filter-error">
+      <span>تعذر جلب خيارات الفلاتر.</span>
+      <button type="button" class="btn-retry-filters" (click)="loadFilters(true)">إعادة المحاولة 🔄</button>
+    </div>
+
+    <ng-container *ngIf="!isLoading && !loadError && filterData">
+      <!-- 1. Segmented Scope Selector -->
+      <div class="scope-tabs">
+        <button type="button"
+                class="scope-tab"
+                [class.active]="currentFilter.scope === 'all'"
+                (click)="setScope('all')">
+          🌐 الكل
+        </button>
+        <button type="button"
+                class="scope-tab"
+                [class.active]="currentFilter.scope === 'module'"
+                (click)="setScope('module')">
+          📚 موديول
+        </button>
+        <button type="button"
+                class="scope-tab"
+                [class.active]="currentFilter.scope === 'unit'"
+                (click)="setScope('unit')">
+          📑 وحدة
+        </button>
+        <button type="button"
+                class="scope-tab"
+                [class.active]="currentFilter.scope === 'lesson'"
+                (click)="setScope('lesson')">
+          🎯 درس محدد
+        </button>
+      </div>
+
+      <!-- 2. Cascading Dropdowns (Animated in when scope is specific) -->
+      <div *ngIf="currentFilter.scope !== 'all'" class="cascading-selects">
+        <!-- Module Select -->
+        <div class="select-group">
+          <label class="select-label">الموديول التعليمي:</label>
+          <select class="form-select"
+                  [ngModel]="currentFilter.moduleId"
+                  (ngModelChange)="onModuleChange($event)">
+            <option *ngFor="let m of filterData.modules" [value]="m.id">
+              {{ m.title }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Unit Select -->
+        <div *ngIf="currentFilter.scope === 'unit' || currentFilter.scope === 'lesson'" class="select-group">
+          <label class="select-label">الوحدة:</label>
+          <select class="form-select"
+                  [ngModel]="currentFilter.unitId"
+                  (ngModelChange)="onUnitChange($event)"
+                  [disabled]="!availableUnits.length">
+            <option *ngIf="!availableUnits.length" [value]="undefined">لا توجد وحدات</option>
+            <option *ngFor="let u of availableUnits" [value]="u.id">
+              {{ u.title }}
+            </option>
+          </select>
+        </div>
+
+        <!-- Lesson Select -->
+        <div *ngIf="currentFilter.scope === 'lesson'" class="select-group">
+          <label class="select-label">الدرس:</label>
+          <select class="form-select"
+                  [ngModel]="currentFilter.lessonId"
+                  (ngModelChange)="onLessonChange($event)"
+                  [disabled]="!availableLessons.length">
+            <option *ngIf="!availableLessons.length" [value]="undefined">لا توجد دروس</option>
+            <option *ngFor="let l of availableLessons" [value]="l.id">
+              {{ l.title }}
+            </option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 3. Quick Filter Chips (Level & Type) -->
+      <div class="chips-section">
+        <!-- Level Chips -->
+        <div class="chips-row" *ngIf="filterData.levels && filterData.levels.length > 0">
+          <span class="chips-row-label">المستوى:</span>
+          <div class="chips-list">
+            <button type="button"
+                    class="chip-btn"
+                    [class.active]="!currentFilter.levelId"
+                    (click)="toggleLevel(undefined)">
+              الكل
+            </button>
+            <button *ngFor="let lvl of filterData.levels"
+                    type="button"
+                    class="chip-btn"
+                    [class.active]="currentFilter.levelId === lvl.id"
+                    (click)="toggleLevel(lvl.id)">
+              {{ lvl.name }}
+            </button>
+          </div>
+        </div>
+
+        <!-- Type Chips -->
+        <div class="chips-row" *ngIf="filterData.types && filterData.types.length > 0">
+          <span class="chips-row-label">نوع المحتوى:</span>
+          <div class="chips-list">
+            <button type="button"
+                    class="chip-btn"
+                    [class.active]="!currentFilter.typeId"
+                    (click)="toggleType(undefined)">
+              الكل
+            </button>
+            <button *ngFor="let t of filterData.types"
+                    type="button"
+                    class="chip-btn"
+                    [class.active]="currentFilter.typeId === t.id"
+                    (click)="toggleType(t.id)">
+              {{ t.name }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</div>

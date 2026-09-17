@@ -12,6 +12,7 @@ import {
 } from '../../../core/services/student.service';
 import { Dialog } from '../../../core/utils/dialog';
 import { LessonSidebarComponent } from '../../../shared/components/lesson-sidebar/lesson-sidebar.component';
+import { CopilotService } from '../../../core/services/copilot.service';
 
 @Component({
   selector: 'app-continue-learning',
@@ -25,6 +26,7 @@ export class ContinueLearningComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private sanitizer = inject(DomSanitizer);
   private studentService = inject(StudentService);
+  private copilotService = inject(CopilotService);
   
   levels: any[] = [];
   isLoading = true;
@@ -89,6 +91,7 @@ export class ContinueLearningComponent implements OnInit {
   
   loadLesson(lessonId: string) {
     this.isLoadingLesson = true;
+    this.copilotService.setActiveLessonId(lessonId);
     this.quizData = null;
     this.summaryData = null;
     this.quizState = null;

@@ -37,4 +37,7 @@ public interface IStudentService
 
     /// <summary>Resets a student's quiz attempt so they can retake the quiz from scratch.</summary>
     Task<Result<bool>> ResetQuizAsync(Guid lessonId, Guid userId);
+
+    /// <summary>Returns the student's authorized hierarchy (Modules -> Units -> Lessons) along with Levels and Types for the Co-Pilot Top Filter Bar.</summary>
+    Task<Result<LearnDynamicPro.Application.Dtos.Student.StudentCopilotFilterDataDto>> GetCopilotFiltersAsync(Guid userId);
 }

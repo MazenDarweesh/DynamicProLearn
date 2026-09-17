@@ -63,6 +63,14 @@
 
   <!-- Body (Hidden if minimized) -->
   <ng-container *ngIf="!isMinimized">
+    <!-- Smart Top Filter Bar -->
+    <app-copilot-top-filter-bar
+      [activeLessonId]="activeLessonId"
+      [isCollapsed]="isFilterBarCollapsed"
+      (filterChange)="onFilterChange($event)"
+      (toggleCollapse)="onFilterCollapseChange($event)">
+    </app-copilot-top-filter-bar>
+
     <div class="copilot-body" #scrollContainer>
       <div *ngFor="let msg of messages; let idx = index"
            class="chat-msg"
@@ -115,6 +123,9 @@
           <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0" class="msg-feedback-container">
             <!-- Provenance & Latency Badge -->
             <div *ngIf="msg.provenance" class="provenance-badge-bar">
+              <span *ngIf="msg.filters && msg.filters.scope !== 'all'" class="provenance-badge badge-scope">
+                {{ msg.filters.scope === 'lesson' ? '🎯 نطاق الدرس' : (msg.filters.scope === 'unit' ? '📑 نطاق الوحدة' : '📚 نطاق الموديول') }}
+              </span>
               <span *ngIf="msg.cacheHit" class="provenance-badge badge-cache" [title]="'المصدر: ' + msg.provenance">
                 ⚡ استجابة فورية ({{ msg.latencyMs || 1 }} ms)
               </span>
