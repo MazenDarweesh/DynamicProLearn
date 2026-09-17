@@ -894,15 +894,10 @@ public class StudentService : IStudentService
         if (!detailResult.IsSuccess)
             return Result<bool>.Failure(detailResult.Error);
 
-        // 2. Fetch Progress
-        var progress = await _context.StudentQuizProgresses
-            .FirstOrDefaultAsync(p => p.UserId == userId && p.LessonId == lessonId);
-
-        if (progress != null)
-        {
-            _context.StudentQuizProgresses.Remove(progress);
-            await _context.SaveChangesAsync();
-        }
+        // 2. Direct Delete (avoids EF Core change tracker synthesized ordinal bug on JSON collections)
+        await _context.StudentQuizProgresses
+            .Where(p => p.UserId == userId && p.LessonId == lessonId)
+            .ExecuteDeleteAsync();
 
         return Result<bool>.Success(true);
     }

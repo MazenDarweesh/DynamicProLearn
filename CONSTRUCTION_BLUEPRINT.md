@@ -295,6 +295,21 @@ npm run build
 #### 🧪 معايير القبول والتحقق:
 - مراجعة القائمة الجانبية والتأكد من ظهور الشارات للدروس المولدة فقط.
 
+### 🔹 الخطوة 9: إصلاح تصفير الاختبار وتكامل محتوى الذكاء الاصطناعي في "متابعة التعلم"
+- **الحالة:** `[x] مكتملة بنجاح`
+- **الملفات المعنية:**
+  - **[MODIFY]** `src/LearnDynamicPro.Application/Features/Student/StudentService.cs`
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/features/student/continue-learning/continue-learning.component.ts`
+  - **[MODIFY]** `learn-dynamic-pro-ui/src/app/features/student/continue-learning/continue-learning.component.html`
+
+#### 🎯 الهدف الفني:
+1. حل خطأ 400 Bad Request عند استدعاء `POST /api/student/lessons/{lessonId}/quiz/reset` الناجم عن استثناء EF Core `__synthesizedOrdinal` على الكيانات المملوكة لـ JSON `StudentQuizAnswerState` عبر استبدال تعقب التغييرات بـ `ExecuteDeleteAsync()`.
+2. إتاحة الملخص الذكي والاختبار التفاعلي المربوطين بحالة قاعدة البيانات في شاشة "متابعة التعلم" (`continue-learning`) ليكون الدرس موحداً في أي شاشة يتصفحه فيها الطالب مع استعادة الإجابات والمزامنة اللحظية.
+
+#### 🧪 معايير القبول والتحقق:
+- فحص استدعاء إعادة ضبط الاختبار: إرجاع `200 OK` (True) وتصفير `StudentQuizProgress` كاملاً في قاعدة البيانات.
+- فتح شاشة "متابعة التعلم" وتأكيد ظهور تبويبات الملخص والكويز بكامل الوظائف (التصحيح، الشرح، النسخ، إعادة المحاولة).
+
 ---
 
 ## 🛡️ استراتيجية التراجع والأمان (Rollback & Safety Guidelines)
@@ -302,6 +317,7 @@ npm run build
 1. **سلامة قاعدة البيانات:** التعديل لا يتطلب أي Migrations جديدة، فالبيانات مخزنة بالفعل في جدولي `LessonQuizzes` و `LessonSummaries`.
 2. **منع الغش في الاختبار:** لن يتم إرسال `CorrectAnswerId` أو `Explanation` في طلب جلب الكويز الأولي `GET /quiz`؛ ويتم إرجاعها فقط للسؤال المحدد بعد إرسال الطالب لإجابته عبر `POST /check-answer`.
 3. **التوافق التام:** الدروس التي لم يُولّد لها كويز أو ملخص ستستمر في عرض الصندوق التوضيحي الهادئ: *"لم يتم نشر ملخص/اختبار لهذا الدرس بعد"*.
+4. **المزامنة المركزية عبر SQL Server:** استمرار تقدم الطالب في أي مكان يفتح منه الدرس (تصفح الموديولات أو متابعة التعلم) دون فقدان أي إجابة.
 
 ---
 
