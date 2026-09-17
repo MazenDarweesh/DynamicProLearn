@@ -337,8 +337,8 @@ public class AdminController : ControllerBase
         var result = await _lessonAiService.GetAdminLessonQuizAsync(lessonId);
         if (!result.IsSuccess)
         {
-            _logger.LogWarning("[AdminAPI] GetLessonQuiz NOT_FOUND | LessonId={LessonId}", lessonId);
-            return NotFound(result.Error);
+            _logger.LogInformation("[AdminAPI] GetLessonQuiz EMPTY/NOT_GENERATED | LessonId={LessonId}", lessonId);
+            return Ok(null);
         }
         _logger.LogInformation("[AdminAPI] GetLessonQuiz OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
@@ -366,8 +366,8 @@ public class AdminController : ControllerBase
         var result = await _lessonAiService.GetAdminLessonSummaryAsync(lessonId);
         if (!result.IsSuccess)
         {
-            _logger.LogWarning("[AdminAPI] GetLessonSummary NOT_FOUND | LessonId={LessonId}", lessonId);
-            return NotFound(result.Error);
+            _logger.LogInformation("[AdminAPI] GetLessonSummary EMPTY/NOT_GENERATED | LessonId={LessonId}", lessonId);
+            return Ok(null);
         }
         _logger.LogInformation("[AdminAPI] GetLessonSummary OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);

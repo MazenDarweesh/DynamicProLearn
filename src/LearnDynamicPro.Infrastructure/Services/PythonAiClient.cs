@@ -32,7 +32,10 @@ public class PythonAiClient : IPythonAiClient
         }
         
         _httpClient.BaseAddress = new Uri(baseUrl);
-        _httpClient.Timeout = TimeSpan.FromMinutes(5); // Explicit timeout since AI generation takes time
+        
+        var timeoutStr = configuration["AiCoPilot:TimeoutSeconds"];
+        var timeoutSeconds = int.TryParse(timeoutStr, out var sec) ? sec : 60;
+        _httpClient.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 
         _serviceToken = configuration["AiCoPilot:ServiceToken"] ?? "default_service_token";
     }
@@ -56,24 +59,48 @@ public class PythonAiClient : IPythonAiClient
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("[PythonAI] POST {Endpoint} | LessonId={LessonId}", endpoint, lessonId);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        AttachAuthorization(request);
-
-        var response = await _httpClient.SendAsync(request);
-        sw.Stop();
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var errContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("[PythonAI] FAIL POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
-                endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
+            var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            AttachAuthorization(request);
+
+            var response = await _httpClient.SendAsync(request);
+            sw.Stop();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("[PythonAI] FAIL POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
+                    endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
+                return null;
+            }
+
+            _logger.LogInformation("[PythonAI] OK POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
+                endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds);
+
+            return await response.Content.ReadFromJsonAsync<GeneratedQuizDto>();
+        }
+        catch (TaskCanceledException ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[PythonAI] TIMEOUT | Endpoint={Endpoint} LessonId={LessonId} ElapsedMs={ElapsedMs} (AI Engine did not respond within configured timeout)",
+                endpoint, lessonId, sw.ElapsedMilliseconds);
             return null;
         }
-
-        _logger.LogInformation("[PythonAI] OK POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
-            endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds);
-
-        return await response.Content.ReadFromJsonAsync<GeneratedQuizDto>();
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[PythonAI] UNREACHABLE | Endpoint={Endpoint} LessonId={LessonId} ElapsedMs={ElapsedMs} (AI Engine server is offline or unreachable)",
+                endpoint, lessonId, sw.ElapsedMilliseconds);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[PythonAI] ERROR | Endpoint={Endpoint} LessonId={LessonId} ElapsedMs={ElapsedMs}",
+                endpoint, lessonId, sw.ElapsedMilliseconds);
+            return null;
+        }
     }
 
     public async Task<GeneratedSummaryDto?> GenerateSummaryAsync(Guid lessonId)
@@ -82,24 +109,48 @@ public class PythonAiClient : IPythonAiClient
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("[PythonAI] POST {Endpoint} | LessonId={LessonId}", endpoint, lessonId);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        AttachAuthorization(request);
-
-        var response = await _httpClient.SendAsync(request);
-        sw.Stop();
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var errContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("[PythonAI] FAIL POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
-                endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
+            var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            AttachAuthorization(request);
+
+            var response = await _httpClient.SendAsync(request);
+            sw.Stop();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("[PythonAI] FAIL POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
+                    endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
+                return null;
+            }
+
+            _logger.LogInformation("[PythonAI] OK POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
+                endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds);
+
+            return await response.Content.ReadFromJsonAsync<GeneratedSummaryDto?>();
+        }
+        catch (TaskCanceledException ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[PythonAI] TIMEOUT | Endpoint={Endpoint} LessonId={LessonId} ElapsedMs={ElapsedMs}",
+                endpoint, lessonId, sw.ElapsedMilliseconds);
             return null;
         }
-
-        _logger.LogInformation("[PythonAI] OK POST {Endpoint} | LessonId={LessonId} StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
-            endpoint, lessonId, (int)response.StatusCode, sw.ElapsedMilliseconds);
-
-        return await response.Content.ReadFromJsonAsync<GeneratedSummaryDto?>();
+        catch (HttpRequestException ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[PythonAI] UNREACHABLE | Endpoint={Endpoint} LessonId={LessonId} ElapsedMs={ElapsedMs}",
+                endpoint, lessonId, sw.ElapsedMilliseconds);
+            return null;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[PythonAI] ERROR | Endpoint={Endpoint} LessonId={LessonId} ElapsedMs={ElapsedMs}",
+                endpoint, lessonId, sw.ElapsedMilliseconds);
+            return null;
+        }
     }
 
     public async Task<bool> ClearAiCacheAsync()
@@ -108,23 +159,32 @@ public class PythonAiClient : IPythonAiClient
         var sw = Stopwatch.StartNew();
         _logger.LogInformation("[PythonAI] POST {Endpoint} | ClearAllCaches", endpoint);
 
-        var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
-        AttachAuthorization(request);
-
-        var response = await _httpClient.SendAsync(request);
-        sw.Stop();
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
-            var errContent = await response.Content.ReadAsStringAsync();
-            _logger.LogError("[PythonAI] FAIL POST {Endpoint} | StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
-                endpoint, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
+            var request = new HttpRequestMessage(HttpMethod.Post, endpoint);
+            AttachAuthorization(request);
+
+            var response = await _httpClient.SendAsync(request);
+            sw.Stop();
+
+            if (!response.IsSuccessStatusCode)
+            {
+                var errContent = await response.Content.ReadAsStringAsync();
+                _logger.LogError("[PythonAI] FAIL POST {Endpoint} | StatusCode={StatusCode} ElapsedMs={ElapsedMs} Details={Details}",
+                    endpoint, (int)response.StatusCode, sw.ElapsedMilliseconds, errContent);
+                return false;
+            }
+
+            _logger.LogInformation("[PythonAI] OK POST {Endpoint} | StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
+                endpoint, (int)response.StatusCode, sw.ElapsedMilliseconds);
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "[PythonAI] ERROR | Endpoint={Endpoint}", endpoint);
             return false;
         }
-
-        _logger.LogInformation("[PythonAI] OK POST {Endpoint} | StatusCode={StatusCode} ElapsedMs={ElapsedMs}",
-            endpoint, (int)response.StatusCode, sw.ElapsedMilliseconds);
-
-        return true;
     }
 }

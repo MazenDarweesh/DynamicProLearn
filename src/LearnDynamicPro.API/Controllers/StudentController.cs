@@ -141,8 +141,8 @@ public class StudentController : ControllerBase
                     lessonId, _currentUserService.UserId);
                 return Forbid(result.Error);
             }
-            _logger.LogWarning("[StudentAPI] GetLessonQuiz NOT_FOUND | LessonId={LessonId}", lessonId);
-            return NotFound(result.Error);
+            _logger.LogInformation("[StudentAPI] GetLessonQuiz EMPTY/NOT_GENERATED | LessonId={LessonId}", lessonId);
+            return Ok(null);
         }
         _logger.LogInformation("[StudentAPI] GetLessonQuiz OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
@@ -162,8 +162,8 @@ public class StudentController : ControllerBase
                     lessonId, _currentUserService.UserId);
                 return Forbid(result.Error);
             }
-            _logger.LogWarning("[StudentAPI] GetLessonSummary NOT_FOUND | LessonId={LessonId}", lessonId);
-            return NotFound(result.Error);
+            _logger.LogInformation("[StudentAPI] GetLessonSummary EMPTY/NOT_GENERATED | LessonId={LessonId}", lessonId);
+            return Ok(null);
         }
         _logger.LogInformation("[StudentAPI] GetLessonSummary OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
