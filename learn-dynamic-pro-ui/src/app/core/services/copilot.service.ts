@@ -138,30 +138,36 @@ export class CopilotService {
 
     if (filters) {
       payload['scope'] = filters.scope;
-      if (filters.moduleId) {
-        payload['module_id'] = filters.moduleId;
-        payload['moduleId'] = filters.moduleId;
-      }
-      if (filters.unitId) {
-        payload['unit_id'] = filters.unitId;
-        payload['unitId'] = filters.unitId;
-      }
-      if (filters.lessonId) {
-        payload['lesson_id'] = filters.lessonId;
-        payload['lessonId'] = filters.lessonId;
-      }
-      if (filters.levelId) {
-        payload['level_id'] = filters.levelId;
-        payload['levelId'] = filters.levelId;
-      }
-      if (filters.typeId) {
-        payload['type_id'] = filters.typeId;
-        payload['typeId'] = filters.typeId;
-      }
+      payload['course_id'] = null;
+      payload['courseId'] = null;
+      payload['module_id'] = filters.moduleId || null;
+      payload['moduleId'] = filters.moduleId || null;
+      payload['unit_id'] = filters.unitId || null;
+      payload['unitId'] = filters.unitId || null;
+      payload['lesson_id'] = filters.lessonId || null;
+      payload['lessonId'] = filters.lessonId || null;
+      payload['level'] = filters.levelId || 0;
+      payload['level_id'] = filters.levelId || null;
+      payload['levelId'] = filters.levelId || null;
+      payload['type'] = filters.typeId || 0;
+      payload['type_id'] = filters.typeId || null;
+      payload['typeId'] = filters.typeId || null;
     } else {
+      payload['scope'] = lessonId ? 'lesson' : 'all';
+      payload['course_id'] = null;
+      payload['courseId'] = null;
+      payload['module_id'] = null;
+      payload['moduleId'] = null;
+      payload['unit_id'] = null;
+      payload['unitId'] = null;
       payload['lesson_id'] = lessonId || null;
       payload['lessonId'] = lessonId || null;
-      payload['scope'] = lessonId ? 'lesson' : 'all';
+      payload['level'] = 0;
+      payload['level_id'] = null;
+      payload['levelId'] = null;
+      payload['type'] = 0;
+      payload['type_id'] = null;
+      payload['typeId'] = null;
     }
 
     const startTime = Date.now();

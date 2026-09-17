@@ -64,7 +64,10 @@ export class LessonEditorComponent implements OnChanges {
       },
       error: (err) => {
         this.isGeneratingQuiz = false;
-        Dialog.alert(err?.error?.message || 'تعذر توليد الاختبار. تأكد من تشغيل محرك الذكاء الاصطناعي وسياق الدرس.', 'خطأ في التوليد', 'error');
+        const msg = typeof err?.error === 'string' 
+          ? err.error 
+          : (err?.error?.message || err?.error?.detail || 'عفواً، تعذر توليد الاختبار. تأكد من أن الدرس تمت معالجته في محرك الذكاء الاصطناعي.');
+        Dialog.alert(msg, 'تنبيه', 'error');
       }
     });
   }
@@ -80,7 +83,10 @@ export class LessonEditorComponent implements OnChanges {
       },
       error: (err) => {
         this.isGeneratingSummary = false;
-        Dialog.alert(err?.error?.message || 'تعذر توليد الملخص. تأكد من تشغيل محرك الذكاء الاصطناعي وسياق الدرس.', 'خطأ في التوليد', 'error');
+        const msg = typeof err?.error === 'string' 
+          ? err.error 
+          : (err?.error?.message || err?.error?.detail || 'عفواً، تعذر توليد الملخص. تأكد من أن الدرس تمت معالجته في محرك الذكاء الاصطناعي.');
+        Dialog.alert(msg, 'تنبيه', 'error');
       }
     });
   }

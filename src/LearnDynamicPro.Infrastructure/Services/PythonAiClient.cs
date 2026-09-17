@@ -51,6 +51,11 @@ public class PythonAiClient : IPythonAiClient
         {
             request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_serviceToken}");
         }
+
+        var roleHeader = _httpContextAccessor.HttpContext?.Request.Headers["X-Role"].FirstOrDefault();
+        var userRole = _httpContextAccessor.HttpContext?.User?.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
+        var role = !string.IsNullOrWhiteSpace(roleHeader) ? roleHeader : (!string.IsNullOrWhiteSpace(userRole) ? userRole : "Admin");
+        request.Headers.TryAddWithoutValidation("X-Role", role);
     }
 
     public async Task<GeneratedQuizDto?> GenerateQuizAsync(Guid lessonId)

@@ -100,7 +100,7 @@
             {{ quizData ? ('متوفر (' + quizData.questions.length + ' أسئلة)') : 'لم يتم التوليد' }}
           </span>
         </div>
-        <p class="text-secondary text-sm mb-3">5 أسئلة اختيار من متعدد مقسمة على الفيديو لقياس فهم الطالب.</p>
+        <p class="text-secondary text-sm mb-3">أسئلة اختيار من متعدد ذكية متكيفة مع طول الدرس والمحتوى لقياس فهم واستيعاب الطالب.</p>
         
         <div class="d-flex gap-2">
           <button *ngIf="!quizData" class="btn-ai btn-ai-primary flex-1" [disabled]="isGeneratingQuiz" (click)="generateQuiz()">
