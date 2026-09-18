@@ -90,6 +90,7 @@ This document provides a comprehensive technical contract specification for all 
 | `GET` | `/api/Admin/lessons/{lessonId}/quiz` | Retrieves AI-generated quiz questions for inspection. |
 | `POST` | `/api/Admin/lessons/{lessonId}/generate-summary` | Triggers AI generation of comprehensive lesson summary. |
 | `GET` | `/api/Admin/lessons/{lessonId}/summary` | Retrieves AI-generated lesson summary markdown. |
+| `POST` | `/api/Admin/lessons/{lessonId}/retry-ai-ingest` | Reset failed or stalled video ingestion state and re-dispatch ingestion event. |
 | `POST` | `/api/Admin/ai/cache/clear` | Admin proxy that flushes both Exact In-Memory Cache and Semantic Vector Cache in Python AI engine. |
 
 ---
@@ -99,6 +100,7 @@ This document provides a comprehensive technical contract specification for all 
 
 | Method | Route | Description |
 |:---|:---|:---|
+| `GET` | `/api/Student/copilot-filters` | Retrieve dynamic hierarchical curriculum filter tree (modules, units, lessons, levels, types) scoped by student RBAC permissions. |
 | `GET` | `/api/Student/modules` | Fetch all training modules assigned to the authenticated student's department. |
 | `GET` | `/api/Student/modules/{moduleId}/units` | View units inside an assigned module. |
 | `GET` | `/api/Student/units/{unitId}/lessons` | View lessons inside an assigned unit with completion statuses. |
@@ -109,6 +111,7 @@ This document provides a comprehensive technical contract specification for all 
 | `GET` | `/api/Student/next-lesson` | Dynamically recommends the next lesson in the curriculum sequence. |
 | `GET` | `/api/Student/unified-curriculum` | Flat list of full assigned curriculum for streamlined track navigation. |
 | `GET` | `/api/Student/lessons/{lessonId}/quiz` | Retrieve interactive practice quiz for the lesson. |
+| `POST` | `/api/Student/lessons/{lessonId}/quiz/check-answer` | Submit single answer for instant interactive evaluation and AI explanation disclosure. |
 | `GET` | `/api/Student/lessons/{lessonId}/summary` | Read AI-generated summary notes before or after watching video. |
 
 ---
@@ -129,10 +132,11 @@ This document provides a comprehensive technical contract specification for all 
 ---
 
 ## 🤖 Service-to-Service AI Endpoints (`/api/internal`)
-*Restricted to internal services. Validated using `Authorization: Bearer <X-Service-Token>`.*
+*Restricted to internal services. Validated using `Authorization: Bearer <JWT>` or `X-Service-Token`.*
 
 | Method | Route | Description |
 |:---|:---|:---|
+| `POST` | `/api/internal/lessons/{lessonId}/ai-status` | Status callback from AI worker (`Completed`, `Failed`, `Processing`) with chunk count and error message. |
 | `GET` | `/api/internal/user-permissions/{userId}` | Returns the full list of accessible modules, units, and lessons for the user to enforce strict RBAC in Qdrant search. |
 | `GET` | `/api/internal/lessons/{lessonId}/full-context` | Returns rich metadata (video URL, PDF URL, module, unit, level, type, tenant IDs) for RAG embedding generation. |
 

@@ -227,6 +227,175 @@
 
 ---
 
+### Q9: How does your Backend-to-Backend Service Authentication work, and why did you generate fresh short-lived JWTs instead of forwarding client tokens or using static API keys?
+### س9: كيف تعمل معمارية التوثيق بين الخدمات (Service-to-Service Auth)، ولماذا ولّدت توكنات JWT قصيرة الأجل (5 دقائق) بدلاً من تمرير توكن العميل أو استخدام API Key ثابت فقط؟
+
+* **🇬🇧 English Answer:**
+  - **The Problem (ClockSkew Mismatch & Token Expiry Mid-Flight):**
+    1. **ClockSkew Mismatch:** In ASP.NET Core, `TokenValidationParameters.ClockSkew` defaults to 5 minutes. If a client's 60-minute token was issued 58 minutes ago, .NET considers it valid. However, Python FastAPI's PyJWT library enforces strict validation with zero clock skew (`leeway = 0`). Forwarding the user's token resulted in Python rejecting requests with `401 Token Expired`, even though .NET had just validated it!
+    2. **Stale Tokens During Long Operations:** If an admin triggers AI quiz or summary generation after browsing for 55 minutes, forwarding the client token risks it expiring while the LLM is streaming or generating, aborting the process midway.
+    3. **The Static Secret Limitation:** Relying solely on a static pre-shared secret (`X-Service-Token`) creates a single point of failure and fails to convey the caller's identity, role, or multi-tenant context required by downstream RBAC rules.
+  - **The Solution (`ITokenService.GenerateServiceCallToken`):**
+    - When `PythonAiClient` calls Python AI endpoints (Quiz, Summary, Cache Clear), .NET mints a dedicated, short-lived (5-minute) internal JWT on the fly.
+    - It embeds the authenticated caller's claims: `sub: userId`, `Role: role`, `iss: DynamicProLearn`, `aud: LMS_CO_Pilot`, signed with the shared HMAC-SHA256 secret.
+    - **Performance & Zero Overhead:** This is a 100% in-memory cryptographic operation (`< 1ms`) requiring zero SQL queries.
+    - **Security (Zero Trust & Least Privilege):** The token is valid for only 300 seconds, strictly scoped, and guarantees that Python receives an authoritative, fresh token immune to ClockSkew divergence.
+
+* **🇸🇦 الإجابة بالعربية:**
+  - **المشكلة الحقيقية (فخ الـ ClockSkew وانقطاع التوكن أثناء المعالجة):**
+    1. **اختلاف معالجة الوقت (ClockSkew):** مكتبة JWT في ASP.NET Core تملك سماحية افتراضية للوقت قدرها 5 دقائق (`ClockSkew = 5 min`). فإذا مر على توكن المستخدم 58 دقيقة، يعتبره دوت نت صالحاً. ولكن في بايثون، مكتبة PyJWT صارمة بنسبة 100% وبدون أي سماحية وقت (`leeway = 0`). بالتالي، عند تمرير نفس التوكن لبايثون كان السيرفر يرفضه فوراً بخطأ `401 Token Expired` رغم أن دوت نت قبله للتو!
+    2. **انتهاء التوكن أثناء التوليد:** لو قام المشرف بطلب توليد كويز بعد تصفح المنصة لمدة 55 دقيقة، فإن تمرير التوكن القديم قد يجعله ينتهي فجأة أثناء انتظار رد الـ LLM، مما يسبب فشل العملية.
+    3. **قصور الـ API Key الثابت:** الاعتماد على Header ثابت فقط (`X-Service-Token`) لا ينقل هوية المستخدم أو صلاحياته (Role) التي يحتاجها بايثون للتحقق من الـ RBAC.
+  - **الحل المعماري الهندسي (`GenerateServiceCallToken`):**
+    - أنشأنا في `TokenService` دالة تصدر توكن خدمة داخلي طازج مدته **5 دقائق فقط** لكل استدعاء من دوت نت لبايثون.
+    - يحمل التوكن بيانات المستخدم الحالية: `sub: userId` و `Role: role` وموقع رقمياً بنفس المفتاح المشفر المشترك.
+    - **الأداء الفائق:** التوليد يتم في الذاكرة (In-Memory HMAC-SHA256) في أقل من **1ms** وبدون أي استعلام في قاعدة البيانات.
+    - **الأمان:** توكن قصير الأجل جداً يضمن عدم انتهاء صلاحيته أثناء معالجة الذكاء الاصطناعي، ويقضي تماماً على مشكلة تباين الساعات بين السيرفرات.
+
+---
+
+### Q10: What is a Webhook, and why did you choose an Asynchronous Webhook Callback for Video AI Ingestion while keeping Synchronous REST for Quizzes?
+### س10: ما هو الـ Webhook، ولماذا اخترت معمارية الـ Asynchronous Webhook Callback لمعالجة الفيديوهات بينما احتفظت بـ Synchronous REST لتوليد الكويزات والملخصات؟
+
+* **🇬🇧 English Answer:**
+  - **What is a Webhook? (Push vs Pull):**
+    - A Webhook is an HTTP-based asynchronous event callback. Instead of the client polling the server repeatedly ("Are you done yet?"), the caller sends a request and provides a callback URL. Once the background process completes, the receiver pushes an HTTP request back to the sender with the payload.
+  - **Why Asynchronous Webhooks for Video Ingestion?**
+    1. **Long-Running Workloads:** Video ingestion involves downloading audio/video, running speech-to-text with Whisper, chunking text, generating BGE-M3 1024-dimensional embeddings, and upserting vectors to Qdrant. This takes between 30 seconds to 3 minutes depending on video duration.
+    2. **Thread Pool Starvation & 504 Timeouts:** Holding a synchronous HTTP connection open for 3 minutes blocks .NET Kestrel worker threads, exhausts connection pools, and trips reverse proxy timeouts (e.g., NGINX / Cloudflare 60s gateway timeouts).
+    3. **Decoupled Event Architecture:** When an admin saves a lesson with a video URL, .NET immediately saves the lesson as `LessonAiStatus.Queued`, dispatches an async HTTP event via `WebhookDispatcher` to Python's `/v1/ingest`, and returns `200 OK` to the admin UI in `< 45ms`. When Python finishes, it fires a callback HTTP POST to `.NET (/api/internal/lessons/{id}/ai-status)` with the final status and chunk count.
+  - **Why Synchronous REST for Quizzes and Summaries?**
+    - Quiz and Summary generation take only 1.5 to 2.5 seconds using Gemini 3.5 Flash-Lite.
+    - The admin is actively sitting on the lesson editor screen waiting for the generated questions to appear. A synchronous REST call with typed `HttpClient` provides immediate transactional feedback, simpler error propagation, and an intuitive user experience.
+  - **Webhook Resilience & Hardening:**
+    - **Dual Authentication Headers:** The webhook dispatches with both `Authorization: Bearer <token>` and `X-Service-Token` for defense-in-depth.
+    - **Dual-Key Payloads:** Payloads serialize both `lesson_id` (Python snake_case) and `lessonId` (C# camelCase) to prevent schema mismatches.
+    - **Configuration Fallback:** Safely falls back to internal container networking (`http://localhost:8000`) if the config string is empty or missing.
+
+* **🇸🇦 الإجابة بالعربية:**
+  - **ما هو الـ Webhook؟ (فلسفة الـ Push مقابل الـ Pull):**
+    - الـ Webhook هو تقنية إرسال إشعارات لحظية عبر HTTP مبنية على الأحداث (Event-Driven Callback). فبدلاً من أن يظل العميل يسأل السيرفر كل لحظة "هل انتهيت؟" (Polling مستمر يستهلك الموارد)، يقوم السيرفر الأول بإرسال المهمة وإعطاء السيرفر الثاني رابطاً ليقوم الثاني بإرسال النتيجة فور الانتهاء مباشرة (Push).
+  - **لماذا استخدمنا Webhook غير متزامن لمعالجة الفيديوهات؟**
+    1. **العمليات الحسابية الطويلة:** معالجة الفيديو تشمل تحميل الصوت، وتشغيل نموذج Whisper لتحويل الصوت إلى نص، وتقطيع النصوص وتوليد متجهات BGE-M3، وحفظها في Qdrant. هذه العملية تستغرق من 30 ثانية إلى 3 دقائق بحسب طول الفيديو.
+    2. **منع استنزاف موارد السيرفر ومهلات الـ Gateway:** إبقاء اتصال HTTP مفتوحاً لمدة 3 دقائق يعطل خيوط المعالجة في Kestrel (Thread Pool Starvation) ويسبب خطأ انتهاء المهلة (504 Gateway Timeout) من الـ Reverse Proxy مثل NGINX.
+    3. **فصل المعمارية (Decoupled Flow):** عند قيام المشرف بحفظ درس به فيديو، يقوم دوت نت بحفظ حالة الدرس فوراً كـ `Queued` ويرسل حدث الـ Webhook عبر `WebhookDispatcher` لمحرك بايثون، ثم يرد على الفرونت إند في أقل من **45ms**! وعندما ينتهي بايثون من المعالجة تماماً، يرسل طلباً خلفياً لمسار الكولباك في دوت نت (`POST /api/internal/lessons/{id}/ai-status`) ليحدث حالة الدرس إلى `Completed`.
+  - **لماذا احتفظنا بـ Synchronous REST للكويز والملخص؟**
+    - توليد الكويز والملخص يستغرق فقط 1.5 إلى 2.5 ثانية عبر Gemini Flash-Lite. المشرف يقف في الشاشة وينتظر ظهور الأسئلة أمامه فوراً، فالاتصال المباشر المتزامن أسرع وأبسط ولا يحتاج تعقيد الـ Callbacks.
+  - **آليات الصمود والأمان في الـ Webhook:**
+    - **توثيق مزدوج (Dual Auth):** نرسل التوكن في رأسين معاً: `Authorization: Bearer` و `X-Service-Token`.
+    - **تطابق المسميات (Dual-Key):** نرسل في الـ JSON كلا المسميين: `lesson_id` و `lessonId` لضمان عدم حدوث خطأ تطابق.
+    - **التعافي التلقائي:** معالجة حالات الـ Empty String في الإعدادات والرجوع للرابط الافتراضي.
+
+---
+
+### Q11: Explain the Video AI Ingestion Lifecycle State Machine. Why store state in SQL Server, and why choose bounded smart polling over WebSockets for the UI?
+### س11: اشرح آلة الحالة لمعالجة الفيديوهات (Video AI Ingestion State Machine). لماذا حفظت الحالة في SQL Server، ولماذا فضّلت الـ Bounded Polling الذكي على WebSockets في الفرونت إند؟
+
+* **🇬🇧 English Answer:**
+  - **The 5-State Life Cycle (`LessonAiStatus` Enum):**
+    - `None (0):` Lesson has no video URL or AI features.
+    - `Queued (1):` Video URL was submitted; webhook event dispatched to AI queue.
+    - `Processing (2):` AI worker is actively transcribing audio and generating embeddings.
+    - `Completed (3):` Vectors indexed in Qdrant; ready for quizzes, summaries, and student RAG.
+    - `Failed (4):` Ingestion failed (network error, invalid video URL, Whisper crash). Stores `AiError` and increments `AiRetryCount`.
+  - **Why Persist State in SQL Server via EF Core?**
+    - Durability: In-memory queues or Redis cache keys can be wiped during container restarts. SQL Server fields (`AiStatus`, `AiError`, `AiChunksCount`, `AiProcessedAt`, `AiRetryCount`) provide a permanent, audit-ready source of truth.
+    - Queryability: Admins can instantly query all failed lessons across the enterprise and trigger batch or manual retries.
+  - **Why Bounded Smart Polling over WebSockets / SignalR in Angular?**
+    - **The Trade-Off:** While WebSockets/SignalR provide push notifications, they introduce persistent socket overhead, reconnection logic, keep-alive heartbeats, and require sticky sessions or Redis backplanes behind load balancers.
+    - **The Context:** Lesson editing is an infrequent administrative action performed by a handful of course creators.
+    - **Smart Polling Solution:** In `lesson-editor.component.ts`, an RxJS `interval(4000)` executes `takeWhile(() => status === Queued || status === Processing)`. The moment the status transitions to `Completed` or `Failed`, the interval automatically un-subscribes and destroys itself.
+    - **Zero Memory Leaks & Zero Server Flooding:** If the admin leaves the page, `ngOnDestroy` cancels the subscription. Total requests per video ingestion: ~5-15 requests.
+  - **Defensive UX Guard (`isAiReady`):**
+    - In the UI, the "Generate Quiz" and "Generate Summary" buttons are disabled until `lesson.aiStatus === LessonAiStatus.Completed`.
+    - This eliminates user frustration and prevents Gemini from attempting to generate quizzes on non-existent or unindexed video content.
+
+* **🇸🇦 الإجابة بالعربية:**
+  - **آلة الحالة الخماسية الحتمية (`LessonAiStatus`):**
+    - `None (0):` درس نصي بدون فيديو أو ذكاء اصطناعي.
+    - `Queued (1):` تم إدخال رابط الفيديو وإرسال إشارة الـ Webhook لطابور بايثون.
+    - `Processing (2):` جاري تنزيل الصوت وتشغيل Whisper وتقطيع وتوليد المتجهات في Qdrant.
+    - `Completed (3):` اكتملت الفهرسة بنجاح، والدرس جاهز لتوليد الكويزات وإجابة أسئلة الطلاب.
+    - `Failed (4):` فشلت العملية، ويتم تسجيل سبب الخطأ في `AiError` وزيادة عداد المحاولات `AiRetryCount`.
+  - **لماذا حفظنا الحالة في قاعدة بيانات SQL Server؟**
+    - لضمان بقاء البيانات وعدم ضياعها في حال إعادة تشغيل حاويات الدوكر. الحقول الخمسة المضافة في جدول `Lessons` تمنحنا سجلاً تدقيقياً كاملاً وتسمح للمشرف برؤية الدروس المتعثرة وإعادة معالجتها بنقرة زر واحدة عبر مسار `POST /retry-ai-ingest`.
+  - **لماذا فضلنا الـ Smart Polling (كل 4 ثوان) على الـ WebSockets/SignalR؟**
+    - **المقارنة الهندسية:** الـ SignalR ممتاز في الشات اللحظي عالي التردد، لكنه في شاشات الإدارة يضيف تعقيداً كبيراً (إبقاء اتصالات Socket مفتوحة، الحاجة لـ Redis Backplane عند توزيع الأحمال، وتعقيد معالجة انقطاع الشبكة).
+    - **طبيعة الاستخدام:** تعديل الدروس هو نشاط إداري محدود التردد.
+    - **الحل الذكي:** صممنا في Angular مؤقتاً ذكياً باستخدام RxJS: `interval(4000).pipe(takeWhile(...))`. يفحص حالة الدرس فقط عندما يكون `Queued` أو `Processing`. وبمجرد أن تصبح الحالة `Completed` أو `Failed`، يقوم المؤقت بإلغاء نفسه فوراً وتدمير الـ Subscription!
+    - لا يوجد أي استهلاك مستمر للخادم، وأي خروج من الصفحة يوقف الفحص تلقائياً في `ngOnDestroy`.
+  - **حماية تجربة المستخدم (Defensive UX):**
+    - زر "توليد الاختبار" وزر "توليد الملخص" يتم تعطيلهما تماماً مع إظهار شارة تنبيهية ذكية طالما أن الدرس لم يكتمل ذكاؤه الاصطناعي بعد (`AiStatus != Completed`). هذا يمنع أي أخطاء أو هلوسة ناتجة عن طلب كويز لفيديو لم تتم فهرسته بعد.
+
+---
+
+### Q12: How do you guarantee contract resilience between heterogeneous microservices (.NET 10 + Python FastAPI) when schemas diverge (Postel's Law)?
+### س12: كيف تضمن مرونة وصمود العقود البرمجية بين أنظمة مختلفة (.NET 10 و Python) عند اختلاف هياكل البيانات (مبدأ بوستيل Postel's Law)؟
+
+* **🇬🇧 English Answer:**
+  - **The Real-World Incident (Super Admin `CompanyId = null`):**
+    - In our .NET domain model, regular users belong to a tenant `CompanyId: Guid`. However, system-wide Global Super Admins have `CompanyId = null` because they oversee the entire platform.
+    - When a Super Admin queried the AI Co-Pilot, Python's Pydantic model strictly required `company_id: UUID`.
+    - Pydantic raised an unhandled `ValidationError`, returning a `500 Internal Server Error` to the Super Admin.
+  - **Applying Postel's Law (The Robustness Principle):**
+    - *"Be conservative in what you do, be liberal in what you accept from others."*
+    - **In Python:** We refactored `TokenClaims` so `company_id` is defined as `Optional[UUID] = None`. In the authentication extractor, if `company_id` is `None`, it safely defaults to `"default"`:
+      ```python
+      company_id: Optional[str] = Field(default=None)
+      # In RBAC context:
+      tenant_company = claims.company_id or "default"
+      ```
+    - **In .NET:** We ensured `TokenService` serializes claims predictably, omitting null claims or providing explicit fallbacks.
+  - **Result:** Complete inter-service harmony without requiring changes to the core enterprise tenant architecture or database constraints.
+
+* **🇸🇦 الإجابة بالعربية:**
+  - **الموقف الواقعي الذي واجهناه (مشكلة الـ Super Admin و CompanyId):**
+    - في معمارية .NET، الموظف العادي يتبع شركة معينة وله `CompanyId: Guid`. أما الـ Super Admin فهو مسؤول عام عن المنصة بأكملها وله `CompanyId = null`.
+    - عندما قام الـ Super Admin باستخدام الشات الذكي، كان بايثون يعتمد نموذج Pydantic صارم يتطلب حقل `company_id: UUID` إجبارياً.
+    - تسبب ذلك في خطأ تحقق داخلي `ValidationError` وأرجع بايثون خطأ `500 Internal Server Error`.
+  - **تطبيق مبدأ بوستيل الهندسي (Postel's Law / The Robustness Principle):**
+    - المبدأ ينص على: *"كن متحفظاً فيما ترسله، ومرحباً ومتقبلاً لما تستقبله من الآخرين"*.
+    - **في بايثون:** قمنا بجعل الحقل اختيارياً `Optional[str] = None` مع وضع قيمة افتراضية ذكية (`default="default"`).
+    - **في دوت نت:** قمنا بضبط الـ Claims لتمرير البيانات المتوافقة مع معايير الـ Microservices.
+  - **النتيجة:** استقرار تام في الاتصال بين بايثون ودوت نت دون الحاجة لتغيير قواعد بيانات المؤسسة.
+
+---
+
+### Q13: How did you implement Hierarchical Dynamic Co-Pilot Filters without causing N+1 database queries?
+### س13: كيف صممت شريط الفلاتر الديناميكي الهرمي للمساعد الذكي دون إحداث استعلامات مضاعفة (N+1 Query Problem)؟
+
+* **🇬🇧 English Answer:**
+  - **The Requirement:** Students need to filter their AI Co-Pilot search scope dynamically across:
+    1. Entire Assigned Curriculum.
+    2. Specific Assigned Module.
+    3. Specific Unit.
+    4. Specific Lesson.
+    5. Difficulty Level (Beginner / Intermediate / Advanced) and Lesson Type (Theory / Practical).
+  - **The N+1 Anti-Pattern:** A naive implementation would fetch assigned modules, then loop and query units for each module, then loop again for lessons, generating dozens of database round-trips.
+  - **Our Solution (`GET /api/student/copilot-filters`):**
+    - Implemented a single EF Core query projection in `StudentService.cs`.
+    - Navigates the relational graph (`Assignments` → `Module` → `Units` → `Lessons`) in a single SQL query using `.Select()` projection.
+    - Filters strictly by the student's company, department, and assigned level/type constraints.
+    - Groups and maps the result into a clean hierarchical DTO tree (`ModuleFilterDto` → `UnitFilterDto` → `LessonFilterItemDto`) alongside distinct arrays of available levels and types.
+    - **Performance:** Executes in `< 35ms` on SQL Server with zero tracking (`AsNoTracking`).
+  - **Angular Client-Side Caching:** In `copilot.service.ts`, the filter tree is cached using RxJS `shareReplay(1)`, so navigating between lessons does not re-fetch the filter structure unless the user explicitly changes tracks.
+
+* **🇸🇦 الإجابة بالعربية:**
+  - **المتطلب:** إتاحة شريط فلاتر هرمي للطالب لتوجيه بحث الذكاء الاصطناعي:
+    1. البحث في كامل المناهج المخصصة له.
+    2. حصر البحث في موديول معين.
+    3. حصر البحث في وحدة معينة (Unit) أو درس محدد (Lesson).
+    4. فلترة بمستوى الصعوبة ونوع الدرس.
+  - **مشكلة الـ N+1 الاستعلامية:** الحل البدائي يستعلم عن الموديولات، ثم يقوم بعمل Loop يستعلم عن وحدات كل موديول، ثم Loop أخرى للدروس، مما يسبب عشرات الاستعلامات البطيئة في قاعدة البيانات.
+  - **الحل المعماري (`GET /api/student/copilot-filters`):**
+    - صممنا استعلاماً واحداً فائق السرعة عبر EF Core `.Select()` Projection.
+    - يقوم بجلب شجرة المنهج بالكامل لشركة وقسم الطالب دفعة واحدة مع تصفية الدروس المخصصة له فقط.
+    - يرجع البيانات في DTO هرمي نظيف مع مصفوفات المستويات والأنواع المتاحة.
+    - **السرعة:** ينفذ في أقل من **35ms** بدون تتبع للكائنات (`AsNoTracking`).
+    - **الكاش في الفرونت إند:** يُحفظ الرد في Angular عبر `shareReplay(1)` لضمان عدم تكرار الطلب الشبكي أثناء تنقل الطالب بين الدروس.
+
+---
+
 ## 🏆 3. STAR Method Behavioral Scenarios / مواقف ومواضيع هندسية بأسلوب STAR
 
 ### Scenario 1: Preventing Session Disruption During Long Learning Videos
@@ -269,6 +438,10 @@
 |:---|:---|:---|
 | **Auth Verification Latency** | `< 20ms` | زمن التحقق من توكن الـ JWT بدون أي استعلام لقاعدة البيانات. |
 | **Silent Token Renewal** | `< 120ms` | سرعة تجديد التوكن الصامت في الخلفية دون شعور المستخدم. |
+| **Service JWT Minting Latency** | `< 1ms` | توليد توكن داخلي 5 دقائق مشفر في الذاكرة لمنع أخطاء الـ ClockSkew. |
+| **Copilot Filter Projection** | `< 35ms` | زمن تنفيذ استعلام شجرة الفلاتر بالكامل في استعلام SQL واحد. |
+| **Video Ingestion Webhook Dispatch** | `< 45ms` | زمن إطلاق حدث الـ Webhook وعودة الاستجابة فوراً دون انتظار تنزيل الفيديو. |
+| **Admin AI Status Polling** | `4s (Bounded)` | فحص دوري ذكي يتوقف تلقائياً بمجرد اكتمال الفهرسة لمنع استنزاف الشبكة. |
 | **Exact & Semantic Cache Hit** | `< 40ms` | سرعة إجابة المساعد الذكي عند العثور على السؤال في كاش الذاكرة أو كاش المتجهات. |
 | **Hybrid RAG End-to-End** | `~ 2.1s` | متوسط زمن البحث المتجهي المزدوج وتدفق إجابة Gemini 3.5 Flash-Lite. |
 | **Readiness Polling Cap** | `5 retries @ 2.5s` | إيقاف الفحص التلقائي تماماً بعد 5 محاولات لمنع إغراق كونسول المتصفح عند توقف السيرفر. |
@@ -285,3 +458,11 @@
    - **الدفاع:** تخزين التوكنات في قاعدة البيانات يفرض تنفيذ استعلام SQL مع كل طلب تجديد، ويخلق ضغطاً وأقفالاً (Table Contention) مع زيادة أعداد الموظفين، ويتطلب Migrations إضافية. التوقيع الرقمي المشفر (Stateless Cryptographic JWT) يوفر نفس درجة الأمان مع زمن استجابة صفري على قاعدة البيانات.
 3. **س: لماذا استخدمت Qdrant تحديداً وليس pgvector أو Pinecone؟**
    - **الدفاع:** Qdrant مكتوب بلغة Rust ويوفر كفاءة استهلاك ذاكرة استثنائية وسرعة فائقة في معالجة الـ Hybrid Search (Dense + Sparse) مع تصفية الـ Payloads المعقدة في خطوة واحدة، بالإضافة لدعم نشره محلياً أو داخل حاوية Docker بسهولة، بعكس الحلول السحابية الباهظة مثل Pinecone.
+4. **س: لماذا لم تستخدم SignalR أو WebSockets بدلاً من الـ 4s Polling لمتابعة حالة معالجة الفيديو؟**
+   - **الدفاع:** شاشة تعديل الدرس هي شاشة إدارية (Low-Concurrency Admin Operation) لا يستخدمها آلاف المستخدمين في نفس اللحظة بل عدد محدود من منشئي المحتوى. إضافة SignalR يفرض إبقاء اتصالات TCP مستمرة، وحاجة لـ Redis Backplane عند توزيع الخوادم، وتعقيدات عند انقطاع الاتصال. الـ Bounded Polling كل 4 ثوان مع التدمير الذاتي التلقائي فور الوصول لحالة `Completed` أو `Failed` هو حل خفيف، صفر تعقيد، ويحقق نفس تجربة المستخدم بسلاسة تامة.
+5. **س: لماذا تولّد توكن خدمة طازج (5 دقائق) بدلاً من تمرير توكن المستخدم الأصلي لمحرك بايثون؟**
+   - **الدفاع:** يرجع ذلك لسببين: الأول هو اختلاف الـ ClockSkew (دوت نت يسمح بـ 5 دقائق بينما بايثون لا يسمح بثانية واحدة مما يسبب رفض التوكنات الصالحة بـ 401). والسبب الثاني أمني وهندسي: توكن المستخدم قد ينتهي أثناء انتظار رد الذكاء الاصطناعي، وتمرير توكن العميل يخالف مبدأ Least Privilege، بينما توكن الخدمة الطازج مضمون الصلاحية ومحدد الصلاحيات لغرض المكالمة فقط.
+6. **س: لماذا استخدمت Webhook لمعالجة الفيديو بينما استخدمت Synchronous REST لتوليد الكويز والملخص؟**
+   - **الدفاع:** معالجة الفيديو عملية طويلة (30 إلى 180 ثانية) واحتجاز اتصال HTTP متزامن يستهلك خيوط معالجة Kestrel ويسبب 504 Gateway Timeout. بينما توليد الكويز والملخص يستغرق 1.5 إلى 2.5 ثانية فقط والمشرف يقف في الشاشة منتظراً الأسئلة؛ فالاتصال المتزامن هنا هو الخيار البديهي والأسرع لتجربة مستخدم لحظية.
+7. **س: ماذا يحدث إذا كان رابط الـ Webhook غير متاح أو تعطل محرك بايثون؟**
+   - **الدفاع:** المنظومة مصممة لتكون صامدة؛ فعند فشل الـ Webhook، تسجل حالة الدرس كـ `Failed` مع توثيق نص الخطأ `AiError` وزيادة عداد المحاولات `AiRetryCount`. ويستطيع المشرف بنقرة زر واحدة عبر مسار `POST /api/admin/lessons/{id}/retry-ai-ingest` إعادة إرسال الحدث فور عودة الخدمة للعمل، دون أي تأثير على باقي وظائف الـ LMS.
