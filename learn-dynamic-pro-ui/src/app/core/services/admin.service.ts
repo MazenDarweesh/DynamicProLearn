@@ -294,4 +294,11 @@ export class AdminService {
   getLessonSummary(lessonId: string): Observable<any> {
     return this.http.get(`${this.apiUrl}/lessons/${lessonId}/summary`);
   }
+
+  getLessonAiJobStatus(lessonId: string, jobId?: string): Observable<any> {
+    const url = jobId 
+      ? `${this.apiUrl}/lessons/${lessonId}/ai-job-status/${jobId}`
+      : `${this.apiUrl}/lessons/${lessonId}/ai-job-status`;
+    return this.http.get(url);
+  }
 }

@@ -20,11 +20,13 @@
 ## ✨ Key Features
 
 ### 🎭 1. Role-Based Portals & Workflows
+
 - **Admin Portal:** Comprehensive curriculum authoring (Modules → Units → Lessons), cross-company department management, employee track assignments, and live progress analytics.
 - **Student (Employee) Portal:** Assigned learning tracks, interactive video player with deep-linking, automatic progress logging, AI-generated practice quizzes, and lesson summaries.
 - **Tester Portal:** ERP version matrix evaluation, version-specific module testing assignments, and standardized QA feedback submissions (Pass, Fail, Regression, UI Glitch).
 
 ### 🤖 2. Context-Aware LMS AI Co-Pilot
+
 - **Streaming RAG Pipeline:** Powered by Python FastAPI, Qdrant Vector DB, BGE-M3 dense embeddings, BM25 sparse search, and Google Gemini 3.5 Flash-Lite (`gemini-3.5-flash-lite`) for accurate contextual answers.
 - **Answer Provenance & Latency Badges:** Live visual feedback displaying whether an answer was served via ⚡ **Instant Cache** (`< 40ms`) or 🧠 **Live LLM Generation** (`~2.1s`).
 - **Interactive Video Citations:** Instant timestamp seeking (`[1] (01:23)`) that synchronizes directly with the video lesson player.
@@ -34,40 +36,49 @@
 - **Floating Drag & Drop Widget:** Built using `@angular/cdk/drag-drop` (`cdkDrag`, `boundary="body"`), allowing users to position the assistant anywhere on screen.
 
 ### 🧭 3. Hierarchical Dynamic Co-Pilot Top Filters
+
 - **Scoped Knowledge Queries:** Student-facing filter bar featuring segmented scope switching (Current Lesson, Current Module, All Assigned Tracks), cascading dropdowns (Module → Unit → Lesson), and difficulty level/type chips.
 - **Single-Query Projection:** Backed by `GET /api/student/copilot-filters` which executes a single, highly-optimized EF Core SQL query strictly bounded to the student's company, department, and assigned curriculum tracks in `< 35ms`.
 
 ### 🔄 4. Zero-Friction Silent Token Refresh (Resilient 401 Interception)
+
 - **Stateless Cryptographic Refresh JWTs:** Dual-token model issuing a 60-minute access token alongside a signed 7-day refresh token (`POST /api/Auth/refresh-token`).
 - **Seamless HTTP & SSE Interception:** Frontend `JwtInterceptor` and streaming SSE fetch client automatically trap `401 Unauthorized` responses, refresh tokens in under 120ms in the background, and replay requests without user logout.
 
 ### 🔐 5. Fresh Backend-to-Backend Service JWT Authentication
+
 - **Zero ClockSkew Failure:** Eliminates the mismatch between ASP.NET Core's default 5-minute `ClockSkew` tolerance and Python FastAPI's zero-tolerance token expiration check.
 - **On-the-Fly Service Tokens:** `ITokenService.GenerateServiceCallToken(userId, role)` issues fresh, short-lived (5-minute) internal JWTs signed with the shared secret per backend-to-backend request, avoiding forwarding stale user tokens during heavy AI workflows.
 
 ### ⚙️ 6. Video AI Ingestion Lifecycle State Machine
+
 - **Deterministic 5-State Life Cycle:** Automatically manages lesson video processing states: `None` → `Queued` → `Processing` → `Completed` / `Failed`.
 - **Database Durability:** Stored in SQL Server via EF Core (`AiStatus`, `AiError`, `AiChunksCount`, `AiProcessedAt`, `AiRetryCount`) as a persistent source of truth across all clients and restarts.
 - **Non-Blocking Execution:** Video uploads or URL updates trigger immediate background processing without blocking .NET HTTP threads or stalling admin UI actions.
 
 ### 📡 7. Bidirectional Inter-Service Webhook Callbacks & Admin Retry
+
 - **Asynchronous Push-Over-Pull:** When a video URL is saved, .NET dispatches a webhook event (`WebhookDispatcher`) to Python's `/v1/ingest`. Once Whisper audio transcription and Qdrant chunk indexing conclude, Python reports back via callback `POST /api/internal/lessons/{lessonId}/ai-status`.
 - **Dual-Header Authentication:** Webhooks and status callbacks authenticate using both `Authorization: Bearer <token>` and `X-Service-Token` headers for maximum interoperability and defense-in-depth.
 - **Admin Ingestion Recovery:** One-click manual retry endpoint `POST /api/admin/lessons/{lessonId}/retry-ai-ingest` resets failed or stalled lessons and re-dispatches the ingestion pipeline.
 
 ### 🖥️ 8. Live Angular 19 AI Status UX & Defensive Guards
+
 - **Smart Bounded Polling:** `LessonEditorComponent` polls lesson status every 4 seconds during `Processing` or `Queued` and automatically terminates polling upon reaching terminal states (`Completed` or `Failed`), eliminating redundant network traffic.
 - **Defensive Action Guards:** "Generate Quiz" and "Generate Summary" buttons are conditionally disabled with informative status alerts until video AI indexing is `Completed`, preventing hallucinations from unindexed content.
 - **Visual Curriculum Indicators:** Instant visual markers in the curriculum tree (`✨` Completed, `⏳` Processing, `❌` Failed) for at-a-glance course status.
 
 ### 📝 9. Automatic Lesson Intelligence
+
 - 1-click AI generation for multiple-choice lesson practice quizzes and concise lesson summaries stored directly in SQL Server via EF Core JSON mapping.
 - Dedicated Admin Proxy endpoint (`POST /api/Admin/ai/cache/clear`) to flush both in-memory and semantic vector caches on demand.
 
 ### 🔗 10. Deep-Link ERP Single Sign-On (SSO)
+
 - Enables employees and testers to launch training tracks directly from within external ERP software windows using an encrypted `erpKey` without requiring manual credential entry.
 
 ### 🐳 11. Zero-Config Multi-Stage Containerization
+
 - Packages the complete Angular 19 SPA static assets and the ASP.NET Core 10 runtime into a single, hardened, unprivileged container under `< 185MB`.
 
 ---
@@ -169,26 +180,26 @@ sequenceDiagram
 The .NET 10 Web API provides over 40+ production endpoints structured across domain controllers:
 
 | Method | Endpoint | Auth Policy | Description |
-|:-------|:---------|:------------|:------------|
+| :------- | :--------- | :------------ | :------------ |
 | `POST` | `/api/Auth/login` | Public | Standard JWT authentication returning access + refresh tokens |
 | `POST` | `/api/Auth/erp-login` | Public | Deep-link SSO from external ERP systems |
 | `POST` | `/api/Auth/refresh-token` | Public | Silent renewal of expired access tokens using 7-day refresh JWT |
-| `GET`  | `/api/Student/copilot-filters` | `StudentOrAbove` | Dynamic hierarchical content tree and metadata filters for scoped AI search |
-| `GET`  | `/api/Student/modules` | `StudentOrAbove` | Retrieve assigned curriculum tracks for authenticated employee |
+| `GET` | `/api/Student/copilot-filters` | `StudentOrAbove` | Dynamic hierarchical content tree and metadata filters for scoped AI search |
+| `GET` | `/api/Student/modules` | `StudentOrAbove` | Retrieve assigned curriculum tracks for authenticated employee |
 | `POST` | `/api/Student/lessons/{id}/complete` | `StudentOrAbove` | Toggle lesson completion status with real-time progress update |
-| `GET`  | `/api/Student/lessons/{id}/quiz` | `StudentOrAbove` | Retrieve interactive practice quiz questions |
+| `GET` | `/api/Student/lessons/{id}/quiz` | `StudentOrAbove` | Retrieve interactive practice quiz questions |
 | `POST` | `/api/Student/lessons/{id}/quiz/check-answer` | `StudentOrAbove` | Instant interactive grading with AI explanation disclosure |
 | `POST` | `/api/Admin/lessons/{id}/generate-quiz` | `AdminOnly` | Trigger AI generation of multiple-choice practice quiz |
 | `POST` | `/api/Admin/lessons/{id}/generate-summary` | `AdminOnly` | Trigger AI generation of lesson summary notes |
 | `POST` | `/api/Admin/lessons/{id}/retry-ai-ingest` | `AdminOnly` | Reset failed/stalled video ingestion state and re-dispatch ingestion event |
 | `POST` | `/api/Admin/ai/cache/clear` | `AdminOnly` | Purge Tier-1 Exact Cache and Tier-2 Semantic Cache in AI engine |
-| `GET`  | `/api/Admin/analytics/curriculum` | `AdminOnly` | Enterprise-wide curriculum engagement metrics |
+| `GET` | `/api/Admin/analytics/curriculum` | `AdminOnly` | Enterprise-wide curriculum engagement metrics |
 | `POST` | `/api/Admin/assignments` | `AdminOnly` | Assign ERP modules to departments with level/type filters |
 | `POST` | `/api/Tester/active-version` | `TesterOnly` | Switch working context between ERP release versions |
 | `POST` | `/api/Tester/feedback` | `TesterOnly` | Submit structured QA evaluation report (Pass/Fail/Bug) |
 | `POST` | `/api/internal/lessons/{id}/ai-status` | `ServiceToken` \| `Bearer` | Webhook callback from AI worker updating video ingestion status, chunks, or errors |
-| `GET`  | `/api/internal/user-permissions/{userId}` | `ServiceToken` | Internal RBAC lookup for Python AI Co-Pilot query scoping |
-| `GET`  | `/api/internal/lessons/{id}/full-context` | `ServiceToken` | Internal metadata injection for vector embeddings |
+| `GET` | `/api/internal/user-permissions/{userId}` | `ServiceToken` | Internal RBAC lookup for Python AI Co-Pilot query scoping |
+| `GET` | `/api/internal/lessons/{id}/full-context` | `ServiceToken` | Internal metadata injection for vector embeddings |
 
 > 📋 **Full Specification:** For all request/response schemas, DTOs, and error codes, refer to the [REST API Reference](docs/API_REFERENCE.md).
 
@@ -197,14 +208,14 @@ The .NET 10 Web API provides over 40+ production endpoints structured across dom
 ## 📊 Real-World Performance & Hardening
 
 | Metric | Measured Value | Architectural Context |
-|:-------|:---------------|:----------------------|
+| :------- | :--------------- | :---------------------- |
 | **Multi-Stage Container** | `< 185 MB` | Node build artifacts and .NET SDKs stripped; minimal ASP.NET runtime only. |
 | **Stateless Auth Validation** | `< 20 ms` | Cryptographic signature verification avoids database round-trips on routes. |
 | **Silent Token Refresh** | `< 120 ms` | Non-blocking token renewal via reactive RxJS mutex interceptor. |
 | **Service-to-Service JWT Minting** | `< 1 ms` | In-memory HMAC-SHA256 signature with zero DB lookup avoiding ClockSkew mismatches. |
 | **Copilot Filter Tree Projection** | `< 35 ms` | Single-query EF Core SQL projection strictly scoped to student RBAC permissions. |
-| **Video Ingestion Webhook Dispatch**| `< 45 ms` | Non-blocking event dispatch; heavy Whisper transcription runs asynchronously. |
-| **Admin AI Status Polling Interval**| `4 s (Bounded)`| Automatically self-terminates upon terminal status (`Completed` / `Failed`). |
+| **Video Ingestion Webhook Dispatch** | `< 45 ms` | Non-blocking event dispatch; heavy Whisper transcription runs asynchronously. |
+| **Admin AI Status Polling Interval** | `4 s (Bounded)` | Automatically self-terminates upon terminal status (`Completed` / `Failed`). |
 | **AI Exact/Semantic Cache** | `< 40 ms` | Tier-1 memory cache and Tier-2 Qdrant cosine similarity cache hits. |
 | **AI Live RAG Generation** | `~ 2.1 s` | Hybrid BGE-M3 + BM25 retrieval, rerank, and Gemini 3.5 Flash-Lite streaming tokens. |
 | **Readiness Polling Cap** | `Max 5 checks` | Bounded polling (2.5s interval) stops network flooding when AI engine is offline. |
@@ -215,7 +226,7 @@ The .NET 10 Web API provides over 40+ production endpoints structured across dom
 ## 🛠️ Technology Stack
 
 | Category | Technologies |
-|:---------|:-------------|
+| :--------- | :------------- |
 | **Backend Core** | .NET 10.0, ASP.NET Core Web API, C# 12 |
 | **Architecture** | Clean Architecture (Domain, Application, Infrastructure, API), CQRS, Repository Pattern |
 | **Database & ORM** | SQL Server 2022, Entity Framework Core 10.0, JSON Column Mappings |
@@ -223,7 +234,7 @@ The .NET 10 Web API provides over 40+ production endpoints structured across dom
 | **UI Ergonomics** | Vanilla CSS Design System, `@angular/cdk/drag-drop`, `ngx-markdown` |
 | **AI Co-Pilot Stack** | Python 3.11+, FastAPI, Qdrant Vector DB, BAAI/bge-m3, BM25, Google Gemini 3.5 Flash-Lite |
 | **Security & Auth** | Dual-Token JWT (Access + Refresh), Service Call Tokens, BCrypt Hashing, RBAC Policies |
-| **DevOps & Containers**| Multi-stage Docker, Docker Compose, Non-root `app` User Hardening |
+| **DevOps & Containers** | Multi-stage Docker, Docker Compose, Non-root `app` User Hardening |
 
 ---
 
@@ -240,30 +251,34 @@ cd DynamicProLearn
 docker compose -f deployment/docker-compose.yml up -d
 ```
 
-* **Web Application:** `http://localhost:8080`
-* **Default Admin Credentials:** `admin` / `Admin@123`
-* **Default Student Credentials:** `student` / `Student@123`
-* **Default Tester Credentials:** `tester` / `Tester@123`
+- **Web Application:** `http://localhost:8080`
+- **Default Admin Credentials:** `admin` / `Admin@123`
+- **Default Student Credentials:** `student` / `Student@123`
+- **Default Tester Credentials:** `tester` / `Tester@123`
 
 ---
 
 ### Option B: Local Development Setup
 
 #### 1. Backend (.NET 10 API)
+
 ```bash
 # From repository root
 dotnet restore
 dotnet build
 dotnet run --project src/LearnDynamicPro.API
 ```
+
 *API will run on `http://localhost:5115` with Swagger UI at `http://localhost:5115/swagger`.*
 
 #### 2. Frontend (Angular 19 UI)
+
 ```bash
 cd learn-dynamic-pro-ui
 npm install
 npm start
 ```
+
 *Frontend will run on `http://localhost:4200`.*
 
 ---
@@ -310,10 +325,10 @@ npm start
 ## 👨‍💻 Author
 
 **Mazen Darweesh**  
-*Principal Software Engineer & Technical Lead*  
 [GitHub Profile](https://github.com/MazenDarweesh) | [Docker Hub](https://hub.docker.com/r/mazendarweesh/dynamicprolearn) | [LinkedIn](https://linkedin.com/in/mazen-darweesh)
 
 ---
 
 ## 📄 License
+
 This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.

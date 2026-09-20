@@ -79,6 +79,23 @@ export class LessonEditorComponent implements OnChanges, OnDestroy {
         });
       }, 4000);
     }
+
+    if (this.lesson?.id) {
+      this.adminService.getLessonAiJobStatus(this.lesson.id).subscribe({
+        next: (job) => {
+          if (job && (job.status === 1 || job.status === 'Processing' || job.status === 0 || job.status === 'Pending')) {
+            if (job.jobType === 'Quiz' && !this.isGeneratingQuiz) {
+              this.isGeneratingQuiz = true;
+              this.pollAiJobStatus(this.lesson.id, job.jobId, 'Quiz');
+            } else if (job.jobType === 'Summary' && !this.isGeneratingSummary) {
+              this.isGeneratingSummary = true;
+              this.pollAiJobStatus(this.lesson.id, job.jobId, 'Summary');
+            }
+          }
+        },
+        error: () => {}
+      });
+    }
   }
 
   stopPolling(): void {
@@ -124,41 +141,79 @@ export class LessonEditorComponent implements OnChanges, OnDestroy {
   }
 
   generateQuiz(): void {
+    this.startAiGeneration('Quiz');
+  }
+
+  generateSummary(): void {
+    this.startAiGeneration('Summary');
+  }
+
+  private startAiGeneration(jobType: 'Quiz' | 'Summary'): void {
     if (!this.lesson?.id) return;
-    this.isGeneratingQuiz = true;
-    this.adminService.generateLessonQuiz(this.lesson.id).subscribe({
-      next: () => {
-        this.isGeneratingQuiz = false;
-        Dialog.alert('تم توليد اختبار الدرس بالذكاء الاصطناعي بنجاح وحفظه في النظام.', 'نجاح', 'success');
-        this.fetchExistingAiContent();
+    const isQuiz = jobType === 'Quiz';
+    if (isQuiz) this.isGeneratingQuiz = true; else this.isGeneratingSummary = true;
+
+    const action$ = isQuiz 
+      ? this.adminService.generateLessonQuiz(this.lesson.id)
+      : this.adminService.generateLessonSummary(this.lesson.id);
+
+    const label = isQuiz ? 'اختبار' : 'ملخص';
+
+    action$.subscribe({
+      next: (job) => {
+        Dialog.toast(`بدأ توليد ${label} الدرس بالذكاء الاصطناعي في الخلفية...`, 'info');
+        this.pollAiJobStatus(this.lesson.id, job?.jobId || job?.id, jobType);
       },
       error: (err) => {
-        this.isGeneratingQuiz = false;
+        if (isQuiz) this.isGeneratingQuiz = false; else this.isGeneratingSummary = false;
         const msg = typeof err?.error === 'string' 
           ? err.error 
-          : (err?.error?.message || err?.error?.detail || 'عفواً، تعذر توليد الاختبار. تأكد من أن الدرس تمت معالجته في محرك الذكاء الاصطناعي.');
+          : (err?.error?.message || err?.error?.detail || `عفواً، تعذر توليد ال${label}. تأكد من أن الدرس تمت معالجته في محرك الذكاء الاصطناعي.`);
         Dialog.alert(msg, 'تنبيه', 'error');
       }
     });
   }
 
-  generateSummary(): void {
-    if (!this.lesson?.id) return;
-    this.isGeneratingSummary = true;
-    this.adminService.generateLessonSummary(this.lesson.id).subscribe({
-      next: () => {
-        this.isGeneratingSummary = false;
-        Dialog.alert('تم توليد ملخص الدرس بالذكاء الاصطناعي بنجاح وحفظه في النظام.', 'نجاح', 'success');
-        this.fetchExistingAiContent();
-      },
-      error: (err) => {
-        this.isGeneratingSummary = false;
-        const msg = typeof err?.error === 'string' 
-          ? err.error 
-          : (err?.error?.message || err?.error?.detail || 'عفواً، تعذر توليد الملخص. تأكد من أن الدرس تمت معالجته في محرك الذكاء الاصطناعي.');
-        Dialog.alert(msg, 'تنبيه', 'error');
-      }
-    });
+  private pollAiJobStatus(lessonId: string, jobId: string | undefined, jobType: 'Quiz' | 'Summary'): void {
+    const isQuiz = jobType === 'Quiz';
+    const label = isQuiz ? 'اختبار' : 'ملخص';
+    const setBusy = (val: boolean) => {
+      if (isQuiz) this.isGeneratingQuiz = val; else this.isGeneratingSummary = val;
+    };
+
+    let attempts = 0;
+    const interval = setInterval(() => {
+      attempts++;
+      this.adminService.getLessonAiJobStatus(lessonId, jobId).subscribe({
+        next: (job) => {
+          if (!job) return;
+          const isCompleted = job.status === 2 || job.status === 'Completed';
+          const isFailed = job.status === 3 || job.status === 'Failed';
+
+          if (isCompleted) {
+            clearInterval(interval);
+            setBusy(false);
+            Dialog.toast(`تم اكتمال توليد ${label} الدرس بالذكاء الاصطناعي بنجاح!`, 'success');
+            if (isQuiz) {
+              this.adminService.getLessonQuiz(lessonId).subscribe(data => this.quizData = data);
+            } else {
+              this.adminService.getLessonSummary(lessonId).subscribe(data => this.summaryData = data);
+            }
+          } else if (isFailed || attempts > 30) {
+            clearInterval(interval);
+            setBusy(false);
+            const errorMsg = job.error || (attempts > 30 ? 'انتهت مهلة انتظار المعالجة في الخلفية.' : 'فشلت معالجة المهمة.');
+            Dialog.toast(errorMsg, 'error');
+          }
+        },
+        error: () => {
+          if (attempts > 15) {
+            clearInterval(interval);
+            setBusy(false);
+          }
+        }
+      });
+    }, 2000);
   }
 
   openQuizModal(): void {

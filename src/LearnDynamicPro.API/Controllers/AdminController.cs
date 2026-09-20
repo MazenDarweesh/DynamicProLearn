@@ -333,15 +333,15 @@ public class AdminController : ControllerBase
     [HttpPost("lessons/{lessonId}/generate-quiz")]
     public async Task<IActionResult> GenerateLessonQuiz(Guid lessonId)
     {
-        _logger.LogInformation("[AdminAPI] GenerateLessonQuiz REQUEST | LessonId={LessonId}", lessonId);
-        var result = await _lessonAiService.GenerateLessonQuizAsync(lessonId);
-        if (!result.IsSuccess)
+        _logger.LogInformation("[AdminAPI] GenerateLessonQuiz ENQUEUE REQUEST | LessonId={LessonId}", lessonId);
+        var result = await _lessonAiService.EnqueueLessonQuizGenerationAsync(lessonId);
+        if (!result.IsSuccess || result.Value == null)
         {
             _logger.LogWarning("[AdminAPI] GenerateLessonQuiz FAIL | LessonId={LessonId} Error={Error}", lessonId, result.Error);
-            return BadRequest(result.Error);
+            return BadRequest(result.Error ?? "Failed to enqueue quiz generation job");
         }
-        _logger.LogInformation("[AdminAPI] GenerateLessonQuiz OK | LessonId={LessonId}", lessonId);
-        return Ok();
+        _logger.LogInformation("[AdminAPI] GenerateLessonQuiz ACCEPTED (202) | LessonId={LessonId} JobId={JobId}", lessonId, result.Value.JobId);
+        return Accepted($"/api/Admin/lessons/{lessonId}/ai-job-status/{result.Value.JobId}", result.Value);
     }
 
     [HttpGet("lessons/{lessonId}/quiz")]
@@ -362,15 +362,15 @@ public class AdminController : ControllerBase
     [HttpPost("lessons/{lessonId}/generate-summary")]
     public async Task<IActionResult> GenerateLessonSummary(Guid lessonId)
     {
-        _logger.LogInformation("[AdminAPI] GenerateLessonSummary REQUEST | LessonId={LessonId}", lessonId);
-        var result = await _lessonAiService.GenerateLessonSummaryAsync(lessonId);
-        if (!result.IsSuccess)
+        _logger.LogInformation("[AdminAPI] GenerateLessonSummary ENQUEUE REQUEST | LessonId={LessonId}", lessonId);
+        var result = await _lessonAiService.EnqueueLessonSummaryGenerationAsync(lessonId);
+        if (!result.IsSuccess || result.Value == null)
         {
             _logger.LogWarning("[AdminAPI] GenerateLessonSummary FAIL | LessonId={LessonId} Error={Error}", lessonId, result.Error);
-            return BadRequest(result.Error);
+            return BadRequest(result.Error ?? "Failed to enqueue summary generation job");
         }
-        _logger.LogInformation("[AdminAPI] GenerateLessonSummary OK | LessonId={LessonId}", lessonId);
-        return Ok();
+        _logger.LogInformation("[AdminAPI] GenerateLessonSummary ACCEPTED (202) | LessonId={LessonId} JobId={JobId}", lessonId, result.Value.JobId);
+        return Accepted($"/api/Admin/lessons/{lessonId}/ai-job-status/{result.Value.JobId}", result.Value);
     }
 
     [HttpGet("lessons/{lessonId}/summary")]
@@ -385,6 +385,18 @@ public class AdminController : ControllerBase
         }
         _logger.LogInformation("[AdminAPI] GetLessonSummary OK | LessonId={LessonId}", lessonId);
         return Ok(result.Value);
+    }
+
+    [HttpGet("lessons/{lessonId}/ai-job-status")]
+    [HttpGet("lessons/{lessonId}/ai-job-status/{jobId}")]
+    public IActionResult GetLessonAiJobStatus(Guid lessonId, Guid? jobId = null)
+    {
+        var job = _lessonAiService.GetAiJobStatus(lessonId, jobId);
+        if (job == null)
+        {
+            return NotFound(new { message = "No AI generation job found for this lesson" });
+        }
+        return Ok(job);
     }
 
     // ── Assignments ─────────────────────────────────────────────────────────

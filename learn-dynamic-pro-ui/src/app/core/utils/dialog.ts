@@ -162,4 +162,78 @@ export class Dialog {
       };
     });
   }
+
+  static toast(message: string, type: 'success' | 'error' | 'info' = 'info', durationMs = 4000): void {
+    let container = document.getElementById('custom-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'custom-toast-container';
+      container.style.position = 'fixed';
+      container.style.top = '20px';
+      container.style.left = '50%';
+      container.style.transform = 'translateX(-50%)';
+      container.style.display = 'flex';
+      container.style.flexDirection = 'column';
+      container.style.gap = '10px';
+      container.style.zIndex = '100000';
+      container.style.pointerEvents = 'none';
+      container.dir = 'rtl';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.style.pointerEvents = 'auto';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '10px';
+    toast.style.padding = '12px 20px';
+    toast.style.borderRadius = '10px';
+    toast.style.fontFamily = "'Readex Pro', sans-serif";
+    toast.style.fontSize = '14px';
+    toast.style.fontWeight = '500';
+    toast.style.boxShadow = '0 8px 24px rgba(0,0,0,0.15)';
+    toast.style.transition = 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateY(-20px)';
+
+    let iconSvg = '';
+    if (type === 'success') {
+      toast.style.backgroundColor = 'var(--color-bg-card, #ffffff)';
+      toast.style.color = '#0f5132';
+      toast.style.border = '1px solid #198754';
+      iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#198754" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`;
+    } else if (type === 'error') {
+      toast.style.backgroundColor = 'var(--color-bg-card, #ffffff)';
+      toast.style.color = '#842029';
+      toast.style.border = '1px solid #dc3545';
+      iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dc3545" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>`;
+    } else {
+      toast.style.backgroundColor = 'var(--color-bg-card, #ffffff)';
+      toast.style.color = 'var(--color-primary, #2E5FD9)';
+      toast.style.border = '1px solid var(--color-primary, #2E5FD9)';
+      iconSvg = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`;
+    }
+
+    toast.innerHTML = `<span>${iconSvg}</span><span>${message}</span>`;
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.style.opacity = '1';
+      toast.style.transform = 'translateY(0)';
+    }, 20);
+
+    const dismiss = () => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(-10px)';
+      setTimeout(() => {
+        toast.remove();
+        if (container && container.children.length === 0) {
+          container.remove();
+        }
+      }, 300);
+    };
+
+    setTimeout(dismiss, durationMs);
+    toast.onclick = dismiss;
+  }
 }

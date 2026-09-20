@@ -100,6 +100,7 @@ builder.Services.AddScoped<IProgressService, ProgressService>();
 builder.Services.AddScoped<IProgressAnalyticsService, ProgressAnalyticsService>();
 builder.Services.AddScoped<ITesterService, TesterService>();
 builder.Services.AddScoped<ILessonAiService, LessonAiService>();
+builder.Services.AddSingleton<LearnDynamicPro.Application.Interfaces.IAiJobTracker, LearnDynamicPro.Infrastructure.Services.AiJobTracker>();
 builder.Services.AddHttpClient<IWebhookDispatcher, LearnDynamicPro.Infrastructure.Services.WebhookDispatcher>();
 builder.Services.AddHttpClient<IPythonAiClient, LearnDynamicPro.Infrastructure.Services.PythonAiClient>();
 
