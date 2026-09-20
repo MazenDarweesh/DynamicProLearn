@@ -10,6 +10,7 @@ export interface AdminModuleDto {
 export interface LookupDto {
   id: string;
   label: string;
+  sortOrder?: number;
 }
 
 export interface CompanyDto {

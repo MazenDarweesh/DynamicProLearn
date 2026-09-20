@@ -203,6 +203,13 @@ export class ContentBuilderComponent implements OnInit {
 
   createLesson(event: {unit: any, title: string}) {
     const { unit, title } = event;
+    const defaultLevelId = this.lookups.levels.length ? this.lookups.levels[0].id : '00000000-0000-0000-0000-000000000001';
+    
+    // Auto-calculate max(levelOrderIndex) + 1 for default level across all units in this module
+    const allLessons = this.units.flatMap(u => u.lessons || []);
+    const existingInLevel = allLessons.filter(l => l.levelId === defaultLevelId);
+    const maxOrder = existingInLevel.reduce((max, l) => Math.max(max, l.levelOrderIndex || 0), 0);
+
     const payload = {
       unitId: unit.id,
       title: title,
@@ -210,10 +217,10 @@ export class ContentBuilderComponent implements OnInit {
       videoUrl: '',
       pdfUrl: '',
       externalLink: '',
-      levelId: this.lookups.levels.length ? this.lookups.levels[0].id : '00000000-0000-0000-0000-000000000001',
+      levelId: defaultLevelId,
       typeId: this.lookups.types.length ? this.lookups.types[0].id : '00000000-0000-0000-0000-000000000001',
       orderIndex: unit.lessons.length + 1,
-      levelOrderIndex: 1
+      levelOrderIndex: maxOrder + 1
     };
 
     this.adminService.createLesson(payload).subscribe({

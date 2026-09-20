@@ -137,6 +137,19 @@ public class ModuleService : IModuleService
         if (!await _unitOfWork.Repository<TypeOption>().Query().AnyAsync(t => t.Id == typeId))
             typeId = (await _unitOfWork.Repository<TypeOption>().Query().FirstOrDefaultAsync())?.Id ?? typeId;
 
+        var levelOrderIndex = request.LevelOrderIndex;
+        if (levelOrderIndex <= 0)
+        {
+            var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(request.UnitId);
+            var moduleId = unit?.ModuleId;
+
+            var maxLevelOrder = await _unitOfWork.Repository<Lesson>().Query()
+                .Where(l => l.LevelId == levelId && (moduleId == null || l.Unit!.ModuleId == moduleId))
+                .MaxAsync(l => (int?)l.LevelOrderIndex) ?? 0;
+
+            levelOrderIndex = maxLevelOrder + 1;
+        }
+
         var hasVideo = !string.IsNullOrWhiteSpace(request.VideoUrl);
         var lesson = new Lesson 
         { 
@@ -149,7 +162,7 @@ public class ModuleService : IModuleService
             TypeId = typeId,
             Description = request.Description,
             OrderIndex = request.OrderIndex,
-            LevelOrderIndex = request.LevelOrderIndex,
+            LevelOrderIndex = levelOrderIndex,
             AiStatus = hasVideo ? LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued : LearnDynamicPro.Domain.Enums.LessonAiStatus.None
         };
         await _unitOfWork.Repository<Lesson>().AddAsync(lesson);
@@ -202,8 +215,21 @@ public class ModuleService : IModuleService
         lesson.LevelId = levelId;
         lesson.TypeId = typeId;
         lesson.Description = request.Description;
+        var levelOrderIndex = request.LevelOrderIndex;
+        if (levelOrderIndex <= 0)
+        {
+            var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(lesson.UnitId);
+            var moduleId = unit?.ModuleId;
+
+            var maxLevelOrder = await _unitOfWork.Repository<Lesson>().Query()
+                .Where(l => l.LevelId == levelId && l.Id != id && (moduleId == null || l.Unit!.ModuleId == moduleId))
+                .MaxAsync(l => (int?)l.LevelOrderIndex) ?? 0;
+
+            levelOrderIndex = maxLevelOrder + 1;
+        }
+
         lesson.OrderIndex = request.OrderIndex;
-        lesson.LevelOrderIndex = request.LevelOrderIndex;
+        lesson.LevelOrderIndex = levelOrderIndex;
         
         var hasVideo = !string.IsNullOrWhiteSpace(lesson.VideoUrl);
         if (hasVideo && (videoChanged || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.None || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Failed))

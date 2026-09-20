@@ -361,7 +361,28 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   addLessonToUnit(unitIndex: number) {
-    this.newUnitsList[unitIndex].lessons.push({ title: '', videoUrl: '', levelId: '', typeId: '', orderIndex: 1, levelOrderIndex: 1 });
+    const allLessons = this.newUnitsList.flatMap(u => u.lessons || []);
+    const defaultLevelId = this.allLevels.length ? this.allLevels[0].id : '';
+    const defaultTypeId = this.allTypes.length ? this.allTypes[0].id : '';
+    const existingInLevel = allLessons.filter(l => l.levelId === defaultLevelId);
+    const maxOrder = existingInLevel.reduce((max, l) => Math.max(max, l.levelOrderIndex || 0), 0);
+
+    this.newUnitsList[unitIndex].lessons.push({ 
+      title: '', 
+      videoUrl: '', 
+      levelId: defaultLevelId, 
+      typeId: defaultTypeId, 
+      orderIndex: this.newUnitsList[unitIndex].lessons.length + 1, 
+      levelOrderIndex: maxOrder + 1 
+    });
+  }
+
+  onModalLessonLevelChange(lesson: any, newLevelId: string) {
+    lesson.levelId = newLevelId;
+    const allLessons = this.newUnitsList.flatMap(u => u.lessons || []);
+    const otherLessonsInLevel = allLessons.filter(l => l !== lesson && l.levelId === newLevelId);
+    const maxOrder = otherLessonsInLevel.reduce((max, l) => Math.max(max, l.levelOrderIndex || 0), 0);
+    lesson.levelOrderIndex = maxOrder + 1;
   }
 
   removeLessonFromUnit(unitIndex: number, lessonIndex: number) {

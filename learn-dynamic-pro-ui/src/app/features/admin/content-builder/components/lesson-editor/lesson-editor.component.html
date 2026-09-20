@@ -9,7 +9,7 @@
   <div class="d-flex gap-3 mb-3">
     <div class="form-group flex-1">
       <label>مستوى الدرس (Level)</label>
-      <select class="form-control" [(ngModel)]="lesson.levelId">
+      <select class="form-control" [ngModel]="lesson.levelId" (ngModelChange)="onLevelChange($event)">
         <option *ngFor="let level of lookups.levels" [ngValue]="level.id">{{ level.label }}</option>
       </select>
     </div>

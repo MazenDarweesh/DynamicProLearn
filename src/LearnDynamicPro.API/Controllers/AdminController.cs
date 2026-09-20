@@ -57,7 +57,8 @@ public class AdminController : ControllerBase
     {
         var levels = await _context.LevelOptions
             .AsNoTracking()
-            .Select(l => new { l.Id, l.Label })
+            .OrderBy(l => l.SortOrder)
+            .Select(l => new { l.Id, l.Label, l.SortOrder })
             .ToListAsync();
         return Ok(levels);
     }

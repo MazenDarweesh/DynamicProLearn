@@ -493,7 +493,7 @@
                 <input type="text" class="form-control modal-input text-sm mb-2" [(ngModel)]="lesson.videoUrl" placeholder="رابط فيديو الشرح (YouTube/Vimeo...)">
                 <div class="d-flex gap-2">
                   <div class="custom-select-wrapper flex-1">
-                    <select class="form-control text-sm blue-select" [(ngModel)]="lesson.levelId">
+                    <select class="form-control text-sm blue-select" [ngModel]="lesson.levelId" (ngModelChange)="onModalLessonLevelChange(lesson, $event)">
                       <option value="" disabled>اختر المستوى...</option>
                       <option *ngFor="let lvl of allLevels" [value]="lvl.id">{{ lvl.label }}</option>
                     </select>

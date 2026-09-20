@@ -15,6 +15,7 @@ import { Dialog } from '../../../../../core/utils/dialog';
 export class LessonEditorComponent implements OnChanges, OnDestroy {
   @Input() lesson: any;
   @Input() lookups!: { levels: LookupDto[], types: LookupDto[] };
+  @Input() units: any[] = [];
 
   private adminService = inject(AdminService);
   
@@ -301,5 +302,24 @@ export class LessonEditorComponent implements OnChanges, OnDestroy {
         Dialog.alert('حدث خطأ أثناء رفع الملف', 'خطأ', 'error');
       }
     });
+  }
+
+  onLevelChange(newLevelId: string): void {
+    if (!this.lesson) return;
+    this.lesson.levelId = newLevelId;
+
+    const selectedLevel = this.lookups?.levels?.find((lvl: any) => lvl.id === newLevelId);
+    if (selectedLevel) {
+      this.lesson.levelLabel = selectedLevel.label;
+      if (selectedLevel.sortOrder !== undefined) {
+        this.lesson.levelSortOrder = selectedLevel.sortOrder;
+      }
+    }
+
+    const allLessons = (this.units || []).flatMap((u: any) => u.lessons || []);
+    const otherLessonsInNewLevel = allLessons.filter((l: any) => l.id !== this.lesson.id && l.levelId === newLevelId);
+    const maxOrder = otherLessonsInNewLevel.reduce((max: number, l: any) => Math.max(max, l.levelOrderIndex || 0), 0);
+
+    this.lesson.levelOrderIndex = maxOrder + 1;
   }
 }
