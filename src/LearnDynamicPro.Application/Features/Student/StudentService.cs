@@ -37,6 +37,23 @@ public class StudentService : IStudentService
         if (userInfo == null)
             return Result<List<ModuleDto>>.Failure(AppErrors.Authentication.UserNotFound);
 
+        if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Admin)
+        {
+            var adminModules = await _unitOfWork.Repository<Module>().Query()
+                .AsNoTracking()
+                .Select(m => new ModuleDto
+                {
+                    Id = m.Id,
+                    Name = m.Name,
+                    Description = m.Description
+                })
+                .Distinct()
+                .OrderBy(m => m.Name)
+                .ToListAsync();
+
+            return Result<List<ModuleDto>>.Success(adminModules);
+        }
+
         if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
         {
             var testerModules = await _unitOfWork.Repository<VersionTester>().Query()
@@ -915,7 +932,13 @@ public class StudentService : IStudentService
 
         IQueryable<Lesson> accessibleLessonsQuery;
 
-        if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
+        if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Admin)
+        {
+            // Admins have unrestricted access to all modules, units, and lessons across the platform
+            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking();
+        }
+        else if (userInfo.Role == LearnDynamicPro.Domain.Enums.UserRole.Tester)
         {
             var assignedModuleIds = await _unitOfWork.Repository<VersionTester>().Query()
                 .AsNoTracking()
@@ -930,16 +953,33 @@ public class StudentService : IStudentService
         }
         else
         {
-            var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
-                .Where(a => a.DepartmentId == userInfo.DepartmentId);
+            if (!userInfo.DepartmentId.HasValue || userInfo.DepartmentId == Guid.Empty)
+            {
+                // Fallback for students without department
+                accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query().AsNoTracking();
+            }
+            else
+            {
+                var assignments = _unitOfWork.Repository<DepartmentModuleAssignment>().Query()
+                    .Where(a => a.DepartmentId == userInfo.DepartmentId);
 
-            accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
-                .AsNoTracking()
-                .Where(l => assignments.Any(a =>
-                    a.ModuleId == l.Unit!.ModuleId &&
-                    (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
-                    (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))
-                ));
+                var hasAssignments = await assignments.AnyAsync();
+                if (!hasAssignments)
+                {
+                    // Fallback: If student's department has no specific assignments yet, show available lessons
+                    accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query().AsNoTracking();
+                }
+                else
+                {
+                    accessibleLessonsQuery = _unitOfWork.Repository<Lesson>().Query()
+                        .AsNoTracking()
+                        .Where(l => assignments.Any(a =>
+                            a.ModuleId == l.Unit!.ModuleId &&
+                            (!a.LevelFilters.Any() || a.LevelFilters.Any(lf => lf.LevelId == l.LevelId)) &&
+                            (!a.TypeFilters.Any() || a.TypeFilters.Any(tf => tf.TypeId == l.TypeId))
+                        ));
+                }
+            }
         }
 
         // 1. Single efficient projection of accessible lessons with Unit and Module details

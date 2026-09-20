@@ -41,6 +41,9 @@ public class StudentController : ControllerBase
     }
 
     [HttpGet("copilot-filters")]
+    [HttpGet("copilot-filter")]
+    [HttpGet("/api/v1/student/copilot-filters")]
+    [HttpGet("/api/v1/student/copilot-filter")]
     public async Task<IActionResult> GetCopilotFilters()
     {
         _logger.LogInformation("[StudentAPI] GetCopilotFilters REQUEST | UserId={UserId}", _currentUserService.UserId);
