@@ -46,6 +46,13 @@ graph TD
 ---
 
 ### 2️⃣ المحور الثاني: توقيع الـ Webhooks بـ HMAC-SHA256 (Stripe/GitHub Standard)
+* **الحالة:** ✅ **تم التنفيذ والاختبار التكاملي الميداني والإغلاق بالكامل بنجاح (100% Completed & Verified E2E)**
+  - تم تحديث [`WebhookDispatcher.cs`](file:///e:/Mazen/DynamicProLearn/src/LearnDynamicPro.Infrastructure/Services/WebhookDispatcher.cs) لحساب توقيع `HMAC-SHA256` وإرسال الترويسات الرقمية الصارمة `X-Signature-256` و `X-Timestamp`.
+  - تم إعداد المفتاح المشترك `AiCoPilot:WebhookSecret` في `appsettings.json` و `appsettings.Development.json` ومطابقته مع `.env` في بايثون.
+  - تم تنفيذ واختبار المدقق في بايثون ونجاح كافة الاختبارات الـ 7 (`7/7 Passed`).
+  - **الاختبار الميداني الحي (Live E2E):** تم إرسال حدث تحديث درس حقيقي بنجاح تام وحصل على رد **`202 Accepted`** من بايثون متبوعاً بجلب السياق الكامل `GetLessonFullContext`.
+  - تم تنظيف الكود وحذف التوكنات القديمة (`X-Service-Token` و `Bearer`) ليصبح النظام محكوماً بنظام التوقيع الرقمي الصارم حصراً.
+  - نجاح بناء المشروع: **0 Warnings, 0 Errors**.
 
 #### 🧐 النقد الذاتي للمصادقة المزدوجة (Brutal Tech Lead Critique):
 * **الحقيقة الهندسية:** إرسال هيدرين لنفس الغرض (`Bearer` + `X-Service-Token`) يُعتبر في علم المعمارية **(Code Smell / Defensive Hack)**، ويعكس عدم وجود اتفاق صارم (Strict API Contract) بين الفريقين منذ اليوم الأول؛ فالأصل في الأنظمة الموزعة هو وجود معيار واحد متفق عليه وموثق.

@@ -1,6 +1,7 @@
 using LearnDynamicPro.Application.Interfaces;
 using System;
 using System.Net.Http;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -13,7 +14,7 @@ public class WebhookDispatcher : IWebhookDispatcher
 {
     private readonly HttpClient _httpClient;
     private readonly string _webhookUrl;
-    private readonly string _serviceToken;
+    private readonly string _webhookSecret;
     private readonly ILogger<WebhookDispatcher> _logger;
 
     public WebhookDispatcher(HttpClient httpClient, IConfiguration configuration, ILogger<WebhookDispatcher> logger)
@@ -21,7 +22,9 @@ public class WebhookDispatcher : IWebhookDispatcher
         _httpClient = httpClient;
         var url = configuration["AiCoPilot:WebhookUrl"];
         _webhookUrl = !string.IsNullOrWhiteSpace(url) ? url : "http://localhost:8000/v1/webhooks/lesson-updated";
-        _serviceToken = configuration["AiCoPilot:ServiceToken"] ?? "default_service_token";
+        _webhookSecret = configuration["AiCoPilot:WebhookSecret"] 
+            ?? configuration["AiCoPilot:ServiceToken"] 
+            ?? "default_webhook_secret_key_2026";
         _logger = logger;
     }
 
@@ -52,13 +55,23 @@ public class WebhookDispatcher : IWebhookDispatcher
         {
             try
             {
-                var content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
+                var rawJson = JsonSerializer.Serialize(payload);
+                var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds().ToString();
+                var payloadToSign = $"{timestamp}.{rawJson}";
+
+                using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_webhookSecret));
+                var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(payloadToSign));
+                var signature = Convert.ToHexString(hash).ToLowerInvariant();
+
+                var content = new StringContent(rawJson, Encoding.UTF8, "application/json");
                 var request = new HttpRequestMessage(HttpMethod.Post, _webhookUrl)
                 {
                     Content = content
                 };
-                request.Headers.Add("X-Service-Token", _serviceToken);
-                request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {_serviceToken}");
+
+                // HMAC-SHA256 Digital Signature (Stripe/GitHub Webhook Standard)
+                request.Headers.Add("X-Signature-256", $"sha256={signature}");
+                request.Headers.Add("X-Timestamp", timestamp);
 
                 var response = await _httpClient.SendAsync(request);
                 if (response.IsSuccessStatusCode)
