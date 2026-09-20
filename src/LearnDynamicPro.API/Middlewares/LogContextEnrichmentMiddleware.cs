@@ -20,9 +20,13 @@ public class LogContextEnrichmentMiddleware
         {
             if (context.User.Identity?.IsAuthenticated == true)
             {
-                var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-                var companyId = context.User.FindFirst("CompanyId")?.Value;
-                var departmentId = context.User.FindFirst("DepartmentId")?.Value;
+                var userId = context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                             ?? context.User.FindFirst("sub")?.Value
+                             ?? context.User.FindFirst("user_id")?.Value;
+                var companyId = context.User.FindFirst("company_id")?.Value
+                             ?? context.User.FindFirst("CompanyId")?.Value;
+                var departmentId = context.User.FindFirst("department_id")?.Value
+                                ?? context.User.FindFirst("DepartmentId")?.Value;
 
                 using (LogContext.PushProperty("UserId", userId))
                 using (LogContext.PushProperty("CompanyId", companyId))

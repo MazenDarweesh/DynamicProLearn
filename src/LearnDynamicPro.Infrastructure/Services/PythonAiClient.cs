@@ -61,7 +61,10 @@ public class PythonAiClient : IPythonAiClient
                    ?? _httpContextAccessor.HttpContext?.Request.Headers["X-Role"].FirstOrDefault()
                    ?? (_currentUserService.IsAuthenticated ? _currentUserService.Role.ToString() : "Admin");
 
-        var freshToken = _tokenService.GenerateServiceCallToken(userId, role);
+        var companyId = _currentUserService.CompanyId != Guid.Empty ? _currentUserService.CompanyId : (Guid?)null;
+        var departmentId = _currentUserService.DepartmentId != Guid.Empty ? _currentUserService.DepartmentId : (Guid?)null;
+
+        var freshToken = _tokenService.GenerateServiceCallToken(userId, role, companyId, departmentId);
         request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {freshToken}");
         request.Headers.TryAddWithoutValidation("X-Role", role);
     }

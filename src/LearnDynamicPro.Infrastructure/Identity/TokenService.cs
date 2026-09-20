@@ -22,16 +22,18 @@ public class TokenService : ITokenService
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
             new Claim("Id", user.Id.ToString()),
+            new Claim("user_id", user.Id.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, user.Username ?? ""),
             new Claim(ClaimTypes.Role, user.Role.ToString()),
             new Claim("Role", user.Role.ToString()),
-            new Claim("CompanyId", user.CompanyId?.ToString() ?? ""),
-            new Claim("DepartmentId", user.DepartmentId?.ToString() ?? ""),
+            new Claim("role", user.Role.ToString())
         };
+
+        AddTenantClaims(claims, user.CompanyId, user.DepartmentId);
 
         var token = new JwtSecurityToken(
             issuer: _jwtSettings.Issuer,
@@ -141,20 +143,24 @@ public class TokenService : ITokenService
         }
     }
 
-    public string GenerateServiceCallToken(Guid userId, string role)
+    public string GenerateServiceCallToken(Guid userId, string role, Guid? companyId = null, Guid? departmentId = null)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
             new Claim("Id", userId.ToString()),
+            new Claim("user_id", userId.ToString()),
             new Claim(JwtRegisteredClaimNames.UniqueName, "system"),
             new Claim(ClaimTypes.Role, role),
             new Claim("Role", role),
+            new Claim("role", role),
             new Claim("token_type", "service_call"),
         };
+
+        AddTenantClaims(claims, companyId, departmentId);
 
         var token = new JwtSecurityToken(
             issuer: _jwtSettings.Issuer,
@@ -165,5 +171,22 @@ public class TokenService : ITokenService
         );
 
         return new JwtSecurityTokenHandler().WriteToken(token);
+    }
+
+    private static void AddTenantClaims(List<Claim> claims, Guid? companyId, Guid? departmentId)
+    {
+        if (companyId.HasValue && companyId.Value != Guid.Empty)
+        {
+            var companyStr = companyId.Value.ToString();
+            claims.Add(new Claim("company_id", companyStr));
+            claims.Add(new Claim("CompanyId", companyStr));
+        }
+
+        if (departmentId.HasValue && departmentId.Value != Guid.Empty)
+        {
+            var deptStr = departmentId.Value.ToString();
+            claims.Add(new Claim("department_id", deptStr));
+            claims.Add(new Claim("DepartmentId", deptStr));
+        }
     }
 }

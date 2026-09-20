@@ -32,10 +32,16 @@ public class CurrentUserService : ICurrentUserService
             ? role : UserRole.Student;
 
     public Guid CompanyId =>
-        Guid.TryParse(User?.FindFirst("companyId")?.Value, out var id)
-            ? id : Guid.Empty;
+        Guid.TryParse(
+            User?.FindFirst("company_id")?.Value
+            ?? User?.FindFirst("companyId")?.Value
+            ?? User?.FindFirst("CompanyId")?.Value,
+            out var id) ? id : Guid.Empty;
 
     public Guid DepartmentId =>
-        Guid.TryParse(User?.FindFirst("departmentId")?.Value, out var id)
-            ? id : Guid.Empty;
+        Guid.TryParse(
+            User?.FindFirst("department_id")?.Value
+            ?? User?.FindFirst("departmentId")?.Value
+            ?? User?.FindFirst("DepartmentId")?.Value,
+            out var id) ? id : Guid.Empty;
 }
