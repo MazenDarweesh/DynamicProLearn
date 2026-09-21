@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -28,9 +29,14 @@ public class WebhookDispatcher : IWebhookDispatcher
         _logger = logger;
     }
 
-    public async Task DispatchLessonUpdatedAsync(Guid lessonId)
+    public async Task DispatchLessonUpdatedAsync(Guid lessonId, string? videoUrl = null, Guid? moduleId = null, Guid? unitId = null)
     {
-        await SendWebhookAsync(lessonId, "Updated");
+        await SendWebhookAsync(lessonId, "Updated", videoUrl, moduleId, unitId);
+    }
+
+    public async Task DispatchLessonReferencedAsync(Guid lessonId, string videoUrl, Guid? moduleId = null, Guid? unitId = null)
+    {
+        await SendWebhookAsync(lessonId, "Referenced", videoUrl, moduleId, unitId);
     }
 
     public async Task DispatchLessonDeletedAsync(Guid lessonId)
@@ -38,14 +44,32 @@ public class WebhookDispatcher : IWebhookDispatcher
         await SendWebhookAsync(lessonId, "Deleted");
     }
 
-    private async Task SendWebhookAsync(Guid lessonId, string action)
+    private async Task SendWebhookAsync(Guid lessonId, string action, string? videoUrl = null, Guid? moduleId = null, Guid? unitId = null)
     {
-        var payload = new
+        var payload = new Dictionary<string, object?>
         {
-            lesson_id = lessonId.ToString(),
-            lessonId  = lessonId.ToString(),
-            action    = action
+            ["lesson_id"] = lessonId.ToString(),
+            ["lessonId"]  = lessonId.ToString(),
+            ["action"]    = action
         };
+
+        if (!string.IsNullOrWhiteSpace(videoUrl))
+        {
+            payload["video_url"] = videoUrl;
+            payload["videoUrl"]  = videoUrl;
+        }
+
+        if (moduleId.HasValue && moduleId.Value != Guid.Empty)
+        {
+            payload["module_id"] = moduleId.Value.ToString();
+            payload["moduleId"]  = moduleId.Value.ToString();
+        }
+
+        if (unitId.HasValue && unitId.Value != Guid.Empty)
+        {
+            payload["unit_id"] = unitId.Value.ToString();
+            payload["unitId"]  = unitId.Value.ToString();
+        }
 
         _logger.LogInformation("[WebhookDispatcher] START | TargetUrl={Url} LessonId={LessonId} Action={Action}",
             _webhookUrl, lessonId, action);

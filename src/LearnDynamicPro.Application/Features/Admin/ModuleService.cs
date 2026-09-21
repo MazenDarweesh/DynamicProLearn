@@ -1,7 +1,9 @@
+using System.Text.RegularExpressions;
 using LearnDynamicPro.Application.Dtos.Modules;
 using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Application.Common;
 using LearnDynamicPro.Domain.Entities;
+using LearnDynamicPro.Domain.Entities.AI;
 using Microsoft.EntityFrameworkCore;
 using LearnDynamicPro.Application.Interfaces.Repositories;
 
@@ -137,12 +139,12 @@ public class ModuleService : IModuleService
         if (!await _unitOfWork.Repository<TypeOption>().Query().AnyAsync(t => t.Id == typeId))
             typeId = (await _unitOfWork.Repository<TypeOption>().Query().FirstOrDefaultAsync())?.Id ?? typeId;
 
+        var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(request.UnitId);
+        var moduleId = unit?.ModuleId;
+
         var levelOrderIndex = request.LevelOrderIndex;
         if (levelOrderIndex <= 0)
         {
-            var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(request.UnitId);
-            var moduleId = unit?.ModuleId;
-
             var maxLevelOrder = await _unitOfWork.Repository<Lesson>().Query()
                 .Where(l => l.LevelId == levelId && (moduleId == null || l.Unit!.ModuleId == moduleId))
                 .MaxAsync(l => (int?)l.LevelOrderIndex) ?? 0;
@@ -163,14 +165,22 @@ public class ModuleService : IModuleService
             Description = request.Description,
             OrderIndex = request.OrderIndex,
             LevelOrderIndex = levelOrderIndex,
-            AiStatus = hasVideo ? LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued : LearnDynamicPro.Domain.Enums.LessonAiStatus.None
+            AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.None
         };
         await _unitOfWork.Repository<Lesson>().AddAsync(lesson);
         await _unitOfWork.SaveChangesAsync();
 
         if (hasVideo)
         {
-            _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
+            var linked = await TryLinkExistingProcessedLessonAsync(lesson, moduleId);
+            if (!linked)
+            {
+                lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued;
+                _unitOfWork.Repository<Lesson>().Update(lesson);
+                await _unitOfWork.SaveChangesAsync();
+
+                _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id, lesson.VideoUrl, moduleId, lesson.UnitId);
+            }
         }
 
         return Result<LessonDto>.Success(new LessonDto 
@@ -215,12 +225,12 @@ public class ModuleService : IModuleService
         lesson.LevelId = levelId;
         lesson.TypeId = typeId;
         lesson.Description = request.Description;
+        var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(lesson.UnitId);
+        var moduleId = unit?.ModuleId;
+
         var levelOrderIndex = request.LevelOrderIndex;
         if (levelOrderIndex <= 0)
         {
-            var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(lesson.UnitId);
-            var moduleId = unit?.ModuleId;
-
             var maxLevelOrder = await _unitOfWork.Repository<Lesson>().Query()
                 .Where(l => l.LevelId == levelId && l.Id != id && (moduleId == null || l.Unit!.ModuleId == moduleId))
                 .MaxAsync(l => (int?)l.LevelOrderIndex) ?? 0;
@@ -232,24 +242,36 @@ public class ModuleService : IModuleService
         lesson.LevelOrderIndex = levelOrderIndex;
         
         var hasVideo = !string.IsNullOrWhiteSpace(lesson.VideoUrl);
-        if (hasVideo && (videoChanged || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.None || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Failed))
-        {
-            lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued;
-            lesson.AiError = null;
-        }
-        else if (!hasVideo)
+        var shouldTriggerAi = hasVideo && (videoChanged || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.None || lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Failed);
+
+        if (!hasVideo)
         {
             lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.None;
             lesson.AiError = null;
             lesson.AiChunksCount = 0;
+            _unitOfWork.Repository<Lesson>().Update(lesson);
+            await _unitOfWork.SaveChangesAsync();
         }
-
-        _unitOfWork.Repository<Lesson>().Update(lesson);
-        await _unitOfWork.SaveChangesAsync();
-        
-        if (hasVideo && lesson.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued)
+        else if (shouldTriggerAi)
         {
-            _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
+            _unitOfWork.Repository<Lesson>().Update(lesson);
+            await _unitOfWork.SaveChangesAsync();
+
+            var linked = await TryLinkExistingProcessedLessonAsync(lesson, moduleId);
+            if (!linked)
+            {
+                lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued;
+                lesson.AiError = null;
+                _unitOfWork.Repository<Lesson>().Update(lesson);
+                await _unitOfWork.SaveChangesAsync();
+
+                _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id, lesson.VideoUrl, moduleId, lesson.UnitId);
+            }
+        }
+        else
+        {
+            _unitOfWork.Repository<Lesson>().Update(lesson);
+            await _unitOfWork.SaveChangesAsync();
         }
 
         return Result<LessonDto>.Success(new LessonDto 
@@ -369,16 +391,145 @@ public class ModuleService : IModuleService
             return Result<bool>.Failure("لا يمكن بدء معالجة الذكاء الاصطناعي لدرس لا يحتوي على رابط فيديو.");
         }
 
-        lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued;
-        lesson.AiError = null;
+        var unit = await _unitOfWork.Repository<Unit>().GetByIdAsync(lesson.UnitId);
+        var moduleId = unit?.ModuleId;
+
         lesson.AiRetryCount++;
+        lesson.AiError = null;
 
-        _unitOfWork.Repository<Lesson>().Update(lesson);
-        await _unitOfWork.SaveChangesAsync();
+        var linked = await TryLinkExistingProcessedLessonAsync(lesson, moduleId);
+        if (!linked)
+        {
+            lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Queued;
+            _unitOfWork.Repository<Lesson>().Update(lesson);
+            await _unitOfWork.SaveChangesAsync();
 
-        _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id);
+            _ = _webhookDispatcher.DispatchLessonUpdatedAsync(lesson.Id, lesson.VideoUrl, moduleId, lesson.UnitId);
+        }
 
         return Result<bool>.Success(true);
+    }
+
+    private static readonly Regex YouTubeRegex = new(@"(?:v=|\/)([a-zA-Z0-9_-]{11})", RegexOptions.Compiled);
+
+    private static string ExtractVideoId(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url)) return string.Empty;
+        var match = YouTubeRegex.Match(url);
+        return match.Success ? match.Groups[1].Value : url.Trim();
+    }
+
+    private async Task<bool> TryLinkExistingProcessedLessonAsync(Lesson lesson, Guid? moduleId)
+    {
+        if (string.IsNullOrWhiteSpace(lesson.VideoUrl))
+            return false;
+
+        var cleanVideoUrl = lesson.VideoUrl.Trim();
+        var videoId = ExtractVideoId(cleanVideoUrl);
+
+        // 1. Direct match on VideoUrl or fallback match on YouTube Video ID
+        var match = await _unitOfWork.Repository<Lesson>().Query()
+            .AsNoTracking()
+            .Where(l => l.Id != lesson.Id 
+                     && l.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Completed
+                     && l.VideoUrl != null 
+                     && l.VideoUrl == cleanVideoUrl)
+            .OrderByDescending(l => l.AiProcessedAt)
+            .FirstOrDefaultAsync();
+
+        if (match == null && !string.IsNullOrEmpty(videoId) && videoId.Length == 11)
+        {
+            match = await _unitOfWork.Repository<Lesson>().Query()
+                .AsNoTracking()
+                .Where(l => l.Id != lesson.Id 
+                         && l.AiStatus == LearnDynamicPro.Domain.Enums.LessonAiStatus.Completed
+                         && l.VideoUrl != null 
+                         && l.VideoUrl.Contains(videoId))
+                .OrderByDescending(l => l.AiProcessedAt)
+                .FirstOrDefaultAsync();
+        }
+
+        if (match == null)
+        {
+            return false;
+        }
+
+        // 2. Clone processing state
+        lesson.AiStatus = LearnDynamicPro.Domain.Enums.LessonAiStatus.Completed;
+        lesson.AiChunksCount = match.AiChunksCount;
+        lesson.AiProcessedAt = match.AiProcessedAt ?? DateTime.UtcNow;
+        lesson.AiError = null;
+        _unitOfWork.Repository<Lesson>().Update(lesson);
+
+        // 3. Clone LessonQuiz if exists
+        var existingQuiz = await _unitOfWork.Repository<LessonQuiz>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(q => q.LessonId == match.Id);
+
+        if (existingQuiz != null && existingQuiz.Questions != null && existingQuiz.Questions.Count > 0)
+        {
+            var currentQuiz = await _unitOfWork.Repository<LessonQuiz>().Query()
+                .FirstOrDefaultAsync(q => q.LessonId == lesson.Id);
+            if (currentQuiz != null)
+            {
+                _unitOfWork.Repository<LessonQuiz>().Remove(currentQuiz);
+            }
+
+            var clonedQuiz = new LessonQuiz
+            {
+                LessonId = lesson.Id,
+                GeneratedAt = existingQuiz.GeneratedAt,
+                Questions = existingQuiz.Questions.Select(q => new QuizQuestion
+                {
+                    QuestionNumber = q.QuestionNumber,
+                    QuestionText = q.QuestionText,
+                    CorrectAnswerId = q.CorrectAnswerId,
+                    Explanation = q.Explanation,
+                    Options = q.Options?.Select(o => new QuizOption
+                    {
+                        OptionId = o.OptionId,
+                        Text = o.Text
+                    }).ToList() ?? new()
+                }).ToList()
+            };
+            await _unitOfWork.Repository<LessonQuiz>().AddAsync(clonedQuiz);
+        }
+
+        // 4. Clone LessonSummary if exists
+        var existingSummary = await _unitOfWork.Repository<LessonSummary>().Query()
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.LessonId == match.Id);
+
+        if (existingSummary != null && (!string.IsNullOrEmpty(existingSummary.Overview) || (existingSummary.Topics != null && existingSummary.Topics.Count > 0)))
+        {
+            var currentSummary = await _unitOfWork.Repository<LessonSummary>().Query()
+                .FirstOrDefaultAsync(s => s.LessonId == lesson.Id);
+            if (currentSummary != null)
+            {
+                _unitOfWork.Repository<LessonSummary>().Remove(currentSummary);
+            }
+
+            var clonedSummary = new LessonSummary
+            {
+                LessonId = lesson.Id,
+                GeneratedAt = existingSummary.GeneratedAt,
+                Overview = existingSummary.Overview,
+                Topics = existingSummary.Topics?.Select(t => new SummaryTopic
+                {
+                    TopicName = t.TopicName,
+                    Explanation = t.Explanation,
+                    KeyPoints = t.KeyPoints != null ? new List<string>(t.KeyPoints) : new List<string>()
+                }).ToList() ?? new()
+            };
+            await _unitOfWork.Repository<LessonSummary>().AddAsync(clonedSummary);
+        }
+
+        await _unitOfWork.SaveChangesAsync();
+
+        // 5. Fire asynchronous Webhook to Python AI Engine to link vectors in Qdrant (<10ms)
+        _ = _webhookDispatcher.DispatchLessonReferencedAsync(lesson.Id, lesson.VideoUrl!, moduleId, lesson.UnitId);
+
+        return true;
     }
 }
 
