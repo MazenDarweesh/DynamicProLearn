@@ -395,7 +395,11 @@ public class AdminController : ControllerBase
         var job = _lessonAiService.GetAiJobStatus(lessonId, jobId);
         if (job == null)
         {
-            return NotFound(new { message = "No AI generation job found for this lesson" });
+            if (!jobId.HasValue)
+            {
+                return Ok(null);
+            }
+            return NotFound(new { message = "No AI generation job found for this jobId" });
         }
         return Ok(job);
     }
