@@ -1,4 +1,4 @@
-import { Injectable, signal, inject } from '@angular/core';
+import { Injectable, signal, computed, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 
@@ -8,10 +8,15 @@ import { Observable, tap } from 'rxjs';
 export class AuthService {
   private http = inject(HttpClient);
   
-  readonly token = signal<string | null>(localStorage.getItem('jwt_token'));
+  readonly token = signal<string | null>(this.getValidInitialToken());
   readonly refreshTokenValue = signal<string | null>(localStorage.getItem('refresh_token'));
   readonly userRole = signal<string | null>(this.extractRole(this.token()));
   readonly userName = signal<string | null>(this.extractName(this.token()));
+
+  readonly isAuthenticated = computed(() => {
+    const t = this.token();
+    return !!t && !this.isTokenExpired(t);
+  });
 
   erpLogin(username: string, password: string, erpKey: string | null) {
     return this.http.post<any>('/api/Auth/erp-login', { username, password, erpKey });
@@ -76,5 +81,27 @@ export class AuthService {
     } catch {
       return null;
     }
+  }
+
+  isTokenExpired(token: string | null): boolean {
+    if (!token) return true;
+    try {
+      const decoded = this.decodeJwtPayload(token);
+      if (!decoded || !decoded.exp) return false;
+      return decoded.exp * 1000 < Date.now();
+    } catch {
+      return true;
+    }
+  }
+
+  private getValidInitialToken(): string | null {
+    const token = localStorage.getItem('jwt_token');
+    if (!token) return null;
+    if (this.isTokenExpired(token)) {
+      localStorage.removeItem('jwt_token');
+      localStorage.removeItem('refresh_token');
+      return null;
+    }
+    return token;
   }
 }

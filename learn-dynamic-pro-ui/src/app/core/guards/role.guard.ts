@@ -7,10 +7,10 @@ export const roleGuard = (allowedRoles: string[]): CanActivateFn => {
     const authService = inject(AuthService);
     const router = inject(Router);
     const currentRole = authService.userRole();
-    const token = authService.token();
+    const isAuth = authService.isAuthenticated();
 
-    // Not authenticated at all → go to login
-    if (!token || !currentRole) {
+    // Not authenticated at all or token expired → go to login
+    if (!isAuth || !currentRole) {
       return router.parseUrl('/login');
     }
 

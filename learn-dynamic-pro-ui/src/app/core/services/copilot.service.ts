@@ -70,10 +70,11 @@ export interface StudentCopilotFilterData {
 }
 
 export interface CopilotFilterState {
-  scope: 'all' | 'module' | 'unit' | 'lesson';
+  scope: 'all' | 'module' | 'unit' | 'lesson' | 'lessons';
   moduleId?: string;
   unitId?: string;
   lessonId?: string;
+  lessonIds?: string[];
   levelId?: string;
   typeId?: string;
 }
@@ -146,6 +147,11 @@ export class CopilotService {
       payload['unitId'] = filters.unitId || null;
       payload['lesson_id'] = filters.lessonId || null;
       payload['lessonId'] = filters.lessonId || null;
+      if (filters.scope === 'lessons' || (filters.lessonIds && filters.lessonIds.length > 0)) {
+        payload['scope'] = 'lessons';
+        payload['lesson_ids'] = filters.lessonIds || [];
+        payload['lessonIds'] = filters.lessonIds || [];
+      }
       payload['level'] = filters.levelId || 0;
       payload['level_id'] = filters.levelId || null;
       payload['levelId'] = filters.levelId || null;

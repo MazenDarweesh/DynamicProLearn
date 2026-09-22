@@ -1,5 +1,7 @@
 import { Component, inject } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { filter, map, startWith } from 'rxjs';
 import { CopilotChatComponent } from './shared/components/copilot-chat/copilot-chat.component';
 import { AuthService } from './core/services/auth.service';
 
@@ -13,4 +15,19 @@ import { AuthService } from './core/services/auth.service';
 export class AppComponent {
   title = 'learn-dynamic-pro-ui';
   authService = inject(AuthService);
+  private router = inject(Router);
+
+  private currentUrl = toSignal(
+    this.router.events.pipe(
+      filter(e => e instanceof NavigationEnd),
+      map((e: any) => e.urlAfterRedirects || e.url),
+      startWith(this.router.url)
+    )
+  );
+
+  get canShowCopilot(): boolean {
+    const url = this.currentUrl() || window.location.pathname;
+    const isAuthRoute = url.includes('/login') || url.includes('/erp-redirect');
+    return this.authService.isAuthenticated() && !isAuthRoute;
+  }
 }

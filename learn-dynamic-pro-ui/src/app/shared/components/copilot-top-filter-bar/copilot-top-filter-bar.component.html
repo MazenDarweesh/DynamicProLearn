@@ -12,8 +12,10 @@
           <span *ngSwitchCase="'module'">📚 موديول: {{ selectedModuleName || 'اختر موديول' }}</span>
           <span *ngSwitchCase="'unit'">📑 وحدة: {{ selectedUnitName || 'اختر وحدة' }}</span>
           <span *ngSwitchCase="'lesson'">🎯 درس: {{ selectedLessonTitle || 'اختر درس' }}</span>
+          <span *ngSwitchCase="'lessons'">🧩 {{ selectedLessonsSummary }}</span>
         </ng-container>
       </span>
+
 
       <!-- Active Level/Type Badges -->
       <span *ngIf="currentFilter.levelId" class="extra-pill level-pill">
@@ -100,10 +102,16 @@
                 (click)="setScope('lesson')">
           🎯 درس محدد
         </button>
+        <button type="button"
+                class="scope-tab"
+                [class.active]="currentFilter.scope === 'lessons'"
+                (click)="setScope('lessons')">
+          🧩 عدة دروس
+        </button>
       </div>
 
-      <!-- 2. Cascading Dropdowns (Animated in when scope is specific) -->
-      <div *ngIf="currentFilter.scope !== 'all'" class="cascading-selects">
+      <!-- 2. Cascading Dropdowns (for module / unit / single lesson) -->
+      <div *ngIf="currentFilter.scope !== 'all' && currentFilter.scope !== 'lessons'" class="cascading-selects">
         <!-- Module Select -->
         <div class="select-group">
           <label class="select-label">الموديول التعليمي:</label>
@@ -142,6 +150,83 @@
               {{ l.title }}
             </option>
           </select>
+        </div>
+      </div>
+
+      <!-- 2b. Multi-Lesson Cross-Module Picker (Shown when scope === 'lessons') -->
+      <div *ngIf="currentFilter.scope === 'lessons'" class="multi-lesson-section">
+        <div class="multi-lesson-header">
+          <div class="multi-lesson-search-box">
+            <span class="search-icon">🔎</span>
+            <input type="text"
+                   class="multi-search-input"
+                   placeholder="ابحث عن درس لإضافته (اسم الدرس، الوحدة، أو الموديول)..."
+                   [(ngModel)]="lessonSearchQuery" />
+            <button *ngIf="lessonSearchQuery"
+                    type="button"
+                    class="btn-clear-query"
+                    (click)="lessonSearchQuery = ''"
+                    title="مسح البحث">✕</button>
+          </div>
+          <button *ngIf="selectedLessonsList.length > 0"
+                  type="button"
+                  class="btn-clear-all-chips"
+                  (click)="clearAllSelectedLessons()"
+                  title="حذف جميع الدروس المختارة">
+            مسح الكل ({{ selectedLessonsList.length }}) ✕
+          </button>
+        </div>
+
+        <!-- Selected Lessons Chips / Tags -->
+        <div class="selected-chips-container" *ngIf="selectedLessonsList.length > 0">
+          <span class="chips-headline">الدروس المحددة للمقارنة والبحث:</span>
+          <div class="selected-chips-list">
+            <div *ngFor="let item of selectedLessonsList" class="lesson-chip">
+              <span class="chip-dot">🎯</span>
+              <span class="chip-title" [title]="item.title">{{ item.title }}</span>
+              <span class="chip-module" [title]="item.moduleName">({{ item.moduleName }})</span>
+              <button type="button"
+                      class="btn-chip-remove"
+                      (click)="removeLessonFromMultiSelect(item.id)"
+                      title="إزالة هذا الدرس">✕</button>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="selectedLessonsList.length === 0" class="empty-selection-hint">
+          💡 انقر على أي درس من القائمة بالأسفل لاختياره. يمكنك اختيار دروس من موديولات مختلفة للمقارنة بينها!
+        </div>
+
+        <!-- Available Lessons List Grouped by Module -->
+        <div class="available-lessons-box">
+          <div class="available-scroll-area">
+            <ng-container *ngFor="let group of filteredModulesWithLessons">
+              <div class="module-group-header">
+                <span class="mod-group-icon">📁</span>
+                <span class="mod-group-title">{{ group.moduleTitle }}</span>
+                <span class="mod-group-count">({{ group.lessons.length }})</span>
+              </div>
+              <div class="module-lessons-grid">
+                <div *ngFor="let item of group.lessons"
+                     class="lesson-select-card"
+                     [class.selected]="isLessonSelected(item.lesson.id)"
+                     (click)="toggleLessonSelection(item.lesson, group.moduleTitle)">
+                  <input type="checkbox"
+                         class="lesson-checkbox"
+                         [checked]="isLessonSelected(item.lesson.id)"
+                         (click)="$event.stopPropagation()"
+                         (change)="toggleLessonSelection(item.lesson, group.moduleTitle)" />
+                  <div class="lesson-info">
+                    <span class="lesson-name">{{ item.lesson.title }}</span>
+                    <span class="lesson-unit-tag">{{ item.unitTitle }}</span>
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+            <div *ngIf="filteredModulesWithLessons.length === 0" class="no-lessons-match">
+              لا توجد دروس مطابقة لكلمة البحث "{{ lessonSearchQuery }}"
+            </div>
+          </div>
         </div>
       </div>
 

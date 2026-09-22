@@ -22,6 +22,7 @@ export interface ChatMessage {
   isStreaming?: boolean;
   threadId?: string;
   lessonId?: string;
+  lessonIds?: string[];
   filters?: CopilotFilterState;
   /** Stores the original user question paired with this assistant response */
   relatedUserQuery?: string;
@@ -70,7 +71,9 @@ export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy
   }
 
   get isLoggedIn(): boolean {
-    return !!this.authService.token();
+    const url = this.router.url || window.location.pathname;
+    const isAuthRoute = url.includes('/login') || url.includes('/erp-redirect');
+    return this.authService.isAuthenticated() && !isAuthRoute;
   }
 
   messages: ChatMessage[] = [
@@ -384,7 +387,8 @@ export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy
       isStreaming: true,
       relatedUserQuery: query,
       filters: { ...this.activeFilter },
-      lessonId: this.activeFilter.lessonId
+      lessonId: this.activeFilter.lessonId,
+      lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
     });
 
     await this.copilotService.streamSearch(

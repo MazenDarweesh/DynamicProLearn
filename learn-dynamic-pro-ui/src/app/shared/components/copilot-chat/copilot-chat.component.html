@@ -124,7 +124,7 @@
             <!-- Provenance & Latency Badge -->
             <div *ngIf="msg.provenance" class="provenance-badge-bar">
               <span *ngIf="msg.filters && msg.filters.scope !== 'all'" class="provenance-badge badge-scope">
-                {{ msg.filters.scope === 'lesson' ? '🎯 نطاق الدرس' : (msg.filters.scope === 'unit' ? '📑 نطاق الوحدة' : '📚 نطاق الموديول') }}
+                {{ msg.filters.scope === 'lessons' ? ('🧩 مقارنة ' + (msg.filters.lessonIds?.length || '') + ' دروس') : (msg.filters.scope === 'lesson' ? '🎯 نطاق الدرس' : (msg.filters.scope === 'unit' ? '📑 نطاق الوحدة' : '📚 نطاق الموديول')) }}
               </span>
               <span *ngIf="msg.cacheHit" class="provenance-badge badge-cache" [title]="'المصدر: ' + msg.provenance">
                 ⚡ استجابة فورية ({{ msg.latencyMs || 1 }} ms)

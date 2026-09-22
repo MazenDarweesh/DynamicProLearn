@@ -34,6 +34,9 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
     scope: 'all'
   };
 
+  selectedLessonsList: { id: string; title: string; moduleName: string }[] = [];
+  lessonSearchQuery: string = '';
+
   isAutoDetectedLesson = false;
 
   availableUnits: CopilotFilterUnit[] = [];
@@ -70,7 +73,7 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
     });
   }
 
-  setScope(scope: 'all' | 'module' | 'unit' | 'lesson') {
+  setScope(scope: 'all' | 'module' | 'unit' | 'lesson' | 'lessons') {
     if (this.currentFilter.scope === scope) return;
 
     this.currentFilter.scope = scope;
@@ -80,17 +83,20 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
       this.currentFilter.moduleId = undefined;
       this.currentFilter.unitId = undefined;
       this.currentFilter.lessonId = undefined;
+      this.currentFilter.lessonIds = undefined;
       this.availableUnits = [];
       this.availableLessons = [];
     } else if (scope === 'module') {
       this.currentFilter.unitId = undefined;
       this.currentFilter.lessonId = undefined;
+      this.currentFilter.lessonIds = undefined;
       if (!this.currentFilter.moduleId && this.filterData?.modules.length) {
         this.currentFilter.moduleId = this.filterData.modules[0].id;
       }
       this.updateUnits();
     } else if (scope === 'unit') {
       this.currentFilter.lessonId = undefined;
+      this.currentFilter.lessonIds = undefined;
       if (!this.currentFilter.moduleId && this.filterData?.modules.length) {
         this.currentFilter.moduleId = this.filterData.modules[0].id;
       }
@@ -100,6 +106,7 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
       }
       this.updateLessons();
     } else if (scope === 'lesson') {
+      this.currentFilter.lessonIds = undefined;
       if (!this.currentFilter.moduleId && this.filterData?.modules.length) {
         this.currentFilter.moduleId = this.filterData.modules[0].id;
       }
@@ -111,6 +118,19 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
       if (!this.currentFilter.lessonId && this.availableLessons.length) {
         this.currentFilter.lessonId = this.availableLessons[0].id;
       }
+    } else if (scope === 'lessons') {
+      if (this.currentFilter.lessonId && this.selectedLessonsList.length === 0) {
+        const activeTitle = this.selectedLessonTitle;
+        const activeModule = this.selectedModuleName;
+        if (activeTitle) {
+          this.selectedLessonsList.push({
+            id: this.currentFilter.lessonId,
+            title: activeTitle,
+            moduleName: activeModule
+          });
+        }
+      }
+      this.currentFilter.lessonIds = this.selectedLessonsList.map(l => l.id);
     }
 
     this.emitChange();
@@ -175,13 +195,83 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
       moduleId: undefined,
       unitId: undefined,
       lessonId: undefined,
+      lessonIds: undefined,
       levelId: undefined,
       typeId: undefined
     };
+    this.selectedLessonsList = [];
+    this.lessonSearchQuery = '';
     this.isAutoDetectedLesson = false;
     this.availableUnits = [];
     this.availableLessons = [];
     this.emitChange();
+  }
+
+  addLessonToMultiSelect(lesson: CopilotFilterLesson, moduleName: string) {
+    if (this.selectedLessonsList.some(l => l.id === lesson.id)) return;
+    this.selectedLessonsList.push({
+      id: lesson.id,
+      title: lesson.title,
+      moduleName: moduleName
+    });
+    this.currentFilter.lessonIds = this.selectedLessonsList.map(l => l.id);
+    this.emitChange();
+  }
+
+  removeLessonFromMultiSelect(lessonId: string) {
+    this.selectedLessonsList = this.selectedLessonsList.filter(l => l.id !== lessonId);
+    this.currentFilter.lessonIds = this.selectedLessonsList.map(l => l.id);
+    this.emitChange();
+  }
+
+  clearAllSelectedLessons() {
+    this.selectedLessonsList = [];
+    this.currentFilter.lessonIds = [];
+    this.emitChange();
+  }
+
+  isLessonSelected(lessonId: string): boolean {
+    return this.selectedLessonsList.some(l => l.id === lessonId);
+  }
+
+  toggleLessonSelection(lesson: CopilotFilterLesson, moduleName: string) {
+    if (this.isLessonSelected(lesson.id)) {
+      this.removeLessonFromMultiSelect(lesson.id);
+    } else {
+      this.addLessonToMultiSelect(lesson, moduleName);
+    }
+  }
+
+  get filteredModulesWithLessons(): { moduleTitle: string; lessons: { lesson: CopilotFilterLesson; unitTitle: string }[] }[] {
+    if (!this.filterData?.modules) return [];
+    const query = (this.lessonSearchQuery || '').trim().toLowerCase();
+
+    const results: { moduleTitle: string; lessons: { lesson: CopilotFilterLesson; unitTitle: string }[] }[] = [];
+
+    for (const mod of this.filterData.modules) {
+      const matchedLessons: { lesson: CopilotFilterLesson; unitTitle: string }[] = [];
+      for (const unit of mod.units) {
+        for (const lesson of unit.lessons) {
+          if (!query ||
+              lesson.title.toLowerCase().includes(query) ||
+              mod.title.toLowerCase().includes(query) ||
+              unit.title.toLowerCase().includes(query)) {
+            matchedLessons.push({ lesson, unitTitle: unit.title });
+          }
+        }
+      }
+      if (matchedLessons.length > 0) {
+        results.push({ moduleTitle: mod.title, lessons: matchedLessons });
+      }
+    }
+    return results;
+  }
+
+  get selectedLessonsSummary(): string {
+    if (!this.selectedLessonsList.length) return 'اختر الدروس للمقارنة';
+    const count = this.selectedLessonsList.length;
+    const names = this.selectedLessonsList.slice(0, 2).map(l => l.title).join('، ');
+    return count > 2 ? `${count} دروس: ${names} و+${count - 2} آخرين` : `${count} دروس: ${names}`;
   }
 
   applyAutoDetectedLesson(lessonId: string) {
@@ -264,6 +354,9 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
   }
 
   hasActiveFilters(): boolean {
+    if (this.currentFilter.scope === 'lessons') {
+      return this.selectedLessonsList.length > 0 || !!this.currentFilter.levelId || !!this.currentFilter.typeId;
+    }
     return this.currentFilter.scope !== 'all' ||
       !!this.currentFilter.levelId ||
       !!this.currentFilter.typeId;
