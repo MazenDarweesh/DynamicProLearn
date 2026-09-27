@@ -27,7 +27,7 @@ export class AppComponent {
 
   get canShowCopilot(): boolean {
     const url = this.currentUrl() || window.location.pathname;
-    const isAuthRoute = url.includes('/login') || url.includes('/erp-redirect');
+    const isAuthRoute = url.includes('/login') || url.includes('/erp-redirect') || url.includes('/erp-mock');
     return this.authService.isAuthenticated() && !isAuthRoute;
   }
 }

@@ -48,6 +48,7 @@ export interface CopilotFilterLesson {
   title: string;
   levelId: string;
   typeId: string;
+  erpKey?: string;
 }
 
 export interface CopilotFilterUnit {
@@ -87,7 +88,16 @@ export class CopilotService {
   private authService = inject(AuthService);
 
   private aiBaseUrl = 'http://localhost:8000';
+  private backendBaseUrl = '';
   private filterData$?: Observable<StudentCopilotFilterData>;
+
+  setBaseUrls(aiUrl?: string, backendUrl?: string) {
+    if (aiUrl) this.aiBaseUrl = aiUrl.replace(/\/+$/, '');
+    if (backendUrl) {
+      this.backendBaseUrl = backendUrl.replace(/\/+$/, '');
+      this.authService.setBackendUrl(backendUrl);
+    }
+  }
 
   private activeLessonIdSubject = new BehaviorSubject<string | undefined>(undefined);
   activeLessonId$ = this.activeLessonIdSubject.asObservable();
@@ -106,7 +116,8 @@ export class CopilotService {
    */
   getCopilotFilters(forceRefresh = false): Observable<StudentCopilotFilterData> {
     if (!this.filterData$ || forceRefresh) {
-      this.filterData$ = this.http.get<StudentCopilotFilterData>('/api/student/copilot-filters').pipe(
+      const url = this.backendBaseUrl ? `${this.backendBaseUrl}/api/student/copilot-filters` : '/api/student/copilot-filters';
+      this.filterData$ = this.http.get<StudentCopilotFilterData>(url).pipe(
         shareReplay(1)
       );
     }
@@ -311,8 +322,9 @@ export class CopilotService {
   clearAiCache(): Observable<{ status: string; message: string }> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
     console.info('%c[CoPilot Admin] CLEAR_CACHE', 'color:#f59e0b;font-weight:bold');
+    const url = this.backendBaseUrl ? `${this.backendBaseUrl}/api/admin/ai/cache/clear` : '/api/admin/ai/cache/clear';
     return this.http.post<{ status: string; message: string }>(
-      '/api/admin/ai/cache/clear',
+      url,
       {},
       { headers: { 'Authorization': `Bearer ${token}` } }
     );

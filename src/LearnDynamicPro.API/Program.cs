@@ -127,15 +127,12 @@ builder.Services.AddRateLimiter(options =>
     });
 });
 
-// Configure CORS for Angular (supports config with localhost fallback)
-var corsOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-    ?? new[] { "http://localhost:4200" };
-
+// Configure CORS for Angular & ERP integration testing (allows localhost ports, devtunnels, and LAN IPs)
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAngularApp",
         policy => policy
-            .WithOrigins(corsOrigins)
+            .SetIsOriginAllowed(_ => true)
             .AllowAnyMethod()
             .AllowAnyHeader()
             .AllowCredentials());

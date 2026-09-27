@@ -22,6 +22,7 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
   private copilotService = inject(CopilotService);
 
   @Input() activeLessonId?: string;
+  @Input() erpKey?: string;
   @Input() isCollapsed: boolean = false;
   @Output() filterChange = new EventEmitter<CopilotFilterState>();
   @Output() toggleCollapse = new EventEmitter<boolean>();
@@ -47,7 +48,9 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['activeLessonId'] && this.activeLessonId && this.filterData) {
+    if (changes['erpKey'] && this.erpKey && this.filterData) {
+      this.applyAutoDetectedErpKey(this.erpKey);
+    } else if (changes['activeLessonId'] && this.activeLessonId && this.filterData) {
       this.applyAutoDetectedLesson(this.activeLessonId);
     }
   }
@@ -59,7 +62,9 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
       next: (data) => {
         this.filterData = data;
         this.isLoading = false;
-        if (this.activeLessonId) {
+        if (this.erpKey) {
+          this.applyAutoDetectedErpKey(this.erpKey);
+        } else if (this.activeLessonId) {
           this.applyAutoDetectedLesson(this.activeLessonId);
         } else {
           this.emitChange();
@@ -293,6 +298,57 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
           return;
         }
       }
+    }
+  }
+
+  applyAutoDetectedErpKey(erpKey: string) {
+    if (!this.filterData || !erpKey) return;
+    const cleanKeys = erpKey
+      .split(',')
+      .map(k => k.trim().toLowerCase())
+      .filter(k => k.length > 0);
+
+    if (cleanKeys.length === 0) return;
+
+    const matchedLessons: { id: string; title: string; moduleName: string; moduleId: string; unitId: string }[] = [];
+
+    for (const mod of this.filterData.modules) {
+      for (const unit of mod.units) {
+        for (const lesson of unit.lessons) {
+          if (lesson.erpKey && cleanKeys.includes(lesson.erpKey.trim().toLowerCase())) {
+            matchedLessons.push({
+              id: lesson.id,
+              title: lesson.title,
+              moduleName: mod.title,
+              moduleId: mod.id,
+              unitId: unit.id
+            });
+          }
+        }
+      }
+    }
+
+    if (matchedLessons.length === 1) {
+      const match = matchedLessons[0];
+      this.currentFilter.scope = 'lesson';
+      this.currentFilter.moduleId = match.moduleId;
+      this.currentFilter.unitId = match.unitId;
+      this.currentFilter.lessonId = match.id;
+      this.isAutoDetectedLesson = true;
+
+      this.updateUnits();
+      this.updateLessons();
+      this.emitChange();
+    } else if (matchedLessons.length > 1) {
+      this.currentFilter.scope = 'lessons';
+      this.selectedLessonsList = matchedLessons.map(m => ({
+        id: m.id,
+        title: m.title,
+        moduleName: m.moduleName
+      }));
+      this.currentFilter.lessonIds = matchedLessons.map(m => m.id);
+      this.isAutoDetectedLesson = true;
+      this.emitChange();
     }
   }
 

@@ -89,6 +89,7 @@ public class CopilotFilterLessonDto
     public string Title { get; set; } = string.Empty;
     public Guid LevelId { get; set; }
     public Guid TypeId { get; set; }
+    public string? ErpKey { get; set; }
 }
 
 public class CopilotFilterUnitDto

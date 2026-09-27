@@ -18,8 +18,15 @@ export class AuthService {
     return !!t && !this.isTokenExpired(t);
   });
 
+  private backendBaseUrl = '';
+
+  setBackendUrl(url?: string) {
+    if (url) this.backendBaseUrl = url.replace(/\/+$/, '');
+  }
+
   erpLogin(username: string, password: string, erpKey: string | null) {
-    return this.http.post<any>('/api/Auth/erp-login', { username, password, erpKey });
+    const url = this.backendBaseUrl ? `${this.backendBaseUrl}/api/Auth/erp-login` : '/api/Auth/erp-login';
+    return this.http.post<any>(url, { username, password, erpKey });
   }
 
   login(token: string, refreshToken?: string) {
@@ -45,7 +52,8 @@ export class AuthService {
   refreshToken(): Observable<any> {
     const token = this.token();
     const refreshToken = this.refreshTokenValue();
-    return this.http.post<any>('/api/Auth/refresh-token', { token, refreshToken }).pipe(
+    const url = this.backendBaseUrl ? `${this.backendBaseUrl}/api/Auth/refresh-token` : '/api/Auth/refresh-token';
+    return this.http.post<any>(url, { token, refreshToken }).pipe(
       tap((res: any) => {
         if (res && res.token) {
           this.login(res.token, res.refreshToken);

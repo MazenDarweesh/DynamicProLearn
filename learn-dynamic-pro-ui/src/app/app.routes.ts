@@ -104,6 +104,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/admin/admin-version-details/admin-version-details.component').then(m => m.AdminVersionDetailsComponent)
   },
   {
+    path: 'erp-mock',
+    loadComponent: () => import('./features/erp-mock/erp-mock.component').then(m => m.ErpMockComponent)
+  },
+  {
     path: '',
     redirectTo: 'login',
     pathMatch: 'full'

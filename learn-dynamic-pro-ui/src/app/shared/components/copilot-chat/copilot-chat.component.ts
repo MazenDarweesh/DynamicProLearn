@@ -1,4 +1,4 @@
-import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit } from '@angular/core';
+import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -39,12 +39,23 @@ export interface ChatMessage {
   templateUrl: './copilot-chat.component.html',
   styleUrls: ['./copilot-chat.component.css']
 })
-export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy {
+export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked, OnDestroy {
   private copilotService = inject(CopilotService);
-  private router = inject(Router);
+  private router = inject(Router, { optional: true });
+  private cdr = inject(ChangeDetectorRef);
   authService = inject(AuthService);
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
+
+  @Input() erpKey?: string;
+  @Input() activeLessonId?: string;
+  @Input() token?: string;
+  @Input() u?: string;
+  @Input() p?: string;
+  @Input() apiUrl?: string;
+  @Input() backendUrl?: string;
+
+  @Output() lessonNavigate = new EventEmitter<{ lessonId?: string; videoUrl?: string; timestamp?: number }>();
 
   isOpen = false;
   isMinimized = false;
@@ -55,7 +66,6 @@ export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy
 
   // ── Smart Top Filter Bar State ───────────────────────────────────────────
   activeFilter: CopilotFilterState = { scope: 'all' };
-  activeLessonId?: string;
   isFilterBarCollapsed = false;
   private lessonSub?: Subscription;
 
@@ -71,7 +81,7 @@ export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy
   }
 
   get isLoggedIn(): boolean {
-    const url = this.router.url || window.location.pathname;
+    const url = this.router?.url || window.location.pathname;
     const isAuthRoute = url.includes('/login') || url.includes('/erp-redirect');
     return this.authService.isAuthenticated() && !isAuthRoute;
   }
@@ -84,12 +94,40 @@ export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy
   ];
 
   ngOnInit() {
+    this.applyInputs();
     this.lessonSub = this.copilotService.activeLessonId$.subscribe(lessonId => {
       if (lessonId) {
         this.activeLessonId = lessonId;
       }
     });
     this.detectLessonFromRoute();
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['token'] || changes['apiUrl'] || changes['backendUrl'] || changes['erpKey'] || changes['u'] || changes['p']) {
+      this.applyInputs();
+    }
+  }
+
+  private applyInputs() {
+    if (this.apiUrl || this.backendUrl) {
+      this.copilotService.setBaseUrls(this.apiUrl, this.backendUrl);
+    }
+    if (this.token) {
+      this.authService.login(this.token);
+    }
+    if (this.u && this.p && !this.authService.isAuthenticated()) {
+      this.authService.erpLogin(this.u, this.p, this.erpKey || null).subscribe({
+        next: (res: any) => {
+          this.authService.login(res.token, res.refreshToken);
+          if (res.erpRedirect?.lessonId) {
+            this.activeLessonId = res.erpRedirect.lessonId;
+          }
+          this.cdr.markForCheck();
+        },
+        error: (err) => console.warn('[CopilotChat] Silent ERP Login failed:', err)
+      });
+    }
   }
 
   ngAfterViewChecked() {
@@ -122,8 +160,30 @@ export class CopilotChatComponent implements OnInit, AfterViewChecked, OnDestroy
 
   detectLessonFromRoute() {
     try {
-      const url = this.router.url;
+      const url = this.router?.url || window.location.pathname;
       const queryParams = new URLSearchParams(window.location.search);
+
+      // Check ERP Key query param (?erpKey=... or ?key=...)
+      const queryErpKey = queryParams.get('erpKey') || queryParams.get('key');
+      if (queryErpKey && !this.erpKey) {
+        this.erpKey = queryErpKey;
+      }
+
+      // Check silent ERP handshake credentials (?u=...&p=...)
+      const u = queryParams.get('u');
+      const p = queryParams.get('p');
+      if (u && p && !this.authService.isAuthenticated()) {
+        this.authService.erpLogin(u, p, queryErpKey || null).subscribe({
+          next: (res: any) => {
+            this.authService.login(res.token, res.refreshToken);
+            if (res.erpRedirect?.lessonId) {
+              this.activeLessonId = res.erpRedirect.lessonId;
+            }
+          },
+          error: (err) => console.warn('[CopilotChat] Silent ERP Login failed:', err)
+        });
+      }
+
       const queryLessonId = queryParams.get('lessonId');
       if (queryLessonId) {
         this.activeLessonId = queryLessonId;

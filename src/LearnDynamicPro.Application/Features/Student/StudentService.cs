@@ -992,6 +992,7 @@ public class StudentService : IStudentService
                 l.TypeId,
                 l.OrderIndex,
                 l.LevelOrderIndex,
+                l.ErpKey,
                 UnitId = l.UnitId,
                 UnitTitle = l.Unit!.Name,
                 UnitOrder = l.Unit.OrderIndex,
@@ -1024,7 +1025,8 @@ public class StudentService : IStudentService
                                 Id = l.LessonId,
                                 Title = l.LessonTitle,
                                 LevelId = l.LevelId,
-                                TypeId = l.TypeId
+                                TypeId = l.TypeId,
+                                ErpKey = l.ErpKey
                             })
                             .ToList()
                     })
