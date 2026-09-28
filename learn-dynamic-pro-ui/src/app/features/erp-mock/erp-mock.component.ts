@@ -202,8 +202,8 @@ interface ErpScreen {
       <!-- This is the exact tag that the ERP developers will embed in their screens! -->
       <lms-ai-copilot
         [attr.erp-key]="activeScreen.key"
-        [attr.u]="'admin'"
-        [attr.p]="'admin'"
+        [attr.u]="'a'"
+        [attr.p]="'123'"
         [attr.api-url]="'http://localhost:8000'">
       </lms-ai-copilot>
     </div>
