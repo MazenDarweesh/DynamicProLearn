@@ -86,9 +86,9 @@ This document provides a comprehensive technical contract specification for all 
 ### AI Curriculum Generation & Cache Management
 | Method | Route | Description |
 |:---|:---|:---|
-| `POST` | `/api/Admin/lessons/{lessonId}/generate-quiz` | Triggers Python AI engine to generate multiple-choice quiz and saves it in SQL Server. |
+| `POST` | `/api/Admin/lessons/{lessonId}/generate-quiz` | Triggers Python AI engine to generate multiple-choice quiz (returns `202 Accepted` with async job processing) and saves it in SQL Server. |
 | `GET` | `/api/Admin/lessons/{lessonId}/quiz` | Retrieves AI-generated quiz questions for inspection. |
-| `POST` | `/api/Admin/lessons/{lessonId}/generate-summary` | Triggers AI generation of comprehensive lesson summary. |
+| `POST` | `/api/Admin/lessons/{lessonId}/generate-summary` | Triggers AI generation of comprehensive lesson summary (returns `202 Accepted` async job). |
 | `GET` | `/api/Admin/lessons/{lessonId}/summary` | Retrieves AI-generated lesson summary markdown. |
 | `POST` | `/api/Admin/lessons/{lessonId}/retry-ai-ingest` | Reset failed or stalled video ingestion state and re-dispatch ingestion event. |
 | `POST` | `/api/Admin/ai/cache/clear` | Admin proxy that flushes both Exact In-Memory Cache and Semantic Vector Cache in Python AI engine. |
@@ -100,7 +100,7 @@ This document provides a comprehensive technical contract specification for all 
 
 | Method | Route | Description |
 |:---|:---|:---|
-| `GET` | `/api/Student/copilot-filters` | Retrieve dynamic hierarchical curriculum filter tree (modules, units, lessons, levels, types) scoped by student RBAC permissions. |
+| `GET` | `/api/Student/copilot-filters` | Retrieve dynamic hierarchical curriculum filter tree (modules, units, lessons, levels, types) scoped by student RBAC permissions (aliased for Admin at `/api/Admin/copilot-filters`). |
 | `GET` | `/api/Student/modules` | Fetch all training modules assigned to the authenticated student's department. |
 | `GET` | `/api/Student/modules/{moduleId}/units` | View units inside an assigned module. |
 | `GET` | `/api/Student/units/{unitId}/lessons` | View lessons inside an assigned unit with completion statuses. |
@@ -136,9 +136,9 @@ This document provides a comprehensive technical contract specification for all 
 
 | Method | Route | Description |
 |:---|:---|:---|
-| `POST` | `/api/internal/lessons/{lessonId}/ai-status` | Status callback from AI worker (`Completed`, `Failed`, `Processing`) with chunk count and error message. |
+| `POST` | `/api/internal/lessons/{lessonId}/ai-status` | Status callback from AI worker (`Completed`, `Failed`, `Processing`) with chunk count and error message. Validated with `X-Webhook-Signature` HMAC. |
 | `GET` | `/api/internal/user-permissions/{userId}` | Returns the full list of accessible modules, units, and lessons for the user to enforce strict RBAC in Qdrant search. |
-| `GET` | `/api/internal/lessons/{lessonId}/full-context` | Returns rich metadata (video URL, PDF URL, module, unit, level, type, tenant IDs) for RAG embedding generation. |
+| `GET` | `/api/internal/lessons/{lessonId}/full-context` | Returns rich metadata (video URL, PDF URL, module, unit, level, type, dual-casing tenant IDs: `CompanyId`/`company_id`, `DepartmentId`/`department_id`) for RAG embedding generation. |
 
 ---
 
@@ -149,6 +149,7 @@ When a lesson is modified or deleted in .NET, `WebhookDispatcher` sends an HTTP 
 **Headers:**
 ```http
 X-Service-Token: default_service_token
+X-Webhook-Signature: sha256=a1b2c3d4e5f6...
 Content-Type: application/json
 ```
 
@@ -161,3 +162,4 @@ Content-Type: application/json
 }
 ```
 *(Supports both SnakeCase and CamelCase keys to ensure zero deserialization friction).*
+
