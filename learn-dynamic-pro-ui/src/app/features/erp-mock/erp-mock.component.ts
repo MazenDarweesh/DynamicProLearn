@@ -169,7 +169,11 @@ interface ErpScreen {
               </li>
               <li>
                 <strong>اسم التاج في الـ ERP:</strong>
-                <code>&lt;lms-ai-copilot&gt;</code>
+                <code>&lt;lms-ai-copilot hide-header="true"&gt;</code>
+              </li>
+              <li>
+                <strong>المظهر المعتمد:</strong>
+                <span>جسم الشات فقط (Body Only - بدون هيدر)</span>
               </li>
               <li>
                 <strong>الكود الممرر للشاشة:</strong>
@@ -189,7 +193,7 @@ interface ErpScreen {
 
             <div class="test-helper-box">
               <h4>🎯 جرب تسأل الشات الآن:</h4>
-              <p class="test-tip">انقر على زر الشات العائم بالزاوية السفلية، واسأله:</p>
+              <p class="test-tip">نافذة الشات مفتوحة وموجهة تلقائياً، اسأله:</p>
               <div class="prompt-card" (click)="copyPrompt(activeScreen.sampleQuery)">
                 <span>💬 "{{ activeScreen.sampleQuery }}"</span>
               </div>
@@ -204,7 +208,8 @@ interface ErpScreen {
         [attr.erp-key]="activeScreen.key"
         [attr.u]="'a'"
         [attr.p]="'123'"
-        [attr.api-url]="'http://localhost:8000'">
+        [attr.api-url]="'http://localhost:8000'"
+        [attr.hide-header]="'true'">
       </lms-ai-copilot>
     </div>
   `,

@@ -1,4 +1,4 @@
-import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
+import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef, booleanAttribute } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -8,6 +8,7 @@ import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState } from '../../../core/services/copilot.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
+import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
 
 export interface ChatMessage {
   sender: 'user' | 'assistant';
@@ -35,7 +36,7 @@ export interface ChatMessage {
 @Component({
   selector: 'app-copilot-chat',
   standalone: true,
-  imports: [CommonModule, FormsModule, MarkdownComponent, CdkDrag, CdkDragHandle, CopilotTopFilterBarComponent],
+  imports: [CommonModule, FormsModule, MarkdownComponent, CdkDrag, CdkDragHandle, CopilotTopFilterBarComponent, CopilotHeaderComponent],
   templateUrl: './copilot-chat.component.html',
   styleUrls: ['./copilot-chat.component.css']
 })
@@ -54,6 +55,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   @Input() p?: string;
   @Input() apiUrl?: string;
   @Input() backendUrl?: string;
+  @Input({ transform: booleanAttribute }) hideHeader: boolean = false;
+  @Input({ transform: booleanAttribute }) inline: boolean = false;
 
   @Output() lessonNavigate = new EventEmitter<{ lessonId?: string; videoUrl?: string; timestamp?: number }>();
 

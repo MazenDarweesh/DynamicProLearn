@@ -1,0 +1,18 @@
+<div class="copilot-header" (click)="isMinimized ? onToggle() : null" [style.cursor]="isMinimized ? 'pointer' : 'grab'">
+  <div class="header-info">
+    <div class="header-avatar">🤖</div>
+    <div>
+      <h4 class="header-title">LMS AI Co-Pilot</h4>
+      <span class="header-status">
+        <span class="status-dot" [class.warming]="isWarmingUp" [class.error]="hasConnectionError && !isAiReady"></span>
+        {{ (hasConnectionError && !isAiReady) ? 'تعذر الاتصال (السيرفر متوقف) 🔌' : (isWarmingUp ? 'جاري تهيئة المحرك... ⏳' : 'متصل وجاهز للإجابة') }}
+      </span>
+    </div>
+  </div>
+  <div class="header-controls">
+    <button *ngIf="!isMinimized" class="header-btn" (click)="$event.stopPropagation(); onClear()" title="مسح المحادثة">🗑️</button>
+    <button class="header-btn" (click)="$event.stopPropagation(); onToggle()" title="{{ isMinimized ? 'تكبير النافذة' : 'تصغير' }}">
+      {{ isMinimized ? '▲' : '▼' }}
+    </button>
+  </div>
+</div>

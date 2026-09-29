@@ -1,29 +1,27 @@
 <ng-container *ngIf="isLoggedIn">
-  <!-- ── Chat Window (Opens directly in minimized state) ───────────────────── -->
-  <div class="copilot-window" [class.minimized]="isMinimized" dir="rtl" cdkDrag cdkDragBoundary="body">
-    <!-- Header (Drag Handle & Click to expand when minimized) -->
-    <div class="copilot-header" cdkDragHandle (click)="isMinimized ? toggleMinimize() : null" [style.cursor]="isMinimized ? 'pointer' : 'grab'">
-      <div class="header-info">
-        <div class="header-avatar">🤖</div>
-        <div>
-          <h4 class="header-title">LMS AI Co-Pilot</h4>
-          <span class="header-status">
-            <span class="status-dot" [class.warming]="isWarmingUp"
-              [class.error]="hasConnectionError && !isAiReady"></span>
-            {{ (hasConnectionError && !isAiReady) ? 'تعذر الاتصال (السيرفر متوقف) 🔌' : (isWarmingUp ? 'جاري تهيئة المحرك... ⏳' : 'متصل وجاهز للإجابة') }}
-          </span>
-        </div>
-      </div>
-      <div class="header-controls">
-        <button *ngIf="!isMinimized" class="header-btn" (click)="$event.stopPropagation(); clearHistory()" title="مسح المحادثة">🗑️</button>
-        <button class="header-btn" (click)="$event.stopPropagation(); toggleMinimize()" title="{{ isMinimized ? 'تكبير النافذة' : 'تصغير' }}">
-          {{ isMinimized ? '▲' : '▼' }}
-        </button>
-      </div>
-    </div>
+  <!-- ── Chat Window ──────────────────────────────────────────────────────── -->
+  <div class="copilot-window" 
+       [class.minimized]="!hideHeader && isMinimized" 
+       [class.no-header]="hideHeader"
+       [class.inline-mode]="inline"
+       dir="rtl" 
+       cdkDrag
+       [cdkDragDisabled]="hideHeader || inline" 
+       cdkDragBoundary="body">
 
-    <!-- Body (Hidden if minimized) -->
-    <ng-container *ngIf="!isMinimized">
+    <!-- ── Separated Header Component (Rendered only if !hideHeader) ────────── -->
+    <app-copilot-header *ngIf="!hideHeader"
+                        cdkDragHandle
+                        [isMinimized]="isMinimized"
+                        [isAiReady]="isAiReady"
+                        [isWarmingUp]="isWarmingUp"
+                        [hasConnectionError]="hasConnectionError"
+                        (toggleMinimize)="toggleMinimize()"
+                        (clearHistory)="clearHistory()">
+    </app-copilot-header>
+
+    <!-- Body (Visible always if hideHeader is true, or if not minimized) -->
+    <ng-container *ngIf="hideHeader || !isMinimized">
       <!-- Admin Cache-Clear Strip (visible only for Admins) -->
       <div *ngIf="isAdmin" class="admin-cache-strip">
         <button type="button" class="cache-clear-btn" [disabled]="isClearingCache" (click)="clearAiCache()"
