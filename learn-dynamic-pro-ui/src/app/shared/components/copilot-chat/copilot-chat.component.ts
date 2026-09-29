@@ -57,7 +57,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
   @Output() lessonNavigate = new EventEmitter<{ lessonId?: string; videoUrl?: string; timestamp?: number }>();
 
-  isOpen = false;
+  isOpen = true;
   isMinimized = false;
   inputQuery = '';
   isStreaming = false;
@@ -101,6 +101,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       }
     });
     this.detectLessonFromRoute();
+    this.checkAiReadiness();
   }
 
   ngOnChanges(changes: SimpleChanges) {
@@ -265,11 +266,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
   toggleMinimize() {
     this.isMinimized = !this.isMinimized;
+    if (!this.isMinimized) {
+      this.detectLessonFromRoute();
+      this.checkAiReadiness();
+    }
   }
 
   closeChat() {
-    this.isOpen = false;
-    this.stopReadinessPolling();
+    this.isMinimized = true;
   }
 
   clearHistory() {

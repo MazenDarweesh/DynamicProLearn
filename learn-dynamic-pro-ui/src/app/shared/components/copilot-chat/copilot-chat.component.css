@@ -51,7 +51,6 @@
   100% { transform: scale(1.15); opacity: 0; }
 }
 
-/* ── Chat Window ──────────────────────────────────────────────────────── */
 .copilot-window {
   position: fixed;
   bottom: 25px;
@@ -70,10 +69,25 @@
   border: 1px solid #c7d2fe;
   animation: slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   font-family: inherit;
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.25s ease, box-shadow 0.25s ease;
 }
 
 .copilot-window.minimized {
   height: auto;
+  width: 320px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
+  cursor: pointer;
+}
+
+.copilot-window.minimized .copilot-header {
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+
+.copilot-window.minimized:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(67, 56, 202, 0.3);
 }
 
 @keyframes slideUp {
