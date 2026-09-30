@@ -487,5 +487,5 @@ $RECYCLE.BIN/
 *.pdf
 wwwroot/uploads/
 
-# Docker Deployment Folder
-deployment/
+# Docker Deployment Env Secrets
+deployment/.env

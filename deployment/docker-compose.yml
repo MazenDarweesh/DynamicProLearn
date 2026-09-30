@@ -1,0 +1,61 @@
+services:
+  dynamicprolearn-app:
+    image: mazendarweesh/dynamicprolearn:${IMAGE_TAG:-latest}
+    build:
+      context: ..
+      dockerfile: deployment/Dockerfile
+    container_name: dynamicprolearn-app
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      # ASP.NET Core Runtime Settings
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - AllowedHosts=*
+
+      # Connection String (connecting to the local mssql service)
+      - ConnectionStrings__DefaultConnection=Server=dynamicprolearn-db;Database=DynamicProLearnDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStr0ngP@ssw0rd123!};TrustServerCertificate=True;MultipleActiveResultSets=True;
+
+      # JWT Authentication Settings
+      - JwtSettings__Secret=${JWT_SECRET:-SuperSecretKeyNeedsToBeAtLeast32CharsLong123!}
+      - JwtSettings__Issuer=${JWT_ISSUER:-DynamicProLearn}
+      - JwtSettings__Audience=${JWT_AUDIENCE:-DynamicProLearnClient}
+      - JwtSettings__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
+
+      # AI Co-Pilot Settings
+      - AiCoPilot__ServiceToken=${AI_SERVICE_TOKEN:-MySuperSecretToken2026}
+      - AiCoPilot__WebhookUrl=${AI_WEBHOOK_URL:-http://lms_copilot_api:8000/v1/webhooks/lesson-updated}
+
+    depends_on:
+      dynamicprolearn-db:
+        condition: service_healthy   # ✅ waits until SQL Server is truly ready
+    networks:
+      - dynamicprolearn-network
+    restart: unless-stopped
+
+  dynamicprolearn-db:
+    image: mcr.microsoft.com/mssql/server:2022-CU14-ubuntu-22.04
+    container_name: dynamicprolearn-db
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-YourStr0ngP@ssw0rd123!}
+    ports:
+      - "1433:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    networks:
+      - dynamicprolearn-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P '${MSSQL_SA_PASSWORD:-YourStr0ngP@ssw0rd123!}' -Q 'SELECT 1' -No -C 2>/dev/null || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+
+networks:
+  dynamicprolearn-network:
+    driver: bridge
+
+volumes:
+  mssql_data:
