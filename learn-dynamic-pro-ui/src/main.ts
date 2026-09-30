@@ -5,10 +5,13 @@ import { AppComponent } from './app/app.component';
 import { CopilotChatComponent } from './app/shared/components/copilot-chat/copilot-chat.component';
 
 function registerCopilotElement(injector: any) {
-  if (!customElements.get('lms-ai-copilot')) {
-    const copilotElement = createCustomElement(CopilotChatComponent, { injector });
-    customElements.define('lms-ai-copilot', copilotElement);
-    console.info('%c[LMS AI Copilot] <lms-ai-copilot> registered as Web Component', 'color:#10b981;font-weight:bold');
+  const customTags = ['lms-ai-copilot', 'app-lms-copilot', 'app-copilot-chat'];
+  for (const tag of customTags) {
+    if (!customElements.get(tag)) {
+      const copilotElement = createCustomElement(CopilotChatComponent, { injector });
+      customElements.define(tag, copilotElement);
+      console.info(`%c[LMS AI Copilot] <${tag}> registered as Web Component`, 'color:#10b981;font-weight:bold');
+    }
   }
 }
 

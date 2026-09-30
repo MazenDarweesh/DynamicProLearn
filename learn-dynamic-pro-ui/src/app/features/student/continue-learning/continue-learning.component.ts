@@ -110,10 +110,15 @@ export class ContinueLearningComponent implements OnInit {
         this.isLoadingLesson = false;
         
         if (detail.videoUrl) {
-          let url = detail.videoUrl;
+          let url = detail.videoUrl.trim();
           const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
           if (ytMatch && ytMatch[1]) {
             url = `https://www.youtube.com/embed/${ytMatch[1]}`;
+          } else {
+            const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
+            if (driveMatch && driveMatch[1]) {
+              url = `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+            }
           }
           this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
         } else {

@@ -87,15 +87,51 @@ export class CopilotService {
   private http = inject(HttpClient);
   private authService = inject(AuthService);
 
-  private aiBaseUrl = 'http://localhost:8000';
+  private normalizeTunnelUrl(url: string): string {
+    let clean = url.trim().replace(/[<>]/g, '').replace(/\/+$/, '');
+    if (clean.includes('.devtunnels.ms')) {
+      clean = clean.replace(/^http:\/\//i, 'https://').replace(/:80(?=\/|$)/, '');
+      if (!clean.startsWith('http')) {
+        clean = 'https://' + clean;
+      }
+    }
+    return clean;
+  }
+
+  private detectDefaultAiUrl(): string {
+    if (typeof window !== 'undefined') {
+      const scripts = Array.from(document.querySelectorAll('script[src]')) as HTMLScriptElement[];
+      const tunnelScript = scripts.find(s => s.src && s.src.includes('.devtunnels.ms'));
+      if (tunnelScript) {
+        try {
+          const parsed = new URL(tunnelScript.src);
+          return `https://${parsed.host.replace(/-(?:4200|5115)\./, '-8000.')}`;
+        } catch {}
+      }
+      if (window.location.host.includes('.devtunnels.ms')) {
+        return `https://${window.location.host.replace(/-(?:4200|5115)\./, '-8000.')}`;
+      }
+    }
+    return 'http://localhost:8000';
+  }
+
+  private aiBaseUrl = this.detectDefaultAiUrl();
   private backendBaseUrl = '';
   private filterData$?: Observable<StudentCopilotFilterData>;
 
   setBaseUrls(aiUrl?: string, backendUrl?: string) {
-    if (aiUrl) this.aiBaseUrl = aiUrl.replace(/\/+$/, '');
+    if (aiUrl) {
+      const cleanAi = this.normalizeTunnelUrl(aiUrl);
+      if (cleanAi) {
+        this.aiBaseUrl = cleanAi;
+      }
+    }
     if (backendUrl) {
-      this.backendBaseUrl = backendUrl.replace(/\/+$/, '');
-      this.authService.setBackendUrl(backendUrl);
+      const cleanBackend = this.normalizeTunnelUrl(backendUrl);
+      if (cleanBackend) {
+        this.backendBaseUrl = cleanBackend;
+        this.authService.setBackendUrl(cleanBackend);
+      }
     }
   }
 

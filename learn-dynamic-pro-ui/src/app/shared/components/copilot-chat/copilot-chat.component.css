@@ -1,3 +1,24 @@
+/* ── Host Element Styling ────────────────────────────────────────────── */
+:host {
+  display: contents;
+}
+
+:host(.inline-host),
+:host([inline]),
+:host-context(.ai-chat-window),
+:host-context(.ai-chat-lms-body),
+:host-context([role="dialog"]) {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 0 !important;
+  flex: 1 1 100% !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
 /* ── Floating Launcher ─────────────────────────────────────────────────── */
 .copilot-launcher {
   position: fixed;
@@ -96,7 +117,7 @@
 }
 
 .copilot-window.inline-mode {
-  position: static !important;
+  position: relative !important;
   width: 100% !important;
   height: 100% !important;
   max-width: 100% !important;
@@ -105,6 +126,11 @@
   border-radius: 0 !important;
   box-shadow: none !important;
   animation: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 100% !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
 }
 
 @keyframes slideUp {
@@ -274,6 +300,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .chat-msg {
@@ -879,6 +906,7 @@
   display: flex;
   gap: 10px;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .copilot-input {

@@ -1,4 +1,4 @@
-import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef, booleanAttribute } from '@angular/core';
+import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef, booleanAttribute, HostBinding } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -44,12 +44,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   private copilotService = inject(CopilotService);
   private router = inject(Router, { optional: true });
   private cdr = inject(ChangeDetectorRef);
+  private elRef = inject(ElementRef);
   authService = inject(AuthService);
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   @Input() erpKey?: string;
   @Input() activeLessonId?: string;
+  @Input() lmsPageId?: string;
   @Input() token?: string;
   @Input() u?: string;
   @Input() p?: string;
@@ -57,6 +59,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   @Input() backendUrl?: string;
   @Input({ transform: booleanAttribute }) hideHeader: boolean = false;
   @Input({ transform: booleanAttribute }) inline: boolean = false;
+
+  @HostBinding('class.inline-host') get isInlineHost(): boolean {
+    return this.inline;
+  }
 
   @Output() lessonNavigate = new EventEmitter<{ lessonId?: string; videoUrl?: string; timestamp?: number }>();
 
@@ -97,7 +103,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   ];
 
   ngOnInit() {
+    this.readAttributesFromHost();
+    this.detectEmbeddedMode();
     this.applyInputs();
+    this.setupAttributeObserver();
     this.lessonSub = this.copilotService.activeLessonId$.subscribe(lessonId => {
       if (lessonId) {
         this.activeLessonId = lessonId;
@@ -108,12 +117,123 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['token'] || changes['apiUrl'] || changes['backendUrl'] || changes['erpKey'] || changes['u'] || changes['p']) {
+    if (changes['token'] || changes['apiUrl'] || changes['backendUrl'] || changes['erpKey'] || changes['lmsPageId'] || changes['u'] || changes['p'] || changes['inline'] || changes['hideHeader']) {
+      this.readAttributesFromHost();
       this.applyInputs();
+      if (changes['apiUrl']) {
+        this.checkAiReadiness();
+      }
+    }
+  }
+
+  private attrObserver?: MutationObserver;
+
+  private readAttributesFromHost() {
+    const hostEl: HTMLElement = this.elRef?.nativeElement;
+    if (!hostEl || !hostEl.getAttribute) return;
+
+    const getAttr = (kebab: string, camel: string) => {
+      const val = hostEl.getAttribute(kebab) || hostEl.getAttribute(camel);
+      return val ? val.trim() : undefined;
+    };
+
+    const clean = (val?: string) => {
+      if (!val) return undefined;
+      let res = val.trim().replace(/[<>]/g, '');
+      if (res.includes('.devtunnels.ms')) {
+        res = res.replace(/^http:\/\//i, 'https://').replace(/:80(?=\/|$)/, '');
+      }
+      return res;
+    };
+
+    this.apiUrl = clean(this.apiUrl || getAttr('api-url', 'apiUrl'));
+    this.backendUrl = clean(this.backendUrl || getAttr('backend-url', 'backendUrl'));
+    this.erpKey = clean(this.erpKey || getAttr('erp-key', 'erpKey'));
+    this.lmsPageId = clean(this.lmsPageId || getAttr('lms-page-id', 'lmsPageId'));
+    this.u = clean(this.u || getAttr('u', 'u'));
+    this.p = clean(this.p || getAttr('p', 'p'));
+    this.token = clean(this.token || getAttr('token', 'token'));
+
+    const hideHeaderAttr = getAttr('hide-header', 'hideHeader');
+    if (hideHeaderAttr != null) {
+      this.hideHeader = hideHeaderAttr === 'true' || hideHeaderAttr === '';
+    }
+    const inlineAttr = getAttr('inline', 'inline');
+    if (inlineAttr != null) {
+      this.inline = inlineAttr === 'true' || inlineAttr === '';
+    }
+  }
+
+  private setupAttributeObserver() {
+    const hostEl: HTMLElement = this.elRef?.nativeElement;
+    if (!hostEl || typeof MutationObserver === 'undefined') return;
+
+    this.attrObserver = new MutationObserver(() => {
+      this.readAttributesFromHost();
+      this.applyInputs();
+      this.checkAiReadiness();
+    });
+
+    this.attrObserver.observe(hostEl, {
+      attributes: true,
+      attributeFilter: ['api-url', 'apiUrl', 'backend-url', 'backendUrl', 'erp-key', 'erpKey', 'lms-page-id', 'lmsPageId', 'u', 'p', 'token', 'hide-header', 'inline']
+    });
+  }
+
+  private detectEmbeddedMode() {
+    const hostEl: HTMLElement = this.elRef?.nativeElement;
+    if (!hostEl) return;
+
+    const tagName = hostEl.tagName?.toLowerCase() || '';
+    const parent = hostEl.parentElement;
+    const parentTag = parent?.tagName?.toLowerCase() || '';
+
+    // If hosted as Web Component (<lms-ai-copilot> or <app-lms-copilot>) or inside an ERP container
+    const isCustomElement = tagName.includes('lms-copilot') || tagName.includes('ai-copilot');
+    const isInsideContainer = !!(parent && parentTag !== 'body' && parentTag !== 'app-root');
+
+    if (isCustomElement || isInsideContainer) {
+      this.inline = true;
+      hostEl.style.display = 'flex';
+      hostEl.style.flexDirection = 'column';
+      hostEl.style.width = '100%';
+      hostEl.style.height = '100%';
+      hostEl.style.flex = '1';
+      hostEl.style.minHeight = '0';
+
+      // Defensive: stretch all intermediate parent wrappers up to the window container
+      let current: HTMLElement | null = parent;
+      while (current && current.tagName.toLowerCase() !== 'body' && current.tagName.toLowerCase() !== 'app-root') {
+        if (current.classList.contains('ai-chat-window')) {
+          break;
+        }
+        current.style.flex = '1';
+        current.style.display = 'flex';
+        current.style.flexDirection = 'column';
+        current.style.minHeight = '0';
+        current.style.height = '100%';
+        current.style.overflow = 'hidden';
+        current = current.parentElement;
+      }
+
+      // If ERP has its own header (.ai-chat-header), hide internal copilot header
+      const hasOuterHeader = !!(
+        parent?.closest?.('.ai-chat-window') ||
+        parent?.querySelector?.('.ai-chat-header') ||
+        parent?.parentElement?.querySelector?.('.ai-chat-header')
+      );
+      if (hasOuterHeader) {
+        this.hideHeader = true;
+      }
     }
   }
 
   private applyInputs() {
+    if (this.lmsPageId) {
+      if (!this.erpKey) this.erpKey = this.lmsPageId;
+      if (!this.activeLessonId) this.activeLessonId = this.lmsPageId;
+    }
+    this.detectEmbeddedMode();
     if (this.apiUrl || this.backendUrl) {
       this.copilotService.setBaseUrls(this.apiUrl, this.backendUrl);
     }
@@ -139,6 +259,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   }
 
   ngOnDestroy() {
+    this.attrObserver?.disconnect();
     this.stopReadinessPolling();
     this.lessonSub?.unsubscribe();
   }

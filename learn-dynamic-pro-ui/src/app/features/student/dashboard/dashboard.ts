@@ -28,6 +28,7 @@ export class DashboardComponent implements OnInit {
   private studentService = inject(StudentService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private sanitizer = inject(DomSanitizer);
 
   modules: DashboardModule[] = [];
   isLoading = true;
@@ -89,22 +90,31 @@ export class DashboardComponent implements OnInit {
     this.loadLastLessonData();
   }
 
+  private toSafeVideoUrl(rawUrl?: string): SafeResourceUrl | null {
+    if (!rawUrl) return null;
+    let url = rawUrl.trim();
+
+    // YouTube: convert to embed
+    const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
+    if (ytMatch && ytMatch[1]) {
+      url = `https://www.youtube.com/embed/${ytMatch[1]}`;
+    } else {
+      // Google Drive: convert to /preview for iframe embedding
+      const driveMatch = url.match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?id=)([a-zA-Z0-9_-]+)/);
+      if (driveMatch && driveMatch[1]) {
+        url = `https://drive.google.com/file/d/${driveMatch[1]}/preview`;
+      }
+    }
+    return this.sanitizer.bypassSecurityTrustResourceUrl(url);
+  }
+
   loadLastLessonData() {
     this.studentService.getLastLesson().subscribe({
       next: (res: any) => {
         if (res && res.lessonId) {
-          const san = inject(DomSanitizer);
           this.studentService.getLessonDetail(res.lessonId).subscribe(detail => {
             this.lastLesson = detail;
-            if (detail.videoUrl) {
-              let url = detail.videoUrl;
-              // robust check for youtube
-              const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-              if (ytMatch && ytMatch[1]) {
-                url = `https://www.youtube.com/embed/${ytMatch[1]}`;
-              }
-              this.safeVideoUrl = san.bypassSecurityTrustResourceUrl(url);
-            }
+            this.safeVideoUrl = this.toSafeVideoUrl(detail.videoUrl);
           });
 
           this.studentService.getLessonsByLevel(res.moduleId).subscribe(levels => {
@@ -131,18 +141,9 @@ export class DashboardComponent implements OnInit {
   }
 
   loadSpecificLesson(lessonId: string, moduleId: string) {
-    const san = inject(DomSanitizer);
     this.studentService.getLessonDetail(lessonId).subscribe(detail => {
       this.lastLesson = detail;
-      if (detail.videoUrl) {
-        let url = detail.videoUrl;
-        // robust check for youtube
-        const ytMatch = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/);
-        if (ytMatch && ytMatch[1]) {
-          url = `https://www.youtube.com/embed/${ytMatch[1]}`;
-        }
-        this.safeVideoUrl = san.bypassSecurityTrustResourceUrl(url);
-      }
+      this.safeVideoUrl = this.toSafeVideoUrl(detail.videoUrl);
     });
   }
 
