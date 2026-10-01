@@ -15,9 +15,9 @@ function registerCopilotElement(injector: any) {
   }
 }
 
-// Only bootstrap the full LMS AppComponent if running standalone on our own LMS page
+// Only bootstrap the full LMS AppComponent if running standalone on our own LMS page (where app-root exists)
 const rootEl = document.querySelector('app-root');
-const isOurStandaloneApp = !!(rootEl && document.title.includes('DynamicProLearn') && window.location.hostname === 'localhost' && window.location.port === '4200');
+const isOurStandaloneApp = !!rootEl;
 
 if (isOurStandaloneApp) {
   bootstrapApplication(AppComponent, appConfig)
