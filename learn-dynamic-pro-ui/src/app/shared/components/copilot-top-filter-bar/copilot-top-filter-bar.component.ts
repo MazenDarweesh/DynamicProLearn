@@ -1,4 +1,4 @@
-import { Component, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, inject } from '@angular/core';
+import { Component, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, inject, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import {
@@ -20,6 +20,7 @@ import {
 })
 export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
   private copilotService = inject(CopilotService);
+  private cdr = inject(ChangeDetectorRef);
 
   @Input() activeLessonId?: string;
   @Input() erpKey?: string;
@@ -69,11 +70,13 @@ export class CopilotTopFilterBarComponent implements OnInit, OnChanges {
         } else {
           this.emitChange();
         }
+        this.cdr.markForCheck();
       },
       error: (err) => {
         console.error('[CopilotFilterBar] Failed to load filter hierarchy', err);
         this.isLoading = false;
         this.loadError = true;
+        this.cdr.markForCheck();
       }
     });
   }

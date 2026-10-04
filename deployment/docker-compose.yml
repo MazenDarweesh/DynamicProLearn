@@ -23,6 +23,7 @@ services:
       - JwtSettings__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
 
       # AI Co-Pilot Settings
+      - AiCoPilot__BaseUrl=${AI_BASE_URL:-http://lms_copilot_api:8000}
       - AiCoPilot__ServiceToken=${AI_SERVICE_TOKEN:-MySuperSecretToken2026}
       - AiCoPilot__WebhookUrl=${AI_WEBHOOK_URL:-http://lms_copilot_api:8000/v1/webhooks/lesson-updated}
 
@@ -55,6 +56,7 @@ services:
 
 networks:
   dynamicprolearn-network:
+    name: dynamicprolearn-network
     driver: bridge
 
 volumes:

@@ -1,11 +1,13 @@
 using LearnDynamicPro.Application.Dtos.Auth;
 using LearnDynamicPro.Application.Features.Auth;
+using Microsoft.AspNetCore.Cors;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LearnDynamicPro.API.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[EnableCors("AllowAngularApp")]
 public class AuthController : ControllerBase
 {
     private readonly IAuthService _authService;

@@ -1,4 +1,4 @@
-<ng-container *ngIf="isLoggedIn">
+<ng-container *ngIf="shouldRenderComponent">
   <!-- ── Chat Window ──────────────────────────────────────────────────────── -->
   <div class="copilot-window" 
        [class.minimized]="!hideHeader && isMinimized" 
@@ -22,6 +22,22 @@
 
     <!-- Body (Visible always if hideHeader is true, or if not minimized) -->
     <ng-container *ngIf="hideHeader || !isMinimized">
+      <!-- Auto-Login / Handshake Loading Spinner -->
+      <div *ngIf="isAuthenticating" class="copilot-auth-overlay">
+        <div class="auth-spinner"></div>
+        <p class="auth-spinner-text">جاري مصادقة الجلسة وربط المساعد الذكي بنظام الـ ERP...</p>
+      </div>
+
+      <!-- Auto-Login Error Banner with Retry -->
+      <div *ngIf="authError && !isAuthenticating" class="copilot-auth-error-banner">
+        <div class="auth-error-content">
+          <span class="auth-error-icon">⚠️</span>
+          <span class="auth-error-text">{{ authError }}</span>
+        </div>
+        <button type="button" class="btn-retry-conn" (click)="retryAuth()" title="إعادة محاولة المصادقة">
+          <span>إعادة المحاولة</span> 🔄
+        </button>
+      </div>
       <!-- Admin Cache-Clear Strip (visible only for Admins) -->
       <div *ngIf="isAdmin" class="admin-cache-strip">
         <button type="button" class="cache-clear-btn" [disabled]="isClearingCache" (click)="clearAiCache()"

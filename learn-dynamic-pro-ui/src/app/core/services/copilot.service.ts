@@ -115,8 +115,29 @@ export class CopilotService {
     return 'http://localhost:8000';
   }
 
+  private detectDefaultBackendUrl(): string {
+    if (typeof window !== 'undefined') {
+      const scripts = Array.from(document.querySelectorAll('script[src]')) as HTMLScriptElement[];
+      const tunnelScript = scripts.find(s => s.src && s.src.includes('.devtunnels.ms'));
+      if (tunnelScript) {
+        try {
+          const parsed = new URL(tunnelScript.src);
+          const backendUrl = `https://${parsed.host.replace(/-(?:4200|8000)\./, '-5115.')}`;
+          this.authService.setBackendUrl(backendUrl);
+          return backendUrl;
+        } catch {}
+      }
+      if (window.location.host.includes('.devtunnels.ms')) {
+        const backendUrl = `https://${window.location.host.replace(/-(?:4200|8000)\./, '-5115.')}`;
+        this.authService.setBackendUrl(backendUrl);
+        return backendUrl;
+      }
+    }
+    return '';
+  }
+
   private aiBaseUrl = this.detectDefaultAiUrl();
-  private backendBaseUrl = '';
+  private backendBaseUrl = this.detectDefaultBackendUrl();
   private filterData$?: Observable<StudentCopilotFilterData>;
 
   setBaseUrls(aiUrl?: string, backendUrl?: string) {

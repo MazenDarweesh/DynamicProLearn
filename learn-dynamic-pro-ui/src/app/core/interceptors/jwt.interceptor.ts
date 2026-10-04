@@ -11,7 +11,7 @@ const refreshTokenSubject = new BehaviorSubject<string | null>(null);
 
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
-  const router = inject(Router);
+  const router = inject(Router, { optional: true });
   const token = authService.token();
 
   let modifiedReq = req;
@@ -33,7 +33,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
           req.url.includes('/api/Auth/refresh-token')
         ) {
           authService.logout();
-          router.navigate(['/login']);
+          router?.navigate(['/login']);
           return throwError(() => error);
         }
 
@@ -41,7 +41,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
         if (!authService.refreshTokenValue()) {
           Dialog.alert('انتهت صلاحية الجلسة. الرجاء تسجيل الدخول مجدداً.', 'تنبيه', 'error');
           authService.logout();
-          router.navigate(['/login']);
+          router?.navigate(['/login']);
           return throwError(() => error);
         }
 
@@ -67,7 +67,7 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
               isRefreshing = false;
               Dialog.alert('انتهت صلاحية الجلسة. الرجاء تسجيل الدخول مجدداً.', 'تنبيه', 'error');
               authService.logout();
-              router.navigate(['/login']);
+              router?.navigate(['/login']);
               return throwError(() => refreshErr);
             })
           );

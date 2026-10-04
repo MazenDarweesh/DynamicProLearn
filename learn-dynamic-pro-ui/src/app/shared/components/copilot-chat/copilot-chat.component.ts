@@ -85,14 +85,30 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   readonly maxAttempts = 5;
   private readinessSub?: Subscription;
 
+  isEmbedded = false;
+  isAuthenticating = false;
+  authError: string | null = null;
+
   get isAdmin(): boolean {
     return this.authService.userRole() === 'Admin';
   }
 
   get isLoggedIn(): boolean {
-    const url = this.router?.url || window.location.pathname;
+    // In embedded / inline Web Component mode, never hide based on host app URL!
+    if (this.isEmbedded || this.inline) {
+      return true;
+    }
+    const url = this.router?.url || '';
     const isAuthRoute = url.includes('/login') || url.includes('/erp-redirect');
     return this.authService.isAuthenticated() && !isAuthRoute;
+  }
+
+  get shouldRenderComponent(): boolean {
+    // In embedded / inline mode, always render into the DOM, never hide based on window.location
+    if (this.isEmbedded || this.inline) {
+      return true;
+    }
+    return this.isLoggedIn;
   }
 
   messages: ChatMessage[] = [
@@ -189,10 +205,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     const parentTag = parent?.tagName?.toLowerCase() || '';
 
     // If hosted as Web Component (<lms-ai-copilot> or <app-lms-copilot>) or inside an ERP container
-    const isCustomElement = tagName.includes('lms-copilot') || tagName.includes('ai-copilot');
+    const isCustomElement = tagName.includes('lms-copilot') || tagName.includes('ai-copilot') || tagName.includes('lms-ai');
     const isInsideContainer = !!(parent && parentTag !== 'body' && parentTag !== 'app-root');
+    const hasEmbeddedFlag = !!(window as any)?.__LMS_COPILOT_EMBEDDED__ || !!(window as any)?.__ERP_HOST__;
 
-    if (isCustomElement || isInsideContainer) {
+    if (isCustomElement || isInsideContainer || this.inline || hasEmbeddedFlag) {
+      this.isEmbedded = true;
       this.inline = true;
       hostEl.style.display = 'flex';
       hostEl.style.flexDirection = 'column';
@@ -234,23 +252,49 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       if (!this.activeLessonId) this.activeLessonId = this.lmsPageId;
     }
     this.detectEmbeddedMode();
+
+    if (this.backendUrl) {
+      this.authService.setBackendUrl(this.backendUrl);
+    }
     if (this.apiUrl || this.backendUrl) {
       this.copilotService.setBaseUrls(this.apiUrl, this.backendUrl);
     }
     if (this.token) {
       this.authService.login(this.token);
+      this.isAuthenticating = false;
+      this.authError = null;
+    } else if (this.u && this.p && !this.authService.isAuthenticated()) {
+      this.performErpLogin(this.u, this.p, this.erpKey || null);
     }
-    if (this.u && this.p && !this.authService.isAuthenticated()) {
-      this.authService.erpLogin(this.u, this.p, this.erpKey || null).subscribe({
-        next: (res: any) => {
-          this.authService.login(res.token, res.refreshToken);
-          if (res.erpRedirect?.lessonId) {
-            this.activeLessonId = res.erpRedirect.lessonId;
-          }
-          this.cdr.markForCheck();
-        },
-        error: (err) => console.warn('[CopilotChat] Silent ERP Login failed:', err)
-      });
+  }
+
+  performErpLogin(u: string, p: string, erpKey: string | null) {
+    this.isAuthenticating = true;
+    this.authError = null;
+    this.cdr.markForCheck();
+
+    this.authService.erpLogin(u, p, erpKey).subscribe({
+      next: (res: any) => {
+        this.authService.login(res.token, res.refreshToken);
+        if (res.erpRedirect?.lessonId) {
+          this.activeLessonId = res.erpRedirect.lessonId;
+        }
+        this.isAuthenticating = false;
+        this.authError = null;
+        this.cdr.markForCheck();
+      },
+      error: (err) => {
+        console.warn('[CopilotChat] Silent ERP Login failed:', err);
+        this.isAuthenticating = false;
+        this.authError = 'تعذر تسجيل الدخول التلقائي مع الـ ERP. يرجى التحقق من بيانات الاتصال أو خادم الـ API.';
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
+  retryAuth() {
+    if (this.u && this.p) {
+      this.performErpLogin(this.u, this.p, this.erpKey || null);
     }
   }
 
@@ -285,7 +329,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
   detectLessonFromRoute() {
     try {
-      const url = this.router?.url || window.location.pathname;
+      const url = this.router?.url || '';
       const queryParams = new URLSearchParams(window.location.search);
 
       // Check ERP Key query param (?erpKey=... or ?key=...)
@@ -298,15 +342,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const u = queryParams.get('u');
       const p = queryParams.get('p');
       if (u && p && !this.authService.isAuthenticated()) {
-        this.authService.erpLogin(u, p, queryErpKey || null).subscribe({
-          next: (res: any) => {
-            this.authService.login(res.token, res.refreshToken);
-            if (res.erpRedirect?.lessonId) {
-              this.activeLessonId = res.erpRedirect.lessonId;
-            }
-          },
-          error: (err) => console.warn('[CopilotChat] Silent ERP Login failed:', err)
-        });
+        this.performErpLogin(u, p, queryErpKey || null);
       }
 
       const queryLessonId = queryParams.get('lessonId');

@@ -1,4 +1,22 @@
-/* ── Host Element Styling ────────────────────────────────────────────── */
+/* ── Host Element & Encapsulated Variables ────────────────────────────── */
+:host, lms-ai-copilot, app-lms-copilot, app-copilot-chat {
+  --color-primary: #11557e;
+  --color-primary-light: #E7EDFC;
+  --color-navy: #1B2A4A;
+  --color-accent: #FE932E;
+  --color-accent-light: #FDEBD6;
+  --color-danger: #E24B4A;
+  --color-bg-page: #F7F7F7;
+  --color-bg-card: #FFFFFF;
+  --color-border: #E2E2E2;
+  --color-text-primary: #1B2A4A;
+  --color-text-secondary: #8C8A93;
+  --radius-card: 12px;
+  --radius-btn: 8px;
+  font-family: 'Readex Pro', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-sizing: border-box;
+}
+
 :host {
   display: contents;
 }
@@ -958,5 +976,62 @@
   background: #ede9fe;
   color: #6d28d9;
   border: 1px solid #ddd6fe;
+}
+
+/* ── Auth Loading Overlay & Error Banner ── */
+.copilot-auth-overlay {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 20px;
+  background: rgba(255, 255, 255, 0.96);
+  text-align: center;
+  gap: 14px;
+  min-height: 180px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.auth-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #4f46e5;
+  border-radius: 50%;
+  animation: authSpin 0.8s linear infinite;
+}
+
+@keyframes authSpin {
+  to { transform: rotate(360deg); }
+}
+
+.auth-spinner-text {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 500;
+  margin: 0;
+}
+
+.copilot-auth-error-banner {
+  background: #fef2f2;
+  border-bottom: 1px solid #fecaca;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.auth-error-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #991b1b;
+  font-weight: 500;
+}
+
+.auth-error-icon {
+  font-size: 15px;
 }
 

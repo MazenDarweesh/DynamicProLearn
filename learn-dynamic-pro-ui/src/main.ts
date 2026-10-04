@@ -3,6 +3,7 @@ import { createCustomElement } from '@angular/elements';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 import { CopilotChatComponent } from './app/shared/components/copilot-chat/copilot-chat.component';
+import { copilotElementConfig } from './copilot-element';
 
 function registerCopilotElement(injector: any) {
   const customTags = ['lms-ai-copilot', 'app-lms-copilot', 'app-copilot-chat'];
@@ -15,9 +16,11 @@ function registerCopilotElement(injector: any) {
   }
 }
 
-// Only bootstrap the full LMS AppComponent if running standalone on our own LMS page (where app-root exists)
-const rootEl = document.querySelector('app-root');
-const isOurStandaloneApp = !!rootEl;
+// Check strictly for our LMS standalone app element
+// A generic 'app-root' query causes collision with host Angular applications (e.g., ERP)
+const lmsRootEl = document.querySelector('app-root[data-lms-app]') || document.querySelector('lms-standalone-app');
+const isExplicitlyEmbedded = !!(window as any)?.__LMS_COPILOT_EMBEDDED__ || !!(window as any)?.__ERP_HOST__;
+const isOurStandaloneApp = !!lmsRootEl && !isExplicitlyEmbedded;
 
 if (isOurStandaloneApp) {
   bootstrapApplication(AppComponent, appConfig)
@@ -25,7 +28,9 @@ if (isOurStandaloneApp) {
     .catch((err) => console.error(err));
 } else {
   // Embedded mode (inside ERP or external page): only initialize injector and register Custom Element
-  createApplication(appConfig)
+  // Uses isolated copilotElementConfig (NO ROUTER) to prevent hijacking host application routes/login!
+  createApplication(copilotElementConfig)
     .then(appRef => registerCopilotElement(appRef.injector))
     .catch((err) => console.error(err));
 }
+
