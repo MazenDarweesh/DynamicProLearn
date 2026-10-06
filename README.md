@@ -109,6 +109,12 @@
 - **Non-Blocking AI Generation:** Heavy quiz and summary generation endpoints return `202 Accepted` with polling URLs, decoupling HTTP threads from LLM response latency.
 - **Deterministic Level Ordering:** Lesson creation and level switching dynamically auto-calculate sequential `LevelOrderIndex` (`Max + 1`) in both Angular and EF Core, preventing curriculum ordering collisions.
 
+### 📦 17. Isolated-Scope Web Component Bundle & Zero-Collision Runtime
+
+- **Dual-IIFE Enclosure Architecture:** The automated bundler (`bundle-element.js`) wraps polyfills and component scripts into independent Immediately Invoked Function Expressions (IIFE), eliminating top-level namespace and variable collisions with legacy ERP hosts.
+- **Isolated Routerless Bootstrap:** Utilizes `isolatedCopilotConfig` in `main.ts` with no routing providers, ensuring the embedded copilot never intercepts, overrides, or hijacks host ERP navigation or authentication routes.
+- **Classic Script Distribution:** Strips ES module export artifacts during build, distributing a 100% self-contained `<script src="lms-copilot.bundle.js">` suitable for immediate inclusion in any legacy or modern host application.
+
 ---
 
 ## 🏗️ System Architecture
@@ -355,6 +361,9 @@ npm start
 - [x] Live Angular 19 AI status banners with bounded 4s polling and conditional Quiz/Summary guards
 - [x] Dual-key webhook cache invalidation (`lesson_id` & `lessonId`)
 - [x] Admin proxy endpoint for clearing AI exact and semantic vector caches
+- [x] Automated Dual-IIFE Web Component bundle isolation eliminating global scope collisions
+- [x] Zero-overhead in-DOM ERP Form Fill architectural blueprint and security specification
+- [ ] In-DOM ERP active screen inspection and automated Form Fill injection
 - [ ] Multi-tenant database schema isolation per enterprise client
 
 ---
@@ -364,6 +373,8 @@ npm start
 - [📘 Project Overview & Business Spec](docs/PROJECT_OVERVIEW.md) — Comprehensive business goals, user personas, and complete functional specification.
 - [🎯 Technical Interview Preparation](docs/INTERVIEW_PREP.md) — Architectural defense questions, system design deep-dives, and STAR behavioral scenarios.
 - [🏛️ Architecture Blueprint](docs/ARCHITECTURE.md) — Comprehensive design, data flow diagrams, and security specifications.
+- [📐 ERP AI Form-Fill Blueprint](docs/BLUEPRINT_ERP_AI_FORM_FILL.md) — Zero-overhead, in-DOM contextual form filling and action card execution specification.
+- [🤖 ERP AI Agent Options (2026)](docs/ERP_AI_Agent_Options_2026-10-06.md) — Strategic benchmark comparing API/MCP, browser automation, and Computer Use agents.
 - [📡 REST API Reference](docs/API_REFERENCE.md) — Exhaustive contract specifications for all 40+ endpoints.
 - [🤝 AI Co-Pilot Handoff Brief](AI_COPILOT_HANDOFF_BRIEF.md) — Coordination guide between .NET/Angular and the Python AI engine.
 - [🐳 Deployment Guide](deployment/DEPLOYMENT_GUIDE.md) — Production deployment instructions and environment variables.
