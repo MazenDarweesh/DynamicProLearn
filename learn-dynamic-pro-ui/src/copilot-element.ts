@@ -15,7 +15,7 @@ const changeDetectionProvider = typeof (window as any)?.Zone !== 'undefined'
  * Isolated Application Config for LMS Copilot Custom Element.
  * Completely free of provideRouter(routes) to avoid hijacking host app navigation.
  */
-export const copilotElementConfig: ApplicationConfig = {
+const copilotElementConfig: ApplicationConfig = {
   providers: [
     changeDetectionProvider,
     provideHttpClient(withInterceptors([jwtInterceptor])),

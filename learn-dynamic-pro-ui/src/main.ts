@@ -1,9 +1,22 @@
 import { bootstrapApplication, createApplication } from '@angular/platform-browser';
 import { createCustomElement } from '@angular/elements';
+import { provideZoneChangeDetection, provideExperimentalZonelessChangeDetection, ApplicationConfig } from '@angular/core';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideMarkdown } from 'ngx-markdown';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
 import { CopilotChatComponent } from './app/shared/components/copilot-chat/copilot-chat.component';
-import { copilotElementConfig } from './copilot-element';
+import { jwtInterceptor } from './app/core/interceptors/jwt.interceptor';
+
+const isolatedCopilotConfig: ApplicationConfig = {
+  providers: [
+    typeof (window as any)?.Zone !== 'undefined'
+      ? provideZoneChangeDetection({ eventCoalescing: true })
+      : provideExperimentalZonelessChangeDetection(),
+    provideHttpClient(withInterceptors([jwtInterceptor])),
+    provideMarkdown()
+  ]
+};
 
 function registerCopilotElement(injector: any) {
   const customTags = ['lms-ai-copilot', 'app-lms-copilot', 'app-copilot-chat'];
@@ -29,7 +42,7 @@ if (isOurStandaloneApp) {
 } else {
   // Embedded mode (inside ERP or external page): only initialize injector and register Custom Element
   // Uses isolated copilotElementConfig (NO ROUTER) to prevent hijacking host application routes/login!
-  createApplication(copilotElementConfig)
+  createApplication(isolatedCopilotConfig)
     .then(appRef => registerCopilotElement(appRef.injector))
     .catch((err) => console.error(err));
 }

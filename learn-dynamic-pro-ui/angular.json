@@ -70,7 +70,11 @@
           },
           "configurations": {
             "production": {
-              "optimization": true,
+              "optimization": {
+                "scripts": true,
+                "styles": true,
+                "fonts": false
+              },
               "extractLicenses": false,
               "sourceMap": false,
               "outputHashing": "none"
