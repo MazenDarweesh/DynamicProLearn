@@ -37,6 +37,12 @@ export interface AiReadinessResponse {
   environment?: string;
 }
 
+export interface CopilotFormFillData {
+  intent?: string;
+  fields: Record<string, any>;
+  screenKey?: string;
+}
+
 export interface CopilotFilterOption {
   id: string;
   name: string;
@@ -190,7 +196,10 @@ export class CopilotService {
     onError?: (err: any) => void,
     skipCache: boolean = false,
     filters?: CopilotFilterState,
-    threadId?: string
+    threadId?: string,
+    visibleFields?: string[],
+    erpKey?: string,
+    onFormFill?: (fillData: CopilotFormFillData) => void
   ): Promise<void> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
 
@@ -199,6 +208,16 @@ export class CopilotService {
       skip_cache: skipCache,
       skipCache: skipCache
     };
+
+    if (visibleFields && visibleFields.length > 0) {
+      payload['visible_fields'] = visibleFields;
+      payload['visibleFields'] = visibleFields;
+    }
+
+    if (erpKey) {
+      payload['erp_key'] = erpKey;
+      payload['erpKey'] = erpKey;
+    }
 
     if (threadId) {
       payload['thread_id'] = threadId;
@@ -328,6 +347,10 @@ export class CopilotService {
                 }
                 console.info('%c[CoPilot SSE] SOURCES', 'color:#10b981;font-weight:bold', sourcesArray);
                 onSources(sourcesArray);
+
+              } else if (currentEvent === 'form_fill' && onFormFill) {
+                console.info('%c[CoPilot SSE] FORM_FILL', 'color:#ec4899;font-weight:bold', data);
+                onFormFill(data as CopilotFormFillData);
 
               } else if (currentEvent === 'token' && onToken) {
                 tokenCount++;

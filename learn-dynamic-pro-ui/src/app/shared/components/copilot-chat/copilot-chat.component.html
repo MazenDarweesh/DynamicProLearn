@@ -115,6 +115,35 @@
               </div>
             </div>
 
+            <!-- In-DOM Action Card: Auto-Fill Suggestion -->
+            <div *ngIf="msg.formFillData && !msg.isStreaming" class="form-fill-card animate-fade-in">
+              <div class="form-fill-header">
+                <div class="form-fill-title-wrap">
+                  <span class="form-fill-icon">🪄</span>
+                  <span class="form-fill-title">اقتراح تعبئة الشاشة بالذكاء الاصطناعي</span>
+                </div>
+                <span class="form-fill-badge">جاهز للتنفيذ</span>
+              </div>
+
+              <div class="form-fill-body">
+                <div *ngFor="let item of (msg.formFillData.fields | keyvalue)" class="form-fill-item">
+                  <span class="field-label">{{ item.key }}</span>
+                  <span class="field-value">{{ item.value }}</span>
+                </div>
+              </div>
+
+              <div class="form-fill-footer">
+                <button *ngIf="!msg.formFillApplied" type="button" class="btn-apply-form-fill" (click)="applyFormFill(msg)">
+                  <span class="btn-icon">✨</span>
+                  <span>تعبئة شاشة الـ ERP الآن</span>
+                </button>
+                <div *ngIf="msg.formFillApplied" class="form-fill-applied-badge">
+                  <span>✅</span>
+                  <span>تم ملء الحقول بنجاح في الصفحة! راجع البيانات واضغط حفظ.</span>
+                </div>
+              </div>
+            </div>
+
             <!-- Rating Bar & Feedback Popover (For completed assistant responses) -->
             <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0"
               class="msg-feedback-container">

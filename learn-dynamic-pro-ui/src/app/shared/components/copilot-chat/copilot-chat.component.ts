@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
-import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState } from '../../../core/services/copilot.service';
+import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData } from '../../../core/services/copilot.service';
 import { AuthService } from '../../../core/services/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
@@ -31,6 +31,10 @@ export interface ChatMessage {
   cacheHit?: boolean;
   provenance?: string;
   latencyMs?: number;
+  /** In-DOM Form Fill payload extracted by AI */
+  formFillData?: CopilotFormFillData;
+  /** Whether the user clicked apply and values were injected into the host DOM */
+  formFillApplied?: boolean;
 }
 
 @Component({
@@ -450,7 +454,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       if (this.scrollContainer) {
         this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
       }
-    } catch (err) {}
+    } catch (err) { }
   }
 
   /**
@@ -598,9 +602,118 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     await this.streamQuery(query, skipCache);
   }
 
+  /**
+   * Inspects the host DOM outside of the copilot component to detect input fields
+   * in the currently active ERP screen. Gathers both technical names and visual labels
+   * so the AI RAG engine can seamlessly correlate video training context with form fields.
+   */
+  collectVisibleFormFields(): string[] {
+    if (typeof document === 'undefined') return [];
+    try {
+      const inputs = Array.from(document.querySelectorAll('input, select, textarea')) as (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[];
+      const fields: string[] = [];
+
+      for (const el of inputs) {
+        // Strict Isolation: Ignore inputs inside the copilot widget itself
+        if (this.elRef?.nativeElement?.contains(el)) continue;
+        if (el.type === 'hidden' || el.disabled) continue;
+
+        const name = el.getAttribute('name') || el.id || el.getAttribute('placeholder') || el.getAttribute('data-testid');
+        if (!name) continue;
+
+        // Extract associated label text for rich semantic RAG grounding
+        let labelText = '';
+        const parentGroup = el.closest('.form-group, .field-wrapper, label, td, tr');
+        if (parentGroup) {
+          const labelEl = parentGroup.querySelector('label') || (parentGroup.tagName === 'LABEL' ? parentGroup : null);
+          if (labelEl && labelEl !== el) {
+            labelText = labelEl.textContent?.trim().replace(/[:*]/g, '').trim() || '';
+          }
+        }
+
+        const descriptor = labelText && labelText !== name.trim()
+          ? `${name.trim()} (${labelText})`
+          : name.trim();
+
+        if (!fields.includes(descriptor)) {
+          fields.push(descriptor);
+        }
+      }
+      return fields;
+    } catch (e) {
+      console.warn('[Copilot FormFill] Failed to inspect DOM fields:', e);
+      return [];
+    }
+  }
+
+  /**
+   * Injects extracted values into matching host ERP DOM elements and dispatches
+   * synthetic input/change/blur events so Angular Reactive Forms update reliably.
+   * Handles text, number, date, checkbox, and select dropdown elements.
+   */
+  applyFormFill(msg: ChatMessage): void {
+    if (!msg.formFillData?.fields || typeof document === 'undefined') return;
+
+    let filledCount = 0;
+    for (const [rawKey, val] of Object.entries(msg.formFillData.fields)) {
+      if (val == null) continue;
+
+      // Clean key if it contained descriptive label e.g. "CustomerName (اسم العميل)" -> "CustomerName"
+      const key = rawKey.split('(')[0].trim();
+
+      // Resilient multi-attribute selector: matches name, id, or data-testid
+      const selector = `input[name="${key}" i], select[name="${key}" i], textarea[name="${key}" i], #${key}, [data-testid="input-${key}" i], [data-testid="${key}" i]`;
+      const targets = Array.from(document.querySelectorAll(selector)) as (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[];
+
+      for (const target of targets) {
+        if (this.elRef?.nativeElement?.contains(target)) continue;
+
+        if (target.tagName.toLowerCase() === 'select') {
+          const selectEl = target as HTMLSelectElement;
+          const strVal = String(val).toLowerCase().trim();
+          let matched = false;
+
+          // Try matching option value or visible text
+          for (let i = 0; i < selectEl.options.length; i++) {
+            const opt = selectEl.options[i];
+            if (opt.value.toLowerCase().trim() === strVal || opt.text.toLowerCase().trim().includes(strVal)) {
+              selectEl.selectedIndex = i;
+              matched = true;
+              break;
+            }
+          }
+          if (!matched) selectEl.value = String(val);
+        } else if (target instanceof HTMLInputElement && target.type === 'checkbox') {
+          target.checked = val === true || val === 'true' || val === 1 || val === '1';
+        } else {
+          target.value = String(val);
+        }
+
+        // Dispatch standard DOM events to trigger Angular Form bindings
+        target.dispatchEvent(new Event('input', { bubbles: true }));
+        target.dispatchEvent(new Event('change', { bubbles: true }));
+        target.dispatchEvent(new Event('blur', { bubbles: true }));
+
+        // Visual confirmation pulse
+        target.classList.add('ai-autofill-highlight');
+        setTimeout(() => target.classList.remove('ai-autofill-highlight'), 3500);
+        filledCount++;
+      }
+    }
+
+    msg.formFillApplied = true;
+    this.cdr.markForCheck();
+    console.info(`%c[Copilot FormFill] Successfully filled ${filledCount} field(s)`, 'color:#10b981;font-weight:bold');
+  }
+
   /** Core stream method — shared by sendMessage() and retryMessage() */
   private async streamQuery(query: string, skipCache: boolean = false) {
     this.isStreaming = true;
+
+    // Detect ERP/Host context and gather visible fields from the active page
+    const detectedFields = this.collectVisibleFormFields();
+    const visibleFields = detectedFields.length > 0 ? detectedFields : undefined;
+    console.info('%c[Copilot FormFill] Active Form Fields Detected:', 'color:#10b981;font-weight:bold', visibleFields);
 
     // Create assistant message placeholder
     const assistantMsgIndex = this.messages.length;
@@ -644,7 +757,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
         this.isStreaming = false;
       },
       skipCache,
-      this.activeFilter
+      this.activeFilter,
+      undefined,
+      visibleFields,
+      this.erpKey,
+      (fillData: CopilotFormFillData) => {
+        this.messages[assistantMsgIndex].formFillData = fillData;
+        this.cdr.markForCheck();
+      }
     );
   }
 

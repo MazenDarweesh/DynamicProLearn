@@ -1035,3 +1035,145 @@
   font-size: 15px;
 }
 
+/* ── Form Fill Action Card & Host Highlights ────────────────────────── */
+.form-fill-card {
+  margin-top: 10px;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid #cbd5e1;
+  border-right: 4px solid #10b981;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.form-fill-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.form-fill-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-fill-icon {
+  font-size: 15px;
+}
+
+.form-fill-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.form-fill-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 2px 7px;
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #bbf7d0;
+  border-radius: 12px;
+}
+
+.form-fill-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 10px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+
+.form-fill-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11.5px;
+  padding: 2px 0;
+  border-bottom: 1px dashed #f1f5f9;
+}
+
+.form-fill-item:last-child {
+  border-bottom: none;
+}
+
+.field-label {
+  color: #64748b;
+  font-family: monospace;
+  font-weight: 600;
+  direction: ltr;
+}
+
+.field-value {
+  color: #0f172a;
+  font-weight: 600;
+}
+
+.form-fill-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.btn-apply-form-fill {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+  transition: all 0.2s ease;
+}
+
+.btn-apply-form-fill:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);
+}
+
+.form-fill-applied-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #15803d;
+  background: #dcfce7;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid #bbf7d0;
+}
+
+/* ── Host ERP DOM Animation for Highlighted Inputs ──────────────────── */
+:host-context(body) .ai-autofill-highlight,
+::ng-deep .ai-autofill-highlight {
+  animation: aiAutofillPulse 2s ease-in-out infinite;
+  border-color: #10b981 !important;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.3) !important;
+}
+
+@keyframes aiAutofillPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5);
+  }
+}
+
+

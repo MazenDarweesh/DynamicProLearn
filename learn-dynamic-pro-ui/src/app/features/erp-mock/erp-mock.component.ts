@@ -2,6 +2,7 @@ import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject } from '@angular/core
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
+import { CopilotService } from '../../core/services/copilot.service';
 
 interface ErpScreen {
   key: string;
@@ -62,6 +63,7 @@ interface ErpScreen {
 
       <!-- ── Main ERP Workspace ─────────────────────────────────────────── -->
       <main class="erp-workspace">
+        <!-- ── Right Column: Simulated ERP Screen ───────────────────────── -->
         <div class="erp-main-col">
           <!-- ERP Active Form Card -->
           <div class="erp-card">
@@ -81,22 +83,42 @@ interface ErpScreen {
               <p class="screen-desc">{{ activeScreen.description }}</p>
 
               <!-- Simulated ERP Data Form -->
-              <div class="erp-form-grid">
+              <div *ngIf="activeScreen.key === 'NEW_CUSTOMER'" class="erp-form-grid">
+                <div class="form-group">
+                  <label>اسم العميل / الشركة:</label>
+                  <input type="text" name="CustomerName" id="CustomerName" class="erp-input" placeholder="اكتب اسم العميل أو دعه يتعبأ آلياً..." />
+                </div>
+                <div class="form-group">
+                  <label>رقم الهاتف / الموبايل:</label>
+                  <input type="text" name="Phone" id="Phone" class="erp-input" placeholder="010..." />
+                </div>
+                <div class="form-group">
+                  <label>العنوان / المقر:</label>
+                  <input type="text" name="Address" id="Address" class="erp-input" placeholder="المدينة، الحي، الشارع..." />
+                </div>
+                <div class="form-group">
+                  <label>الحد الائتماني (ج.م):</label>
+                  <input type="number" name="CreditLimit" id="CreditLimit" class="erp-input" placeholder="مثال: 50000" />
+                </div>
+              </div>
+
+              <!-- Simulated General ERP Form for Other Screens -->
+              <div *ngIf="activeScreen.key !== 'NEW_CUSTOMER'" class="erp-form-grid">
                 <div class="form-group">
                   <label>رقم المستند / الفاتورة:</label>
-                  <input type="text" class="erp-input" value="INV-2026-0922" readonly />
+                  <input type="text" name="InvoiceNumber" id="InvoiceNumber" class="erp-input" value="INV-2026-0922" readonly />
                 </div>
                 <div class="form-group">
                   <label>الطرف / العميل:</label>
-                  <input type="text" class="erp-input" value="شركة الأمل للتجارة والتوزيع" />
+                  <input type="text" name="CustomerName" id="CustomerName" class="erp-input" value="شركة الأمل للتجارة والتوزيع" />
                 </div>
                 <div class="form-group">
                   <label>تاريخ المعاملة:</label>
-                  <input type="date" class="erp-input" value="2026-09-22" />
+                  <input type="date" name="DocDate" id="DocDate" class="erp-input" value="2026-09-22" />
                 </div>
                 <div class="form-group">
                   <label>طريقة الدفع:</label>
-                  <select class="erp-input">
+                  <select name="PaymentMethod" id="PaymentMethod" class="erp-input">
                     <option>آجل (استحقاق 30 يوم)</option>
                     <option>نقداً (الخزينة الرئيسية)</option>
                     <option>تحويل بنكي</option>
@@ -147,10 +169,10 @@ interface ErpScreen {
                 <div class="callout-text">
                   <strong>كيف يتكامل الشات مع هذه الشاشة؟</strong>
                   <span>
-                    الـ ERP يمرر كود الشاشة الحالية <code>erp-key="{{ activeScreen.key }}"</code> للودجت بالأسفل.
+                    الـ ERP يمرر كود الشاشة الحالية <code>erp-key="{{ activeScreen.key }}"</code> للشات بالجانب.
                     لاحظ كيف يتعرف المساعد الذكي فوراً على سياق الشاشة، وعندما تسأله: 
                     <em>"{{ activeScreen.sampleQuery }}"</em>،
-                    سيجيبك مباشرة من واقع الفيديوهات التعليمية الخاصة بهذا الموضوع!
+                    سيجيبك مباشرة من واقع الفيديوهات التعليمية أو يملأ بيانات الشاشة آلياً!
                   </span>
                 </div>
               </div>
@@ -158,59 +180,63 @@ interface ErpScreen {
           </div>
         </div>
 
-        <!-- Sidebar Explaining the Architecture -->
-        <aside class="erp-sidebar">
-          <div class="sidebar-card">
-            <h3>⚙️ مواصفات التكامل للـ ERP</h3>
-            <ul class="specs-list">
-              <li>
-                <strong>نوع التكامل:</strong>
-                <span>Web Component (Custom Element)</span>
-              </li>
-              <li>
-                <strong>اسم التاج في الـ ERP:</strong>
-                <code>&lt;lms-ai-copilot hide-header="true"&gt;</code>
-              </li>
-              <li>
-                <strong>المظهر المعتمد:</strong>
-                <span>جسم الشات فقط (Body Only - بدون هيدر)</span>
-              </li>
-              <li>
-                <strong>الكود الممرر للشاشة:</strong>
-                <span class="active-key-pill">{{ activeScreen.key }}</span>
-              </li>
-              <li>
-                <strong>سيرفر الـ AI:</strong>
-                <span>http://localhost:8000</span>
-              </li>
-              <li>
-                <strong>الميزة المفعلة:</strong>
-                <span>توجيه السياق التلقائي (Zero-Click Context)</span>
-              </li>
-            </ul>
-
-            <hr class="divider" />
-
-            <div class="test-helper-box">
-              <h4>🎯 جرب تسأل الشات الآن:</h4>
-              <p class="test-tip">نافذة الشات مفتوحة وموجهة تلقائياً، اسأله:</p>
-              <div class="prompt-card" (click)="copyPrompt(activeScreen.sampleQuery)">
-                <span>💬 "{{ activeScreen.sampleQuery }}"</span>
+        <!-- ── Left Column: Dedicated AI Copilot Panel (Side-by-Side) ───── -->
+        <aside class="erp-copilot-col" [class.floating-mode]="isFloatingMode" [class.minimized]="isCopilotMinimized">
+          <div class="erp-copilot-card">
+            <!-- Header -->
+            <div class="erp-copilot-header">
+              <div class="copilot-header-title">
+                <span class="copilot-header-icon">🤖</span>
+                <span class="copilot-title-text">مساعد Dynamic Pro الذكي</span>
+                <span class="copilot-screen-badge">{{ activeScreen.name }}</span>
               </div>
+              <div class="header-controls">
+                <button type="button" class="btn-dock-mode" (click)="clearCacheFromMock()" [disabled]="isClearingMockCache" title="تفريغ ذاكرة التخزين المؤقت للذكاء الاصطناعي">
+                  {{ mockCacheStatus === 'success' ? '✅ تم التفريغ' : (isClearingMockCache ? '⏳...' : '🧹 تفريغ الكاش') }}
+                </button>
+                <button type="button" class="btn-dock-mode" (click)="toggleFloatingMode()" [title]="isFloatingMode ? 'تثبيت بالجانب' : 'تحويل لنافذة عائمة'">
+                  {{ isFloatingMode ? '📌 تثبيت' : '🪟 عائم' }}
+                </button>
+                <button type="button" class="btn-dock-toggle" (click)="toggleCopilotMinimized()" [title]="isCopilotMinimized ? 'تكبير' : 'تصغير'">
+                  {{ isCopilotMinimized ? '🔼' : '🔽' }}
+                </button>
+              </div>
+            </div>
+
+            <!-- Chat Body with ai-chat-window isolation -->
+            <div class="erp-copilot-body ai-chat-window" *ngIf="!isCopilotMinimized">
+              <lms-ai-copilot
+                [attr.erp-key]="activeScreen.key"
+                [attr.u]="'a'"
+                [attr.p]="'123'"
+                [attr.api-url]="'http://localhost:8000'"
+                [attr.hide-header]="'true'"
+                [attr.inline]="'true'">
+              </lms-ai-copilot>
+            </div>
+          </div>
+
+          <!-- Quick Test & Specs Panel (Compact & Collapsible) -->
+          <div class="erp-specs-collapsible" *ngIf="!isFloatingMode">
+            <div class="specs-header" (click)="toggleSpecsOpen()">
+              <span>⚙️ مواصفات التكامل والأوامر المقترحة</span>
+              <span class="specs-arrow">{{ isSpecsOpen ? '▲' : '▼' }}</span>
+            </div>
+            <div class="specs-body" *ngIf="isSpecsOpen">
+              <div class="prompt-quick-card" (click)="copyPrompt(activeScreen.sampleQuery)">
+                <div class="prompt-label">💬 انقر لنسخ أمر التجربة:</div>
+                <div class="prompt-text">"{{ activeScreen.sampleQuery }}"</div>
+                <span class="copy-hint">{{ copiedPrompt ? '✅ تم النسخ إلى الحافظة!' : '📋 انقر للنسخ' }}</span>
+              </div>
+              <ul class="specs-mini-list">
+                <li><strong>التاج:</strong> <code>&lt;lms-ai-copilot hide-header="true"&gt;</code></li>
+                <li><strong>السيرفر:</strong> <code>http://localhost:8000</code></li>
+                <li><strong>كود الشاشة:</strong> <code>{{ activeScreen.key }}</code></li>
+              </ul>
             </div>
           </div>
         </aside>
       </main>
-
-      <!-- ── The Actual Embedded Web Component / Copilot Widget ─────────── -->
-      <!-- This is the exact tag that the ERP developers will embed in their screens! -->
-      <lms-ai-copilot
-        [attr.erp-key]="activeScreen.key"
-        [attr.u]="'a'"
-        [attr.p]="'123'"
-        [attr.api-url]="'http://localhost:8000'"
-        [attr.hide-header]="'true'">
-      </lms-ai-copilot>
     </div>
   `,
   styles: [`
@@ -345,14 +371,15 @@ interface ErpScreen {
     /* ── Workspace ─────────────────────────────────────── */
     .erp-workspace {
       flex: 1;
-      padding: 20px 24px;
+      padding: 16px 24px;
       display: grid;
-      grid-template-columns: 1fr 340px;
+      grid-template-columns: minmax(0, 1fr) 480px;
       gap: 20px;
-      max-width: 1400px;
+      max-width: 1680px;
       width: 100%;
       margin: 0 auto;
       box-sizing: border-box;
+      align-items: start;
     }
 
     .erp-card {
@@ -486,79 +513,303 @@ interface ErpScreen {
       gap: 4px;
     }
 
-    /* ── Sidebar ───────────────────────────────────────── */
-    .sidebar-card {
+    /* ── Dedicated Side-by-Side Copilot Panel strictly inside ERP Mock ── */
+    .erp-copilot-col {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 480px;
+      max-width: 480px;
+      position: sticky;
+      top: 28px;
+      margin-top: 8px;
+      z-index: 100;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .erp-copilot-card {
+      background: #ffffff;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+      display: flex;
+      flex-direction: column;
+      height: 720px;
+      max-height: calc(100vh - 120px);
+      overflow: hidden;
+      transition: height 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .erp-copilot-col.floating-mode {
+      position: fixed;
+      bottom: 24px;
+      left: 24px;
+      width: 460px;
+      max-width: calc(100vw - 48px);
+      z-index: 99999;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+      border-radius: 14px;
+    }
+
+    .erp-copilot-col.floating-mode .erp-copilot-card {
+      height: 620px;
+      box-shadow: none;
+      border: 1px solid #94a3b8;
+    }
+
+    .erp-copilot-col.minimized .erp-copilot-card {
+      height: 48px;
+      overflow: hidden;
+    }
+
+    .erp-copilot-header {
+      background: #1e293b;
+      color: #ffffff;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+      border-bottom: 2px solid #3b82f6;
+    }
+
+    .copilot-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .copilot-header-icon {
+      font-size: 16px;
+    }
+
+    .copilot-title-text {
+      color: #ffffff;
+    }
+
+    .copilot-screen-badge {
+      font-size: 10px;
+      background: #3b82f6;
+      color: #ffffff;
+      padding: 2px 7px;
+      border-radius: 10px;
+      font-weight: 500;
+      max-width: 140px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-dock-mode, .btn-dock-toggle {
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #f1f5f9;
+      font-size: 11px;
+      cursor: pointer;
+      padding: 3px 8px;
+      border-radius: 6px;
+      transition: all 0.15s ease;
+      font-family: inherit;
+    }
+
+    .btn-dock-mode:hover, .btn-dock-toggle:hover {
+      background: rgba(255, 255, 255, 0.2);
+      color: #ffffff;
+    }
+
+    .erp-copilot-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      background: #f8fafc;
+      overflow: hidden;
+      position: relative;
+      padding-top: 16px;
+      box-sizing: border-box;
+    }
+
+    .erp-copilot-body lms-ai-copilot {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      flex: 1;
+      min-height: 0;
+      box-sizing: border-box;
+    }
+
+    .erp-copilot-body ::ng-deep .admin-cache-strip {
+      display: flex !important;
+      visibility: visible !important;
+      margin: 4px 10px 8px 10px !important;
+      border-radius: 8px !important;
+      border: 1px solid #cbd5e1 !important;
+      background: #ffffff !important;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+    }
+
+    .erp-copilot-body ::ng-deep .copilot-window {
+      padding-top: 6px !important;
+      overflow: visible !important;
+    }
+
+    .erp-copilot-body ::ng-deep .filter-ribbon {
+      border-top: 1px solid #e2e8f0;
+      border-radius: 8px 8px 0 0;
+      margin-top: 4px;
+    }
+
+    /* ── Collapsible Specs Box ─────────────────────────── */
+    .erp-specs-collapsible {
       background: #ffffff;
       border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 16px 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
     }
-    .sidebar-card h3 {
-      font-size: 14px;
-      margin: 0 0 12px 0;
-      color: #0f172a;
+
+    .specs-header {
+      background: #f8fafc;
+      padding: 8px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #e2e8f0;
+      user-select: none;
     }
-    .specs-list {
+
+    .specs-arrow {
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    .specs-body {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .prompt-quick-card {
+      background: #eff6ff;
+      border: 1px dashed #3b82f6;
+      border-radius: 8px;
+      padding: 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .prompt-quick-card:hover {
+      background: #dbeafe;
+    }
+
+    .prompt-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: #1e40af;
+      margin-bottom: 4px;
+    }
+
+    .prompt-text {
+      font-size: 11px;
+      color: #1d4ed8;
+      line-height: 1.4;
+      font-weight: 500;
+    }
+
+    .copy-hint {
+      display: block;
+      font-size: 10px;
+      color: #2563eb;
+      margin-top: 6px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    .specs-mini-list {
       list-style: none;
       padding: 0;
       margin: 0;
       display: flex;
       flex-direction: column;
-      gap: 10px;
-    }
-    .specs-list li {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
+      gap: 6px;
       font-size: 11px;
+      color: #475569;
     }
-    .specs-list li strong { color: #64748b; font-size: 10px; text-transform: uppercase; }
-    .specs-list li span { color: #1e293b; font-weight: 600; }
-    .active-key-pill {
-      background: #eff6ff;
-      color: #2563eb;
-      padding: 2px 8px;
-      border-radius: 4px;
-      border: 1px solid #bfdbfe;
+
+    .specs-mini-list code {
       font-family: monospace;
-      font-size: 11px;
-      display: inline-block;
-      width: fit-content;
+      background: #f1f5f9;
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: #0f172a;
     }
-    .divider {
-      border: 0;
-      border-top: 1px solid #e2e8f0;
-      margin: 16px 0;
-    }
-    .test-helper-box h4 {
-      font-size: 12px;
-      margin: 0 0 4px 0;
-      color: #1e293b;
-    }
-    .test-tip {
-      font-size: 11px;
-      color: #64748b;
-      margin: 0 0 8px 0;
-    }
-    .prompt-card {
-      background: #f8fafc;
-      border: 1px dashed #cbd5e1;
-      border-radius: 6px;
-      padding: 8px 10px;
-      font-size: 11px;
-      color: #3b82f6;
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .prompt-card:hover {
-      background: #eff6ff;
-      border-color: #93c5fd;
+
+    @media (max-width: 1200px) {
+      .erp-workspace {
+        grid-template-columns: 1fr;
+      }
+      .erp-copilot-col {
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        position: static;
+      }
     }
   `]
 })
 export class ErpMockComponent implements OnInit {
   authService = inject(AuthService);
+  copilotService = inject(CopilotService);
+  isFloatingMode = false;
+  isCopilotMinimized = false;
+  isSpecsOpen = true;
+  copiedPrompt = false;
+  isClearingMockCache = false;
+  mockCacheStatus: 'idle' | 'success' | 'error' = 'idle';
+
+  clearCacheFromMock() {
+    if (this.isClearingMockCache) return;
+    this.isClearingMockCache = true;
+    this.mockCacheStatus = 'idle';
+    this.copilotService.clearAiCache().subscribe({
+      next: () => {
+        this.isClearingMockCache = false;
+        this.mockCacheStatus = 'success';
+        setTimeout(() => this.mockCacheStatus = 'idle', 3000);
+      },
+      error: () => {
+        this.isClearingMockCache = false;
+        this.mockCacheStatus = 'error';
+        setTimeout(() => this.mockCacheStatus = 'idle', 3000);
+      }
+    });
+  }
+
+  toggleFloatingMode() {
+    this.isFloatingMode = !this.isFloatingMode;
+  }
+
+  toggleCopilotMinimized() {
+    this.isCopilotMinimized = !this.isCopilotMinimized;
+  }
+
+  toggleSpecsOpen() {
+    this.isSpecsOpen = !this.isSpecsOpen;
+  }
 
   erpScreens: ErpScreen[] = [
     {
@@ -567,6 +818,13 @@ export class ErpMockComponent implements OnInit {
       category: 'المبيعات والعملاء',
       description: 'شاشة إصدار فواتير المبيعات للعملاء واحتساب ضريبة القيمة المضافة وإرسال الفاتورة الإلكترونية.',
       sampleQuery: 'كيف أقوم بإصدار فاتورة مبيعات مع تطبيق خصم تجاري؟'
+    },
+    {
+      key: 'NEW_CUSTOMER',
+      name: 'تسجيل عميل جديد (تجربة التعبئة بالذكاء الاصطناعي)',
+      category: 'العملاء والحسابات',
+      description: 'شاشة فتح بطاقة عميل جديد في الـ ERP وتسجيل بيانات الاتصال والحد الائتماني.',
+      sampleQuery: 'سجل لي عميل جديد باسم شركة الأمل للتجارة وتليفونه 01012345678 وعنوانه مدينة نصر وحد ائتماني 50000'
     },
     {
       key: 'PURCHASE_INVOICE',
@@ -609,5 +867,8 @@ export class ErpMockComponent implements OnInit {
 
   copyPrompt(text: string) {
     navigator.clipboard?.writeText(text);
+    this.copiedPrompt = true;
+    setTimeout(() => this.copiedPrompt = false, 2500);
   }
 }
+
