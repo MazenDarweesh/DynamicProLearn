@@ -102,8 +102,56 @@ interface ErpScreen {
                 </div>
               </div>
 
+              <!-- Simulated Purchase Invoice Form (DynamicPro Real Schema) -->
+              <div *ngIf="activeScreen.key === 'PURCHASE_INVOICE'" class="erp-form-grid">
+                <div class="form-group">
+                  <label>المورد:</label>
+                  <select name="Supplier" id="Supplier" class="erp-input" (change)="onMockSupplierChange($event)">
+                    <option value="">-- اختر المورد --</option>
+                    <option value="شركة التوحيد خامات">شركة التوحيد خامات</option>
+                    <option value="شركة الحمد للتجارة">شركة الحمد للتجارة</option>
+                    <option value="مؤسسة النور توريدات">مؤسسة النور توريدات</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>طريقة الشراء:</label>
+                  <select name="PurchaseMethod" id="PurchaseMethod" class="erp-input">
+                    <option value="مباشرة">مباشرة (شراء فوري)</option>
+                    <option value="آجل">آجل (فترة سماح)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>المخزن المستلم:</label>
+                  <select name="Warehouse" id="Warehouse" class="erp-input">
+                    <option value="القاهرة">مخزن القاهرة الرئيسي</option>
+                    <option value="الإسكندرية">مخزن الإسكندرية</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>تاريخ الفاتورة:</label>
+                  <input type="date" name="Date" id="Date" class="erp-input" value="2026-10-07" />
+                </div>
+                <!-- 4 Dependent Fields Auto-Filled upon Supplier Selection -->
+                <div class="form-group">
+                  <label>اسم المورد الرسمي:</label>
+                  <input type="text" name="'SupplierName'" id="SupplierName" class="erp-input" [value]="mockSupplierDetails.name" disabled />
+                </div>
+                <div class="form-group">
+                  <label>العنوان:</label>
+                  <input type="text" name="'address'" id="SupplierAddress" class="erp-input" [value]="mockSupplierDetails.address" disabled />
+                </div>
+                <div class="form-group">
+                  <label>رقم الهاتف:</label>
+                  <input type="text" name="phone" id="SupplierPhone" class="erp-input" [value]="mockSupplierDetails.phone" disabled />
+                </div>
+                <div class="form-group">
+                  <label>الملف الضريبي:</label>
+                  <input type="text" name="TaxFile" id="SupplierTax" class="erp-input" [value]="mockSupplierDetails.taxFile" disabled />
+                </div>
+              </div>
+
               <!-- Simulated General ERP Form for Other Screens -->
-              <div *ngIf="activeScreen.key !== 'NEW_CUSTOMER'" class="erp-form-grid">
+              <div *ngIf="activeScreen.key !== 'NEW_CUSTOMER' && activeScreen.key !== 'PURCHASE_INVOICE'" class="erp-form-grid">
                 <div class="form-group">
                   <label>رقم المستند / الفاتورة:</label>
                   <input type="text" name="InvoiceNumber" id="InvoiceNumber" class="erp-input" value="INV-2026-0922" readonly />
@@ -126,8 +174,47 @@ interface ErpScreen {
                 </div>
               </div>
 
-              <!-- Simulated ERP Table -->
-              <div class="erp-table-box">
+              <!-- Purchase Invoice Items Grid -->
+              <div class="erp-table-box" *ngIf="activeScreen.key === 'PURCHASE_INVOICE'">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <strong style="font-size:13px;">جدول الأصناف الموردة:</strong>
+                  <button type="button" class="btn-erp btn-primary" (click)="addMockRow()">+ إضافة سطر صنف</button>
+                </div>
+                <table class="erp-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>الصنف</th>
+                      <th>الكمية</th>
+                      <th>التكلفة</th>
+                      <th>الإجمالي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of mockRows; let rIdx = index">
+                      <td>{{ rIdx + 1 }}</td>
+                      <td><input type="text" name="ItemName" [(ngModel)]="row.itemName" class="erp-input" style="padding:4px;" placeholder="اسم الصنف..." /></td>
+                      <td><input type="number" name="Quantity" [(ngModel)]="row.quantity" (input)="calcMockTotals()" class="erp-input" style="padding:4px; width:80px;" /></td>
+                      <td><input type="number" name="Cost" [(ngModel)]="row.cost" (input)="calcMockTotals()" class="erp-input" style="padding:4px; width:90px;" /></td>
+                      <td><strong>{{ (row.quantity * row.cost) | number }} ج.م</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div style="display:flex; justify-content:flex-end; gap:20px; margin-top:12px; padding:10px; background:#f8fafc; border-radius:6px;">
+                  <div>
+                    <label style="font-size:12px; color:#64748b; font-weight:600;">إجمالي الفاتورة:</label>
+                    <input type="text" name="TotalAmount" id="TotalAmount" class="erp-input" [value]="mockTotalAmount" readonly style="width:120px; font-weight:700;" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px; color:#1e40af; font-weight:600;">المدفوع نقداً:</label>
+                    <input type="text" name="CashPaid" id="CashPaid" class="erp-input" placeholder="0" style="width:120px; border-color:#3b82f6;" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Simulated General ERP Table for Other Screens -->
+              <div class="erp-table-box" *ngIf="activeScreen.key !== 'PURCHASE_INVOICE'">
                 <table class="erp-table">
                   <thead>
                     <tr>
@@ -828,10 +915,10 @@ export class ErpMockComponent implements OnInit {
     },
     {
       key: 'PURCHASE_INVOICE',
-      name: 'فاتورة المشتريات وتوريد الأصناف',
+      name: 'فاتورة المشتريات (تجربة تعبئة الأصناف والموردين)',
       category: 'المخازن والمشتريات',
-      description: 'شاشة تسجيل أوامر التوريد وفواتير المشتريات وإثبات زيادة المخزون في المستودعات.',
-      sampleQuery: 'ما هي خطوات تسجيل فاتورة شراء وإثباتها في المستودع؟'
+      description: 'شاشة تسجيل أوامر التوريد وفواتير المشتريات وتوريد الأصناف وإثبات السداد وسحب الحقول التابعة تلقائياً.',
+      sampleQuery: 'سجل لي فاتورة مشتريات من شركة التوحيد خامات بطريقة شراء مباشرة من مخزن القاهرة ف يوم 2026-10-07 المنتج كابلات شبكة CAT6 الكمية 10 وسعر 150 ودفعت نقدي التكلفة كاملة'
     },
     {
       key: 'JOURNAL_ENTRY',
@@ -850,6 +937,33 @@ export class ErpMockComponent implements OnInit {
   ];
 
   activeScreen: ErpScreen = this.erpScreens[0];
+
+  mockSupplierDetails = { name: '', address: '', phone: '', taxFile: '' };
+  mockRows = [
+    { itemName: '', quantity: 0, cost: 0 }
+  ];
+  mockTotalAmount = 0;
+
+  onMockSupplierChange(e: any) {
+    const val = e.target.value;
+    if (val.includes('التوحيد')) {
+      this.mockSupplierDetails = { name: 'شركة التوحيد خامات', address: 'العاشر من رمضان - المنطقة الصناعية B3', phone: '01099887766', taxFile: 'TAX-8849-01' };
+    } else if (val.includes('الحمد')) {
+      this.mockSupplierDetails = { name: 'شركة الحمد للتجارة', address: 'مدينة العبور - المنطقة الأولى', phone: '01122334455', taxFile: 'TAX-1122-33' };
+    } else if (val) {
+      this.mockSupplierDetails = { name: val, address: 'القاهرة', phone: '01012345678', taxFile: 'TAX-0000-00' };
+    } else {
+      this.mockSupplierDetails = { name: '', address: '', phone: '', taxFile: '' };
+    }
+  }
+
+  addMockRow() {
+    this.mockRows.push({ itemName: '', quantity: 0, cost: 0 });
+  }
+
+  calcMockTotals() {
+    this.mockTotalAmount = this.mockRows.reduce((sum, r) => sum + ((Number(r.quantity) || 0) * (Number(r.cost) || 0)), 0);
+  }
 
   ngOnInit() {
     // If not authenticated, silent login as student for seamless testing

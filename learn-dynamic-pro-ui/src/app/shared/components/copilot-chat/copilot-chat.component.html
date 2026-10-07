@@ -126,10 +126,22 @@
               </div>
 
               <div class="form-fill-body">
-                <div *ngFor="let item of (msg.formFillData.fields | keyvalue)" class="form-fill-item">
-                  <span class="field-label">{{ item.key }}</span>
-                  <span class="field-value">{{ item.value }}</span>
-                </div>
+                <ng-container *ngIf="msg.formFillData.fields">
+                  <div *ngFor="let item of (msg.formFillData.fields | keyvalue)" class="form-fill-item">
+                    <span class="field-label">{{ item.key }}</span>
+                    <span class="field-value">{{ item.value }}</span>
+                  </div>
+                </ng-container>
+
+                <ng-container *ngIf="msg.formFillData.rows && msg.formFillData.rows.length > 0">
+                  <div class="form-fill-rows-title">📦 الأصناف ({{ msg.formFillData.rows.length }} سطر):</div>
+                  <div *ngFor="let row of msg.formFillData.rows; let rIdx = index" class="form-fill-row-box">
+                    <span class="row-num">#{{ rIdx + 1 }}</span>
+                    <span *ngFor="let col of (row | keyvalue)" class="row-col">
+                      <strong class="col-k">{{ col.key }}:</strong> {{ col.value }}
+                    </span>
+                  </div>
+                </ng-container>
               </div>
 
               <div class="form-fill-footer">

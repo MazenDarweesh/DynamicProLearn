@@ -39,7 +39,8 @@ export interface AiReadinessResponse {
 
 export interface CopilotFormFillData {
   intent?: string;
-  fields: Record<string, any>;
+  fields?: Record<string, any>;
+  rows?: Record<string, any>[];
   screenKey?: string;
 }
 
@@ -199,7 +200,8 @@ export class CopilotService {
     threadId?: string,
     visibleFields?: string[],
     erpKey?: string,
-    onFormFill?: (fillData: CopilotFormFillData) => void
+    onFormFill?: (fillData: CopilotFormFillData) => void,
+    formSchema?: any[]
   ): Promise<void> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
 
@@ -212,6 +214,11 @@ export class CopilotService {
     if (visibleFields && visibleFields.length > 0) {
       payload['visible_fields'] = visibleFields;
       payload['visibleFields'] = visibleFields;
+    }
+
+    if (formSchema && formSchema.length > 0) {
+      payload['form_schema'] = formSchema;
+      payload['formSchema'] = formSchema;
     }
 
     if (erpKey) {
