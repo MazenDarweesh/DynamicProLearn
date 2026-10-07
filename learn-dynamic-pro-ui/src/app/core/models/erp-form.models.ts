@@ -46,3 +46,25 @@ export interface FormFillExecutionReport {
   filledCount: number;
   results: FormFillResult[];
 }
+
+export interface ErpBatchItem {
+  id?: string;
+  title?: string;
+  fields: Record<string, any>;
+  rows?: Record<string, any>[];
+  status?: 'pending' | 'filling' | 'completed' | 'skipped' | 'failed';
+  report?: FormFillExecutionReport;
+  error?: string;
+}
+
+export type BatchStepStatus = 'idle' | 'navigating' | 'filling' | 'waiting_confirm' | 'paused' | 'completed' | 'cancelled';
+
+export interface ErpBatchState {
+  total: number;
+  currentIndex: number;
+  status: BatchStepStatus;
+  items: ErpBatchItem[];
+  autoAdvance: boolean;
+  screenKey?: string;
+}
+

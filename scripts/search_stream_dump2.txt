@@ -1,0 +1,85 @@
+856:             visible_fields=req.visible_fields,
+857:             extracted_form_fields=extracted_form_fields if extracted_form_fields else None,
+858:         )
+859:         thread_id = req.thread_id or str(uuid.uuid4())
+860: 
+861:         user_prompt_text = req.query
+862:         if extracted_form_fields:
+863:             user_prompt_text += (
+864:                 f"\n\n[توجيه تنفيذي لمساعد ERP:\n"
+865:                 f"تم استخراج وتجهيز بيانات النموذج التالية بنجاح للتعبئة في الشاشة: {json.dumps(extracted_form_fields, ensure_ascii=False)}.\n"
+866:                 f"أنت المساعد الذكي. أكّد للمستخدم بلباقة ووضوح أن بيانات العميل جاهزة للتعبئة في الشاشة الآن عبر زر التعبئة المتاح أدناه، "
+867:                 f"وقدم له أي نصيحة إرشادية وتدريبية مفيدة مستفادة من المقاطع التعليمية المتاحة (مثل أهمية تحديد تصنيف العميل المناسب للحصول على السعر الصحيح أو التحقق من البيانات). "
+868:                 f"لا تقل أبداً أن المقاطع لا تحتوي على هذه البيانات.]"
+869:             )
+870:         elif req.visible_fields:
+871:             fields_doc = ", ".join(req.visible_fields)
+872:             user_prompt_text += (
+873:                 f"\n\n[توجيه تنفيذي لشاشة الـ ERP:\n"
+874:                 f"الشاشة المفتوحة أمامك تحتوي على الحقول: {fields_doc}.\n"
+875:                 f"المستخدم يقدم لك بيانات لتعبئتها في هذه الحقول. استخرج القيم من رسالته وطابقها مع أسماء الحقول الإنجليزية.\n"
+876:                 f"يجب عليك إلزامياً كتابة بلوك التعبئة كالتالي:\n"
+877:                 f"```form_fill\n{{\n  \"CustomerName\": \"...\",\n  \"Phone\": \"...\"\n}}\n```]"
+878:             )
+879:         gemini_contents = [types.Content(role="user", parts=[types.Part.from_text(text=user_prompt_text)])]
+880: 
+881:         loop = asyncio.get_running_loop()
+882:         stop_event = threading.Event()
+883:         # Bounded queue (maxsize=30) enforces Backpressure on slow clients and prevents memory bloat
+884:         queue: asyncio.Queue[str | Exception | None] = asyncio.Queue(maxsize=30)
+885:         recorded_usage = {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0}
+886: 
+887:         def _produce_tokens():
+888:             try:
+889:                 stream_res = self._gemini_client.models.generate_content_stream(
+890:                     model=settings.GEMINI_MODEL,
+891:                     contents=gemini_contents,
+892:                     config=types.GenerateContentConfig(
+893:                         temperature=0.2,
+894:                         max_output_tokens=1024,
+895:                         system_instruction=system_instruction,
+896:                     ),
+897:                 )
+898:                 for chunk in stream_res:
+899:                     if stop_event.is_set():
+900:                         break
+901:                     if getattr(chunk, "usage_metadata", None):
+902:                         meta = chunk.usage_metadata
+903:                         recorded_usage["prompt_tokens"] = getattr(meta, "prompt_token_count", 0) or 0
+904:                         recorded_usage["completion_tokens"] = getattr(meta, "candidates_token_count", 0) or 0
+905:                         recorded_usage["total_tokens"] = getattr(meta, "total_token_count", 0) or 0
+906:                     if chunk.text:
+907:                         # Thread-safe put with backpressure: blocks worker thread if queue reaches maxsize
+908:                         future = asyncio.run_coroutine_threadsafe(queue.put(chunk.text), loop)
+909:                         future.result(timeout=30.0)
+910:                 if not stop_event.is_set():
+911:                     asyncio.run_coroutine_threadsafe(queue.put(None), loop).result(timeout=5.0)
+912:             except Exception as e:
+913:                 if not stop_event.is_set():
+914:                     asyncio.run_coroutine_threadsafe(queue.put(e), loop).result(timeout=5.0)
+915: 
+916:         producer_task = asyncio.create_task(asyncio.to_thread(_produce_tokens))
+917: 
+918:         accumulated_answer: list[str] = []
+919:         is_client_disconnected = False
+920:         first_token_received = False
+921:         first_token_time: float | None = None
+922:         token_count = 0
+923:         form_fill_detected = False
+924: 
+925:         try:
+926:             while True:
+927:                 if await request.is_disconnected():
+928:                     logger.info("Client disconnected during SSE stream — cancelling generation", thread_id=thread_id)
+929:                     is_client_disconnected = True
+930:                     break
+931: 
+932:                 try:
+933:                     item = await asyncio.wait_for(queue.get(), timeout=15.0)
+934:                 except asyncio.TimeoutError:
+935:                     # W3C SSE comment keeps reverse proxy sockets alive without consumer consumption
+936:                     yield ": heartbeat\n\n"
+937:                     continue
+938: 
+939:                 if item is None:
+940:                     break

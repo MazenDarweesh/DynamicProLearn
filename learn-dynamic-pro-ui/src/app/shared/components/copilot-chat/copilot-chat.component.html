@@ -117,43 +117,167 @@
 
             <!-- In-DOM Action Card: Auto-Fill Suggestion -->
             <div *ngIf="msg.formFillData && !msg.isStreaming" class="form-fill-card animate-fade-in">
-              <div class="form-fill-header">
-                <div class="form-fill-title-wrap">
-                  <span class="form-fill-icon">🪄</span>
-                  <span class="form-fill-title">اقتراح تعبئة الشاشة بالذكاء الاصطناعي</span>
-                </div>
-                <span class="form-fill-badge">جاهز للتنفيذ</span>
-              </div>
-
-              <div class="form-fill-body">
-                <ng-container *ngIf="msg.formFillData.fields">
-                  <div *ngFor="let item of (msg.formFillData.fields | keyvalue)" class="form-fill-item">
-                    <span class="field-label">{{ item.key }}</span>
-                    <span class="field-value">{{ item.value }}</span>
+              
+              <!-- ── Case A: Batch Mode (Multiple Invoices / Documents) ── -->
+              <ng-container *ngIf="msg.formFillData.batch_mode && msg.formFillData.batch_items && msg.formFillData.batch_items.length > 0">
+                <div class="form-fill-header batch-hdr">
+                  <div class="form-fill-title-wrap">
+                    <span class="form-fill-icon">🔄</span>
+                    <span class="form-fill-title">حلقة تنفيذ متتابعة ({{ msg.formFillData.batch_items.length }} مستندات)</span>
                   </div>
-                </ng-container>
+                  <span class="form-fill-badge batch-badge">
+                    {{ msg.batchExecutionActive ? (batchStepper.state().status === 'completed' ? 'اكتملت ✅' : (batchStepper.state().status === 'paused' ? 'متوقف ⏸️' : 'جارٍ التنفيذ ⚡')) : 'جاهز للبدء' }}
+                  </span>
+                </div>
 
-                <ng-container *ngIf="msg.formFillData.rows && msg.formFillData.rows.length > 0">
-                  <div class="form-fill-rows-title">📦 الأصناف ({{ msg.formFillData.rows.length }} سطر):</div>
-                  <div *ngFor="let row of msg.formFillData.rows; let rIdx = index" class="form-fill-row-box">
-                    <span class="row-num">#{{ rIdx + 1 }}</span>
-                    <span *ngFor="let col of (row | keyvalue)" class="row-col">
-                      <strong class="col-k">{{ col.key }}:</strong> {{ col.value }}
+                <!-- Batch Progress Strip (When Active) -->
+                <div *ngIf="msg.batchExecutionActive" class="batch-progress-container">
+                  <div class="batch-progress-bar">
+                    <div class="batch-progress-fill"
+                         [style.width.%]="batchStepper.state().total > 0 ? ((batchStepper.state().currentIndex + (batchStepper.state().status === 'completed' ? 1 : 0)) / batchStepper.state().total * 100) : 0">
+                    </div>
+                  </div>
+                  <div class="batch-progress-meta">
+                    <span class="batch-step-count">
+                      المستند {{ batchStepper.state().currentIndex + 1 }} من {{ batchStepper.state().total }}
+                    </span>
+                    <span class="batch-step-pct">
+                      {{ batchStepper.state().total > 0 ? ((((batchStepper.state().currentIndex + (batchStepper.state().status === 'completed' ? 1 : 0)) / batchStepper.state().total) * 100) | number:'1.0-0') : 0 }}%
                     </span>
                   </div>
-                </ng-container>
-              </div>
-
-              <div class="form-fill-footer">
-                <button *ngIf="!msg.formFillApplied" type="button" class="btn-apply-form-fill" (click)="applyFormFill(msg)">
-                  <span class="btn-icon">✨</span>
-                  <span>تعبئة شاشة الـ ERP الآن</span>
-                </button>
-                <div *ngIf="msg.formFillApplied" class="form-fill-applied-badge">
-                  <span>✅</span>
-                  <span>تم ملء الحقول بنجاح في الصفحة! راجع البيانات واضغط حفظ.</span>
                 </div>
-              </div>
+
+                <!-- Batch Items List Preview / Status -->
+                <div class="form-fill-body batch-body">
+                  <div *ngFor="let bItem of getBatchItems(msg); let bIdx = index"
+                       class="batch-item-row"
+                       [class.active-item]="msg.batchExecutionActive && batchStepper.state().currentIndex === bIdx && batchStepper.state().status !== 'completed'"
+                       [class.completed-item]="msg.batchExecutionActive && bItem.status === 'completed'"
+                       [class.skipped-item]="msg.batchExecutionActive && bItem.status === 'skipped'">
+                    <div class="batch-item-head">
+                      <span class="batch-item-tag">#{{ bIdx + 1 }}</span>
+                      <span class="batch-item-desc">
+                        {{ bItem.fields['Supplier'] || bItem.fields['المورد'] || bItem.fields['CustomerName'] || bItem.fields['العميل'] || 'مستند رقم ' + (bIdx + 1) }}
+                      </span>
+                      <span class="batch-item-state">
+                        <ng-container *ngIf="!msg.batchExecutionActive">جاهز ⏳</ng-container>
+                        <ng-container *ngIf="msg.batchExecutionActive">
+                          <span *ngIf="bItem.status === 'pending'">في الانتظار ⏳</span>
+                          <span *ngIf="bItem.status === 'filling'" class="filling-blink">جارٍ التعبئة ⚡</span>
+                          <span *ngIf="bItem.status === 'completed'" class="done-green">تم بنجاح ✅</span>
+                          <span *ngIf="bItem.status === 'skipped'" class="skip-muted">تم التخطي ⏭️</span>
+                          <span *ngIf="bItem.status === 'failed'" class="fail-red">فشل ❌</span>
+                        </ng-container>
+                      </span>
+                    </div>
+
+                    <!-- Mini details for line items -->
+                    <div *ngIf="bItem.rows && bItem.rows.length > 0" class="batch-item-rows">
+                      <span *ngFor="let r of bItem.rows" class="batch-sub-row">
+                        📦 {{ r['الصنف'] || r['ItemName'] || r['الوصف'] || 'صنف' }}: {{ r['الكمية'] || r['Quantity'] || 1 }} وحدة
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Batch Stepper Controls Footer -->
+                <div class="form-fill-footer batch-footer">
+                  <!-- Case 1: Not started yet -->
+                  <div *ngIf="!msg.batchExecutionActive" class="batch-start-actions">
+                    <button type="button" class="btn-apply-form-fill" (click)="startBatchExecution(msg, false)">
+                      <span class="btn-icon">🚀</span>
+                      <span>بدء التعبئة المتتابعة (خطوة بخطوة)</span>
+                    </button>
+                    <button type="button" class="btn-apply-form-fill btn-turbo" (click)="startBatchExecution(msg, true)" title="تنفيذ آلي فوري بدون توقف">
+                      <span class="btn-icon">⚡</span>
+                      <span>تنفيذ آلي (Turbo)</span>
+                    </button>
+                  </div>
+
+                  <!-- Case 2: Active Stepper Controls -->
+                  <div *ngIf="msg.batchExecutionActive && batchStepper.state().status !== 'completed' && batchStepper.state().status !== 'cancelled'" class="batch-active-controls">
+                    <!-- If waiting for confirmation (Guided mode) -->
+                    <button *ngIf="batchStepper.state().status === 'waiting_confirm'"
+                            type="button" class="btn-ctrl btn-next"
+                            (click)="batchStepper.confirmAndNext()">
+                      <span>✅ اعتماد والفاتورة التالية</span>
+                    </button>
+
+                    <button *ngIf="batchStepper.state().status === 'waiting_confirm'"
+                            type="button" class="btn-ctrl btn-skip"
+                            (click)="batchStepper.skipCurrent()">
+                      <span>⏭️ تخطي</span>
+                    </button>
+
+                    <!-- Pause / Resume -->
+                    <button *ngIf="batchStepper.state().status === 'filling' || batchStepper.state().status === 'waiting_confirm'"
+                            type="button" class="btn-ctrl btn-pause"
+                            (click)="batchStepper.pause()">
+                      <span>⏸️ إيقاف مؤقت</span>
+                    </button>
+
+                    <button *ngIf="batchStepper.state().status === 'paused'"
+                            type="button" class="btn-ctrl btn-resume"
+                            (click)="batchStepper.resume()">
+                      <span>▶️ استئناف</span>
+                    </button>
+
+                    <!-- Cancel -->
+                    <button type="button" class="btn-ctrl btn-cancel"
+                            (click)="batchStepper.cancel()">
+                      <span>🛑 إلغاء الحلقة</span>
+                    </button>
+                  </div>
+
+                  <!-- Case 3: Completed or Cancelled badge -->
+                  <div *ngIf="msg.batchExecutionActive && (batchStepper.state().status === 'completed' || batchStepper.state().status === 'cancelled')" class="form-fill-applied-badge">
+                    <span *ngIf="batchStepper.state().status === 'completed'">🎉 تم الانتهاء من إدخال الدفعة بالكامل! راجع شاشة الـ ERP.</span>
+                    <span *ngIf="batchStepper.state().status === 'cancelled'">🛑 تم إيقاف حلقة الإدخال بواسطة المستخدم.</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- ── Case B: Single Document Mode (Standard) ── -->
+              <ng-container *ngIf="!msg.formFillData.batch_mode">
+                <div class="form-fill-header">
+                  <div class="form-fill-title-wrap">
+                    <span class="form-fill-icon">🪄</span>
+                    <span class="form-fill-title">اقتراح تعبئة الشاشة بالذكاء الاصطناعي</span>
+                  </div>
+                  <span class="form-fill-badge">جاهز للتنفيذ</span>
+                </div>
+
+                <div class="form-fill-body">
+                  <ng-container *ngIf="msg.formFillData.fields">
+                    <div *ngFor="let item of (msg.formFillData.fields | keyvalue)" class="form-fill-item">
+                      <span class="field-label">{{ item.key }}</span>
+                      <span class="field-value">{{ item.value }}</span>
+                    </div>
+                  </ng-container>
+
+                  <ng-container *ngIf="msg.formFillData.rows && msg.formFillData.rows.length > 0">
+                    <div class="form-fill-rows-title">📦 الأصناف ({{ msg.formFillData.rows.length }} سطر):</div>
+                    <div *ngFor="let row of msg.formFillData.rows; let rIdx = index" class="form-fill-row-box">
+                      <span class="row-num">#{{ rIdx + 1 }}</span>
+                      <span *ngFor="let col of (row | keyvalue)" class="row-col">
+                        <strong class="col-k">{{ col.key }}:</strong> {{ col.value }}
+                      </span>
+                    </div>
+                  </ng-container>
+                </div>
+
+                <div class="form-fill-footer">
+                  <button *ngIf="!msg.formFillApplied" type="button" class="btn-apply-form-fill" (click)="applyFormFill(msg)">
+                    <span class="btn-icon">✨</span>
+                    <span>تعبئة شاشة الـ ERP الآن</span>
+                  </button>
+                  <div *ngIf="msg.formFillApplied" class="form-fill-applied-badge">
+                    <span>✅</span>
+                    <span>تم ملء الحقول بنجاح في الصفحة! راجع البيانات واضغط حفظ.</span>
+                  </div>
+                </div>
+              </ng-container>
+
             </div>
 
             <!-- Rating Bar & Feedback Popover (For completed assistant responses) -->

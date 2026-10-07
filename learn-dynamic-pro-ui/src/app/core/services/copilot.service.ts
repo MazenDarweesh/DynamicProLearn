@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, firstValueFrom, shareReplay, BehaviorSubject } from 'rxjs';
 import { AuthService } from './auth.service';
+import { ErpBatchItem } from '../models/erp-form.models';
 
 export interface CopilotSource {
   type?: 'video' | 'pdf' | string;
@@ -42,6 +43,8 @@ export interface CopilotFormFillData {
   fields?: Record<string, any>;
   rows?: Record<string, any>[];
   screenKey?: string;
+  batch_mode?: boolean;
+  batch_items?: ErpBatchItem[];
 }
 
 export interface CopilotFilterOption {

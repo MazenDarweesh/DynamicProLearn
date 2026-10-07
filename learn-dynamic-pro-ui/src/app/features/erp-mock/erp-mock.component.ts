@@ -73,6 +73,7 @@ interface ErpScreen {
                 <span class="screen-tag">ERP Key: <code>{{ activeScreen.key }}</code></span>
               </div>
               <div class="header-actions">
+                <button type="button" class="btn-erp btn-outline" title="فاتورة جديدة" (click)="clearMockPurchaseForm()">✨ جديد / تفريغ</button>
                 <button class="btn-erp btn-primary">💾 حفظ</button>
                 <button class="btn-erp btn-secondary">🖨️ طباعة</button>
                 <button class="btn-erp btn-outline">↺ تراجع</button>
@@ -294,8 +295,7 @@ interface ErpScreen {
             <div class="erp-copilot-body ai-chat-window" *ngIf="!isCopilotMinimized">
               <lms-ai-copilot
                 [attr.erp-key]="activeScreen.key"
-                [attr.u]="'a'"
-                [attr.p]="'123'"
+                [attr.token]="effectiveToken"
                 [attr.api-url]="'http://localhost:8000'"
                 [attr.hide-header]="'true'"
                 [attr.inline]="'true'">
@@ -915,10 +915,10 @@ export class ErpMockComponent implements OnInit {
     },
     {
       key: 'PURCHASE_INVOICE',
-      name: 'فاتورة المشتريات (تجربة تعبئة الأصناف والموردين)',
+      name: 'فاتورة المشتريات (تجربة تعبئة الأصناف والدفعات المتكررة)',
       category: 'المخازن والمشتريات',
       description: 'شاشة تسجيل أوامر التوريد وفواتير المشتريات وتوريد الأصناف وإثبات السداد وسحب الحقول التابعة تلقائياً.',
-      sampleQuery: 'سجل لي فاتورة مشتريات من شركة التوحيد خامات بطريقة شراء مباشرة من مخزن القاهرة ف يوم 2026-10-07 المنتج كابلات شبكة CAT6 الكمية 10 وسعر 150 ودفعت نقدي التكلفة كاملة'
+      sampleQuery: 'سجل لي دفعة من 3 فواتير مشتريات: الأولى من شركة التوحيد خامات المنتج كابلات شبكة CAT6 الكمية 10 وسعر 150 نقدي، الثانية من شركة الحمد للتجارة المنتج رواتر 5 وسعر 800، الثالثة من مؤسسة النور توريدات المنتج سويتشات 2 وسعر 1200'
     },
     {
       key: 'JOURNAL_ENTRY',
@@ -965,12 +965,33 @@ export class ErpMockComponent implements OnInit {
     this.mockTotalAmount = this.mockRows.reduce((sum, r) => sum + ((Number(r.quantity) || 0) * (Number(r.cost) || 0)), 0);
   }
 
+  clearMockPurchaseForm() {
+    this.mockSupplierDetails = { name: '', address: '', phone: '', taxFile: '' };
+    this.mockRows = [{ itemName: '', quantity: 0, cost: 0 }];
+    this.mockTotalAmount = 0;
+    const supplierSel = document.querySelector('select[name="Supplier"]') as HTMLSelectElement;
+    if (supplierSel) supplierSel.value = '';
+    const cashInput = document.querySelector('input[name="CashPaid"]') as HTMLInputElement;
+    if (cashInput) cashInput.value = '';
+  }
+
+  mockDevToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlcnAtbW9jay1hZG1pbiIsIm5hbWUiOiJcdTA2NDVcdTA2MjdcdTA2MzJcdTA2NDYgXHUwNjJmXHUwNjMxXHUwNjQ4XHUwNjRhXHUwNjM0Iiwicm9sZSI6IkFkbWluIiwidGVuYW50X2lkIjoidGVuYW50LXRlc3QiLCJkZXBhcnRtZW50X2lkIjoiZGVwdC10ZXN0IiwiaXNzIjoiRHluYW1pY1Byb0xlYXJuIiwiYXVkIjoiRHluYW1pY1Byb0xlYXJuQ2xpZW50IiwiZXhwIjoxODIyOTE0ODc2fQ.t7-b2keNiYiFEuzB5QYqrNNzmYTyIDjAFdVM_s3C3DQ';
+
+  get effectiveToken(): string {
+    const active = this.authService.token();
+    if (active && !this.authService.isTokenExpired(active)) {
+      return active;
+    }
+    return this.mockDevToken;
+  }
+
   ngOnInit() {
-    // If not authenticated, silent login as student for seamless testing
     if (!this.authService.isAuthenticated()) {
       const savedToken = localStorage.getItem('jwt_token');
       if (savedToken && !this.authService.isTokenExpired(savedToken)) {
         this.authService.login(savedToken);
+      } else {
+        this.authService.login(this.mockDevToken);
       }
     }
   }

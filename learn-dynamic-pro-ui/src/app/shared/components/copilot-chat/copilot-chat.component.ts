@@ -7,7 +7,8 @@ import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData } from '../../../core/services/copilot.service';
 import { ErpFormDriverService } from '../../../core/services/erp-form-driver.service';
-import { FormFillExecutionReport, FormFieldSchema } from '../../../core/models/erp-form.models';
+import { ErpBatchStepperService } from '../../../core/services/erp-batch-stepper.service';
+import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem } from '../../../core/models/erp-form.models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
@@ -39,6 +40,8 @@ export interface ChatMessage {
   formFillApplied?: boolean;
   /** Structured execution report from ErpFormDriver */
   formFillReport?: FormFillExecutionReport;
+  /** Whether batch stepper execution was triggered for this message */
+  batchExecutionActive?: boolean;
 }
 
 @Component({
@@ -51,6 +54,7 @@ export interface ChatMessage {
 export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked, OnDestroy {
   private copilotService = inject(CopilotService);
   private formDriver = inject(ErpFormDriverService);
+  batchStepper = inject(ErpBatchStepperService);
   private router = inject(Router, { optional: true });
   private cdr = inject(ChangeDetectorRef);
   private elRef = inject(ElementRef);
@@ -642,6 +646,32 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     } catch (err) {
       console.error('[Copilot FormFill] Execution error:', err);
     }
+  }
+
+  /**
+   * Starts sequential batch stepper loop for multi-document extractions.
+   */
+  startBatchExecution(msg: ChatMessage, autoAdvance = false): void {
+    const items = msg.formFillData?.batch_items;
+    if (!items || items.length === 0) return;
+
+    msg.batchExecutionActive = true;
+    this.batchStepper.startBatch(
+      items,
+      msg.formFillData?.screenKey || this.erpKey,
+      autoAdvance
+    );
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Helper to resolve batch items list safely for template rendering
+   */
+  getBatchItems(msg: ChatMessage): ErpBatchItem[] {
+    if (msg.batchExecutionActive) {
+      return this.batchStepper.state().items;
+    }
+    return (msg.formFillData?.batch_items || []) as ErpBatchItem[];
   }
 
   /** Core stream method — shared by sendMessage() and retryMessage() */
