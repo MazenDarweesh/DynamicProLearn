@@ -1,10 +1,13 @@
 import { Injectable } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import {
   FormFieldSchema,
   FormFillResult,
   FormFillExecutionReport,
   FieldKind,
   FieldGroup,
+  FieldSignatureIn,
+  LeftoverResponse,
 } from '../models/erp-form.models';
 
 /**
@@ -66,6 +69,85 @@ export class ErpFormDriverService {
         resolve(predicate() || null);
       }, timeoutMs);
     });
+  }
+
+  /**
+   * Waits for DOM mutations to quiesce (settle) within container, with a safety ceiling.
+   * Ensures Angular change detection, component transitions, and dependent field rendering
+   * are completely finished before the next field is inspected or filled.
+   */
+  async settle(
+    container?: HTMLElement,
+    options: { quietMs?: number; maxMs?: number } = {}
+  ): Promise<void> {
+    if (typeof document === 'undefined') return;
+
+    const quietMs = options.quietMs ?? 250;
+    const maxMs = options.maxMs ?? 3000;
+    const target = container || document.body;
+
+    return new Promise<void>((resolve) => {
+      let timeoutId: any;
+      let maxTimeoutId: any;
+      let observer: MutationObserver | null = null;
+
+      const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        if (maxTimeoutId) clearTimeout(maxTimeoutId);
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+        resolve();
+      };
+
+      maxTimeoutId = setTimeout(() => {
+        cleanup();
+      }, maxMs);
+
+      const resetQuietTimer = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          cleanup();
+        }, quietMs);
+      };
+
+      observer = new MutationObserver(() => {
+        resetQuietTimer();
+      });
+
+      observer.observe(target, {
+        childList: true,
+        subtree: true,
+        attributes: true,
+      });
+
+      // Start initial quiet timer
+      resetQuietTimer();
+    });
+  }
+
+  /**
+   * Compares two form schemas to identify newly revealed or newly enabled fields.
+   */
+  diffSchemas(
+    before: FormFieldSchema[],
+    after: FormFieldSchema[]
+  ): { newlyAppeared: FormFieldSchema[]; newlyEnabled: FormFieldSchema[] } {
+    const beforeMap = new Map(before.map((f) => [f.key, f]));
+    const newlyAppeared: FormFieldSchema[] = [];
+    const newlyEnabled: FormFieldSchema[] = [];
+
+    for (const field of after) {
+      const prev = beforeMap.get(field.key);
+      if (!prev) {
+        newlyAppeared.push(field);
+      } else if (prev.disabled && !field.disabled) {
+        newlyEnabled.push(field);
+      }
+    }
+
+    return { newlyAppeared, newlyEnabled };
   }
 
   /**
@@ -191,15 +273,31 @@ export class ErpFormDriverService {
   }
 
   /**
-   * Executes form filling sequentially according to the architecture diamond loop:
-   * 1. Header fields first (e.g. Supplier, Warehouse, Date)
-   * 2. Grid rows (Items, quantities)
-   * 3. Footer fields (e.g. CashPaid = $TOTAL)
+   * Executes form filling sequentially according to the architecture diamond loop.
+   * Delegates to applyProgressiveFill for backward compatibility.
    */
   async applyFormFill(
     fields?: Record<string, any>,
     rows?: Record<string, any>[],
     excludeContainer?: HTMLElement
+  ): Promise<FormFillExecutionReport> {
+    return this.applyProgressiveFill(fields, rows, excludeContainer);
+  }
+
+  /**
+   * Progressive Form Fill loop:
+   * 1. Fills currently ready & visible fields.
+   * 2. After each fill action, calls settle() to wait for dependent DOM rendering.
+   * 3. Scans for newly revealed fields and queries AI (/v1/erp/form-fill/resolve-leftover)
+   *    to populate values from previously extracted user intent.
+   * 4. Repeats until all fields settle or max passes (8) reached.
+   */
+  async applyProgressiveFill(
+    fields?: Record<string, any>,
+    rows?: Record<string, any>[],
+    excludeContainer?: HTMLElement,
+    copilotService?: any,
+    userMessage?: string
   ): Promise<FormFillExecutionReport> {
     const results: FormFillResult[] = [];
     let filledCount = 0;
@@ -208,17 +306,68 @@ export class ErpFormDriverService {
       return { success: true, fieldsProcessed: 0, filledCount: 0, results: [] };
     }
 
-    // ──────────────────────────────────────────────
-    // 1. Fill Header Fields (Text, ng-select, Selects)
-    // ──────────────────────────────────────────────
-    if (fields) {
-      for (const [rawKey, rawVal] of Object.entries(fields)) {
-        if (rawVal == null) continue;
+    const pendingFields: Record<string, any> = { ...(fields || {}) };
+    const filledFields: Record<string, any> = {};
+    const maxPasses = 8;
+    let pass = 0;
 
-        // Skip payment fields for footer processing if value denotes total
-        if (String(rawVal).toUpperCase() === '$TOTAL' || String(rawVal).toUpperCase() === 'TOTAL') {
-          continue;
+    while (pass < maxPasses) {
+      pass++;
+      const currentSchema = this.collectFormSchema(excludeContainer);
+      const readyKeys = Object.keys(pendingFields).filter((k) => {
+        if (String(pendingFields[k]).toUpperCase() === '$TOTAL' || String(pendingFields[k]).toUpperCase() === 'TOTAL') {
+          return false;
         }
+        const schemaField = currentSchema.find(
+          (s) => s.key === k || normalizeArabicText(s.label) === normalizeArabicText(k)
+        );
+        return schemaField && !schemaField.disabled;
+      });
+
+      if (readyKeys.length === 0) {
+        // Check if there are newly revealed fields we don't have values for yet
+        if (copilotService && userMessage && Object.keys(filledFields).length > 0) {
+          const newUnmappedFields = currentSchema
+            .filter((s) => !s.disabled && !filledFields[s.key] && !pendingFields[s.key])
+            .map(
+              (s): FieldSignatureIn => ({
+                key: s.key,
+                label: s.label,
+                kind: s.kind,
+                disabled: s.disabled,
+                options: s.options,
+              })
+            );
+
+          if (newUnmappedFields.length > 0) {
+            try {
+              const leftoverRes: LeftoverResponse = await firstValueFrom(
+                copilotService.resolveErpLeftover({
+                  user_message: userMessage,
+                  extracted_data: fields || {},
+                  filled: filledFields,
+                  new_fields: newUnmappedFields,
+                })
+              );
+
+              if (leftoverRes && leftoverRes.fields && Object.keys(leftoverRes.fields).length > 0) {
+                Object.assign(pendingFields, leftoverRes.fields);
+                continue; // Re-run pass with newly resolved fields!
+              }
+            } catch (err) {
+              console.warn('[ProgressiveFill] leftover resolution error', err);
+            }
+          }
+        }
+        break; // No more fields to process in this pass
+      }
+
+      // Process ready fields in this pass
+      for (const rawKey of readyKeys) {
+        const rawVal = pendingFields[rawKey];
+        delete pendingFields[rawKey];
+
+        if (rawVal == null) continue;
 
         const cleanKey = rawKey.split('(')[0].trim().replace(/^['"]|['"]$/g, '');
         const targetElement = this.findTargetElement(cleanKey, excludeContainer);
@@ -233,7 +382,6 @@ export class ErpFormDriverService {
           continue;
         }
 
-        // Check if field is disabled / read-only -> skip and let Angular handle it!
         if (this.isElementDisabled(targetElement)) {
           results.push({
             field: cleanKey,
@@ -244,55 +392,61 @@ export class ErpFormDriverService {
           continue;
         }
 
-        // Process by element kind
         const tagName = targetElement.tagName.toLowerCase();
+        let status: 'filled' | 'ambiguous' | 'not_found' = 'filled';
+
         if (tagName === 'eg-select' || tagName === 'ng-select') {
-          const status = await this.setNgSelect(targetElement, rawVal);
-          if (status === 'filled') filledCount++;
-          results.push({
-            field: cleanKey,
-            value: rawVal,
-            status,
-            message: status === 'filled' ? 'تم اختيار العنصر بنجاح' : 'لم يتم العثور على خيار مطابق',
-          });
+          status = await this.setNgSelect(targetElement, rawVal);
         } else if (tagName === 'select') {
           const ok = this.setNativeSelect(targetElement as HTMLSelectElement, rawVal);
-          if (ok) filledCount++;
-          results.push({
-            field: cleanKey,
-            value: rawVal,
-            status: ok ? 'filled' : 'not_found',
-          });
+          status = ok ? 'filled' : 'not_found';
         } else if (targetElement instanceof HTMLInputElement && targetElement.type === 'checkbox') {
           const checked = rawVal === true || rawVal === 'true' || rawVal === 1 || rawVal === '1';
           if (targetElement.checked !== checked) {
             targetElement.click();
           }
-          filledCount++;
-          results.push({ field: cleanKey, value: checked, status: 'filled' });
+          status = 'filled';
         } else if (
           targetElement instanceof HTMLInputElement ||
           targetElement instanceof HTMLTextAreaElement
         ) {
           this.setTextOrDate(targetElement, rawVal);
+          status = 'filled';
+        }
+
+        if (status === 'filled') {
           filledCount++;
-          results.push({ field: cleanKey, value: rawVal, status: 'filled' });
+          filledFields[cleanKey] = rawVal;
+          results.push({
+            field: cleanKey,
+            value: rawVal,
+            status: 'filled',
+            message: 'تم إدخال القيمة بنجاح',
+          });
+          // Quiesce/settle DOM after each successful input to trigger dependent reactive fields
+          await this.settle(targetElement.closest('form, app-base') as HTMLElement || undefined);
+        } else {
+          results.push({
+            field: cleanKey,
+            value: rawVal,
+            status,
+            message: status === 'ambiguous' ? 'الخيار غامض' : 'لم يتم العثور على العنصر',
+          });
         }
       }
     }
 
     // ──────────────────────────────────────────────
-    // 1.5 Fill Grid Rows (Items Table)
+    // 2. Fill Grid Rows (Items Table)
     // ──────────────────────────────────────────────
     if (rows && rows.length > 0) {
       const rowFilledCount = await this.fillGridRows(rows, excludeContainer, results);
       filledCount += rowFilledCount;
-      // Wait 150ms for ERP reactive calculations (totals, discounts, taxes) to settle
-      await new Promise((r) => setTimeout(r, 150));
+      await this.settle();
     }
 
     // ──────────────────────────────────────────────
-    // 2. Handle Payment Field with $TOTAL (Footer)
+    // 3. Handle Payment Field with $TOTAL (Footer)
     // ──────────────────────────────────────────────
     if (fields) {
       for (const [rawKey, rawVal] of Object.entries(fields)) {
@@ -300,8 +454,10 @@ export class ErpFormDriverService {
           const cleanKey = rawKey.split('(')[0].trim().replace(/^['"]|['"]$/g, '');
           const targetElement = this.findTargetElement(cleanKey, excludeContainer);
 
-          if (targetElement && (targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)) {
-            // Read calculated total from ERP screen
+          if (
+            targetElement &&
+            (targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
+          ) {
             const calculatedTotal = this.readCalculatedTotal();
             const finalVal = calculatedTotal || '0';
             this.setTextOrDate(targetElement, finalVal);

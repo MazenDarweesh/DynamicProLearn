@@ -68,3 +68,51 @@ export interface ErpBatchState {
   screenKey?: string;
 }
 
+// ─────────────────────────────────────────────────────────────
+// ERP Autonomous Navigation & Progressive Leftover Contracts
+// (Matches backend Pydantic models in LMS_CO_Pilot/src/models/erp_models.py)
+// ─────────────────────────────────────────────────────────────
+
+export interface NavCandidateIn {
+  id: string;
+  label: string;
+  path: string[];
+}
+
+export interface NavRequest {
+  user_message: string;
+  candidates: NavCandidateIn[];
+  current_path?: string[];
+}
+
+export interface NavScored {
+  id: string;
+  confidence: number;
+  reason: string;
+}
+
+export interface NavResolution {
+  decision: 'go' | 'ask' | 'clarify';
+  candidates: NavScored[];
+}
+
+export interface FieldSignatureIn {
+  key: string;
+  label?: string;
+  kind: string;
+  disabled?: boolean;
+  options?: string[];
+}
+
+export interface LeftoverRequest {
+  user_message: string;
+  extracted_data: Record<string, any>;
+  filled: Record<string, any>;
+  new_fields: FieldSignatureIn[];
+}
+
+export interface LeftoverResponse {
+  fields: Record<string, any>;
+  ask_user: string[];
+}
+

@@ -2,7 +2,13 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, firstValueFrom, shareReplay, BehaviorSubject } from 'rxjs';
 import { AuthService } from './auth.service';
-import { ErpBatchItem } from '../models/erp-form.models';
+import {
+  ErpBatchItem,
+  NavRequest,
+  NavResolution,
+  LeftoverRequest,
+  LeftoverResponse
+} from '../models/erp-form.models';
 
 export interface CopilotSource {
   type?: 'video' | 'pdf' | string;
@@ -418,5 +424,27 @@ export class CopilotService {
       {},
       { headers: { 'Authorization': `Bearer ${token}` } }
     );
+  }
+
+  /**
+   * Resolves ERP autonomous navigation target using backend LLM + lexical reranking.
+   * Calls POST /v1/erp/navigation/resolve
+   */
+  resolveErpNavigation(req: NavRequest): Observable<NavResolution> {
+    const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return this.http.post<NavResolution>(`${this.aiBaseUrl}/v1/erp/navigation/resolve`, req, { headers });
+  }
+
+  /**
+   * Resolves dynamically revealed/dependent leftover fields during progressive form filling.
+   * Calls POST /v1/erp/form-fill/resolve-leftover
+   */
+  resolveErpLeftover(req: LeftoverRequest): Observable<LeftoverResponse> {
+    const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return this.http.post<LeftoverResponse>(`${this.aiBaseUrl}/v1/erp/form-fill/resolve-leftover`, req, { headers });
   }
 }

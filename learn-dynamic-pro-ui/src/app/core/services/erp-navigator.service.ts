@@ -1,9 +1,15 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
+import { NavCandidateIn, NavResolution, NavScored } from '../models/erp-form.models';
+import { normalizeArabicText } from './erp-form-driver.service';
+import { CopilotService } from './copilot.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ErpNavigatorService {
+  private copilotService = inject(CopilotService, { optional: true });
+  private candidateElementsMap = new Map<string, HTMLElement>();
 
   /**
    * Screen dictionary mapping keys to common Arabic labels and selectors
@@ -182,6 +188,134 @@ export class ErpNavigatorService {
       }
     }
     return false;
+  }
+
+  /**
+   * Scans visible ERP screen items (cards, tabs, chips, mock buttons) from the active DOM.
+   * Excludes any settings modals, headers, and Copilot widget elements.
+   */
+  scanVisibleCandidates(): NavCandidateIn[] {
+    this.candidateElementsMap.clear();
+    const candidates: NavCandidateIn[] = [];
+    const seenLabels = new Set<string>();
+
+    if (typeof document === 'undefined') {
+      return candidates;
+    }
+
+    const badContainers = '.dp-set, #dpSettingsLabel, lms-ai-copilot, app-copilot-chat';
+    const domSelectors = '.dp-mods__card, .dp-hdr__tab, .dp-cats__chip, .screen-btn, [data-screen]';
+    const elements = Array.from(document.querySelectorAll<HTMLElement>(domSelectors));
+
+    let index = 1;
+    for (const el of elements) {
+      if (el.closest(badContainers)) continue;
+      if (!this.isElementVisible(el)) continue;
+
+      const rawText = (el.textContent || '').trim();
+      if (!rawText || rawText.length < 2 || rawText.length > 50) continue;
+
+      const normalized = normalizeArabicText(rawText);
+      if (seenLabels.has(normalized)) continue;
+      seenLabels.add(normalized);
+
+      const candidateId = el.getAttribute('data-screen') || el.id || `candidate_${index++}`;
+      this.candidateElementsMap.set(candidateId, el);
+
+      candidates.push({
+        id: candidateId,
+        label: rawText,
+        path: ['الرئيسية']
+      });
+    }
+
+    // Fallback: If on an empty/detached screen or mock buttons not in DOM, populate from registry
+    if (candidates.length === 0) {
+      for (const [key, val] of Object.entries(this.screenRegistry)) {
+        candidates.push({
+          id: key,
+          label: val.labels[0] || key,
+          path: ['الرئيسية']
+        });
+      }
+    }
+
+    return candidates;
+  }
+
+  /**
+   * Resolves target screen using AI Backend (/v1/erp/navigation/resolve).
+   * - 'go' (confidence >= 0.80): Navigates immediately and triggers prepareFreshForm().
+   * - 'ask': Returns top 3 scored options for the user to select.
+   * - 'clarify': Prompts user for clearer input.
+   */
+  async resolveAndNavigate(userMessage: string): Promise<{
+    success: boolean;
+    decision: 'go' | 'ask' | 'clarify';
+    chosen?: NavScored;
+    askOptions?: NavScored[];
+    message?: string;
+  }> {
+    const candidates = this.scanVisibleCandidates();
+    if (candidates.length === 0) {
+      return { success: false, decision: 'clarify', message: 'لم يتم العثور على أي شاشات متاحة في واجهة النظام حالياً.' };
+    }
+
+    if (!this.copilotService) {
+      // Fallback if CopilotService not available
+      return { success: false, decision: 'clarify', message: 'خدمة الذكاء الاصطناعي غير متصلة.' };
+    }
+
+    try {
+      const res = await firstValueFrom(
+        this.copilotService.resolveErpNavigation({
+          user_message: userMessage,
+          candidates,
+          current_path: []
+        })
+      );
+
+      if (res.decision === 'go' && res.candidates.length > 0) {
+        const top = res.candidates[0];
+        const targetEl = this.candidateElementsMap.get(top.id);
+
+        if (targetEl) {
+          targetEl.click();
+        } else {
+          // Try navigating by key/label in screenRegistry
+          await this.navigateToScreen(top.id);
+        }
+
+        await this.delay(400);
+        // Prepare fresh form if we reached the form/list
+        await this.prepareFreshForm();
+
+        return {
+          success: true,
+          decision: 'go',
+          chosen: top
+        };
+      } else if (res.decision === 'ask') {
+        return {
+          success: false,
+          decision: 'ask',
+          askOptions: res.candidates.slice(0, 3)
+        };
+      } else {
+        return {
+          success: false,
+          decision: 'clarify',
+          message: 'يرجى توضيح اسم الشاشة أو العملية المطلوبة (مثال: فاتورة مشتريات، تسجيل عميل).'
+        };
+      }
+    } catch (err: any) {
+      console.error('[ErpNavigator] resolveAndNavigate error', err);
+      return {
+        success: false,
+        decision: 'clarify',
+        message: 'حدث خطأ أثناء التواصل مع محرك الذكاء الاصطناعي، يرجى المحاولة لاحقاً.'
+      };
+    }
   }
 
   private isElementVisible(el: Element): boolean {
