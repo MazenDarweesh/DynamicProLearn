@@ -680,6 +680,39 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     return (msg.formFillData?.batch_items || []) as ErpBatchItem[];
   }
 
+  /**
+   * Checks whether form fill data actually contains actionable fields, rows, or batch items.
+   * Prevents displaying empty proposal cards when no data was extracted.
+   */
+  hasFormFillData(msg: ChatMessage): boolean {
+    return !!msg.formFillData && this.isValidFormFill(msg.formFillData);
+  }
+
+  isValidFormFill(data?: CopilotFormFillData): boolean {
+    if (!data) return false;
+
+    if (data.batch_mode) {
+      return Array.isArray(data.batch_items) && data.batch_items.length > 0;
+    }
+
+    const hasFields =
+      !!data.fields &&
+      Object.keys(data.fields).some((k) => {
+        const val = data.fields![k];
+        return val != null && String(val).trim() !== '';
+      });
+
+    const hasRows =
+      !!data.rows &&
+      Array.isArray(data.rows) &&
+      data.rows.length > 0 &&
+      data.rows.some((row) =>
+        Object.values(row).some((val) => val != null && String(val).trim() !== '')
+      );
+
+    return hasFields || hasRows;
+  }
+
   async selectAskOption(option: NavScored, originalQuery?: string) {
     console.info('%c[Copilot Navigation] User clicked ambiguity chip:', 'color:#3b82f6;font-weight:bold', option);
     // 1. Navigate to chosen screen
@@ -789,8 +822,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       visibleFields,
       this.erpKey,
       (fillData: CopilotFormFillData) => {
-        this.messages[assistantMsgIndex].formFillData = fillData;
-        this.cdr.markForCheck();
+        if (fillData && this.isValidFormFill(fillData)) {
+          this.messages[assistantMsgIndex].formFillData = fillData;
+          this.cdr.markForCheck();
+        }
       },
       formSchema
     );

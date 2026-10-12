@@ -797,9 +797,19 @@ export class ErpFormDriverService {
           if (addBtn) {
             addBtn.click();
             targetRow = (await this.waitFor<HTMLElement>(() => {
-              const currentRows = Array.from(table.querySelectorAll('tbody tr, mat-row')) as HTMLElement[];
-              return currentRows.length > rowEls.length ? currentRows[currentRows.length - 1] : null;
-            }, 1500)) || undefined;
+              const currentRows = (Array.from(
+                table.querySelectorAll('tbody tr, mat-row, [role="row"]')
+              ) as HTMLElement[]).filter((r) => !r.querySelector('th, [role="columnheader"]'));
+
+              if (currentRows.length > rowEls.length) {
+                const candidate = currentRows[rIdx] || currentRows[currentRows.length - 1];
+                const inputs = candidate.querySelectorAll('input, select, textarea, eg-select, ng-select');
+                return inputs.length > 0 ? candidate : null;
+              }
+              return null;
+            }, 3000)) || undefined;
+
+            await new Promise((resolve) => setTimeout(resolve, 80));
           }
         }
 
@@ -826,7 +836,9 @@ export class ErpFormDriverService {
 
           if (!targetCell) {
             for (const cell of cells) {
-              const input = cell.querySelector(`input[name*="${colKey}" i], select[name*="${colKey}" i]`);
+              const input = cell.querySelector(
+                `input[name*="${colKey}" i], select[name*="${colKey}" i], textarea[name*="${colKey}" i], [data-field*="${colKey}" i]`
+              );
               if (input) {
                 targetCell = cell;
                 break;
@@ -876,16 +888,65 @@ export class ErpFormDriverService {
   }
 
   private findAddRowButton(table: HTMLElement, excludeContainer?: HTMLElement): HTMLElement | null {
-    const container = table.closest('.card, .panel, .form-group, section, div') || table.parentElement || table;
-    const buttons = Array.from(container.querySelectorAll('button, a.btn, span.btn')) as HTMLElement[];
-    const blacklisted = ['حفظ', 'ترحيل', 'اعتماد', 'حذف', 'تعديل', 'save', 'post', 'delete'];
+    const candidates: HTMLElement[] = [];
+    let current: HTMLElement | null = table;
 
-    for (const btn of buttons) {
+    while (current && current !== document.body) {
+      const btns = Array.from(
+        current.querySelectorAll('button, a.btn, span.btn, [role="button"]')
+      ) as HTMLElement[];
+      for (const btn of btns) {
+        if (!candidates.includes(btn)) candidates.push(btn);
+      }
+      if (
+        current.classList.contains('erp-table-box') ||
+        current.classList.contains('card') ||
+        current.tagName.toLowerCase() === 'section'
+      ) {
+        break;
+      }
+      current = current.parentElement;
+    }
+
+    const formRoot = (table.closest('.erp-mock-main, .erp-screen, form, main') || document.body) as HTMLElement;
+    const formBtns = Array.from(
+      formRoot.querySelectorAll('button, a.btn, span.btn, [role="button"]')
+    ) as HTMLElement[];
+    for (const btn of formBtns) {
+      if (!candidates.includes(btn)) candidates.push(btn);
+    }
+
+    const blacklisted = [
+      'حفظ', 'ترحيل', 'اعتماد', 'حذف', 'تعديل', 'save', 'post', 'delete',
+      'تراجع', 'طباعه', 'طباعة', 'تفريغ'
+    ];
+
+    for (const btn of candidates) {
       if (excludeContainer && excludeContainer.contains(btn)) continue;
-      const text = normalizeArabicText(btn.textContent || '');
-      if (blacklisted.some((b) => text.includes(b))) continue;
+      const rawText = (btn.textContent || '').trim();
+      const text = normalizeArabicText(rawText);
+      if (!text && !rawText) continue;
 
-      if (text.includes('اضافة') || text.includes('سطر') || text.includes('جديد') || text.includes('add') || text === '+') {
+      if (blacklisted.some((b) => text.includes(normalizeArabicText(b)))) continue;
+      if (text === 'جديد' || text.includes('تفريغ') || text.includes('سجل جديد')) continue;
+
+      if (
+        text.includes('اضافه') ||
+        text.includes('اضافة') ||
+        text.includes('سطر') ||
+        text.includes('طرف') ||
+        text.includes('قيد') ||
+        text.includes('صنف') ||
+        text.includes('فرع') ||
+        text.includes('موقع') ||
+        text.includes('بند') ||
+        text.includes('جديد') ||
+        text.includes('add') ||
+        text.includes('row') ||
+        text.includes('item') ||
+        text.includes('line') ||
+        rawText.includes('+')
+      ) {
         return btn;
       }
     }

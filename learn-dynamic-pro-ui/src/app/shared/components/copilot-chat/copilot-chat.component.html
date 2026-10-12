@@ -134,7 +134,7 @@
             </div>
 
             <!-- In-DOM Action Card: Auto-Fill Suggestion -->
-            <div *ngIf="msg.formFillData && !msg.isStreaming" class="form-fill-card animate-fade-in">
+            <div *ngIf="hasFormFillData(msg) && !msg.isStreaming" class="form-fill-card animate-fade-in">
               
               <!-- ── Case A: Batch Mode (Multiple Invoices / Documents) ── -->
               <ng-container *ngIf="msg.formFillData.batch_mode && msg.formFillData.batch_items && msg.formFillData.batch_items.length > 0">

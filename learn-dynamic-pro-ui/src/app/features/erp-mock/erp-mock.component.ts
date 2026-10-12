@@ -1277,6 +1277,7 @@ export class ErpMockComponent implements OnInit {
 
   addMockRow() {
     this.mockRows.push({ itemName: '', quantity: 0, cost: 0 });
+    this.cdr.detectChanges();
   }
 
   calcMockTotals() {
@@ -1306,6 +1307,7 @@ export class ErpMockComponent implements OnInit {
   addSalesRow() {
     this.mockSalesRows.push({ itemName: '', unit: 'قطعة', quantity: 1, price: 0, discount: 0 });
     this.calcSalesTotals();
+    this.cdr.detectChanges();
   }
 
   calcSalesTotals() {
@@ -1328,6 +1330,7 @@ export class ErpMockComponent implements OnInit {
 
   addCustomerBranch() {
     this.mockCustomerBranches.push({ branchName: '', contactPerson: '', phone: '', city: '' });
+    this.cdr.detectChanges();
   }
 
   // 4. Journal Entry State
@@ -1341,6 +1344,7 @@ export class ErpMockComponent implements OnInit {
   addJournalRow() {
     this.mockJournalRows.push({ accountCode: '', accountName: '', costCenter: '', debit: 0, credit: 0, lineNotes: '' });
     this.calcJournalTotals();
+    this.cdr.detectChanges();
   }
 
   calcJournalTotals() {
@@ -1360,6 +1364,7 @@ export class ErpMockComponent implements OnInit {
   addAuditRow() {
     this.mockAuditRows.push({ itemCode: '', itemName: '', unit: 'قطعة', bookQty: 0, actualQty: 0, unitCost: 0 });
     this.calcAuditTotals();
+    this.cdr.detectChanges();
   }
 
   calcAuditTotals() {
