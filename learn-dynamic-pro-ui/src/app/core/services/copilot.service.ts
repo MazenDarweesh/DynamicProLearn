@@ -428,23 +428,39 @@ export class CopilotService {
 
   /**
    * Resolves ERP autonomous navigation target using backend LLM + lexical reranking.
-   * Calls POST /v1/erp/navigation/resolve
+   * Calls POST /v1/erp/navigation/resolve via fetch for maximum transport reliability.
    */
-  resolveErpNavigation(req: NavRequest): Observable<NavResolution> {
+  async resolveErpNavigation(req: NavRequest): Promise<NavResolution> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    return this.http.post<NavResolution>(`${this.aiBaseUrl}/v1/erp/navigation/resolve`, req, { headers });
+    const res = await fetch(`${this.aiBaseUrl}/v1/erp/navigation/resolve`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(req)
+    });
+    if (!res.ok) {
+      throw new Error(`Navigation resolve failed with status ${res.status}`);
+    }
+    return await res.json();
   }
 
   /**
    * Resolves dynamically revealed/dependent leftover fields during progressive form filling.
-   * Calls POST /v1/erp/form-fill/resolve-leftover
+   * Calls POST /v1/erp/form-fill/resolve-leftover via fetch for maximum transport reliability.
    */
-  resolveErpLeftover(req: LeftoverRequest): Observable<LeftoverResponse> {
+  async resolveErpLeftover(req: LeftoverRequest): Promise<LeftoverResponse> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    return this.http.post<LeftoverResponse>(`${this.aiBaseUrl}/v1/erp/form-fill/resolve-leftover`, req, { headers });
+    const res = await fetch(`${this.aiBaseUrl}/v1/erp/form-fill/resolve-leftover`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(req)
+    });
+    if (!res.ok) {
+      throw new Error(`Leftover resolve failed with status ${res.status}`);
+    }
+    return await res.json();
   }
 }

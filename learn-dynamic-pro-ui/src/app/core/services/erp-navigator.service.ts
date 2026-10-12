@@ -14,26 +14,29 @@ export class ErpNavigatorService {
   /**
    * Screen dictionary mapping keys to common Arabic labels and selectors
    */
+  /**
+   * Screen dictionary mapping keys to common Arabic labels and selectors
+   */
   private readonly screenRegistry: Record<string, { labels: string[]; selectorHint?: string }> = {
     'PURCHASE_INVOICE': {
       labels: ['فاتورة المشتريات', 'الموردين و المشتريات', 'المشتريات'],
-      selectorHint: 'app-extraction-supplier, [data-screen="PURCHASE_INVOICE"], select[name="Supplier"]'
+      selectorHint: 'select[name="Supplier"]'
     },
     'SALES_INVOICE': {
       labels: ['فاتورة المبيعات', 'العملاء  و المبيعات', 'المبيعات'],
-      selectorHint: '[data-screen="SALES_INVOICE"]'
+      selectorHint: 'input[name="InvoiceNumber"]'
     },
     'NEW_CUSTOMER': {
       labels: ['تسجيل عميل جديد', 'العملاء والحسابات', 'عميل جديد'],
-      selectorHint: '[data-screen="NEW_CUSTOMER"], input[name="CustomerName"]'
+      selectorHint: 'input[name="CustomerName"]'
     },
     'JOURNAL_ENTRY': {
-      labels: ['قيود اليومية العامة', 'الحسابات العامه', 'قيود اليومية'],
-      selectorHint: '[data-screen="JOURNAL_ENTRY"]'
+      labels: ['قيود اليومية العامة', 'الحسابات العامة', 'قيود اليومية'],
+      selectorHint: 'input[name="EntryNumber"]'
     },
-    'CONTRACTOR_EXTRACTION': {
-      labels: ['مستخلصات المقاولين', 'المكتب الفني', 'مستخلصات'],
-      selectorHint: 'app-extraction-supplier'
+    'INVENTORY_AUDIT': {
+      labels: ['الجرد والتسويات المخزنية', 'إدارة المستودعات', 'محضر الجرد'],
+      selectorHint: 'input[name="AuditNumber"]'
     }
   };
 
@@ -44,7 +47,21 @@ export class ErpNavigatorService {
     const config = this.screenRegistry[screenKey];
     if (!config) return false;
 
-    // 1. Check selector hint if specified
+    // 1. Check active tab or button with .active / .is-active specifically for this screenKey
+    const activeTab = document.querySelector(
+      `.screen-btn.active[data-screen="${screenKey}"], .dp-hdr__tab.is-active[data-screen="${screenKey}"], .dp-mods__card.is-active[data-screen="${screenKey}"]`
+    );
+    if (activeTab && this.isElementVisible(activeTab)) {
+      return true;
+    }
+
+    // 2. Check if the active form content matches this screenKey
+    const formContent = document.querySelector(`[data-screen-content="${screenKey}"]`);
+    if (formContent && this.isElementVisible(formContent)) {
+      return true;
+    }
+
+    // 3. Check specific inputs that only exist when this specific screen is open
     if (config.selectorHint) {
       const el = document.querySelector(config.selectorHint);
       if (el && this.isElementVisible(el)) {
@@ -52,22 +69,10 @@ export class ErpNavigatorService {
       }
     }
 
-    // 2. Check tab active states in the ERP shell or mock
-    const activeTabs = document.querySelectorAll('.screen-btn.active, .dp-hdr__tab.is-active, .dp-mods__card.is-active');
-    for (const tab of Array.from(activeTabs)) {
-      const text = (tab.textContent || '').trim();
-      if (config.labels.some(l => text.includes(l)) || text.includes(screenKey)) {
-        return true;
-      }
-    }
-
-    // 3. Check page titles or headers
-    const headers = document.querySelectorAll('.dp-list__ttltxt, .screen-title, .erp-title');
-    for (const h of Array.from(headers)) {
-      const text = (h.textContent || '').trim();
-      if (config.labels.some(l => text.includes(l))) {
-        return true;
-      }
+    // 4. Check active screen tag in ERP card header
+    const activeTag = document.querySelector('.screen-tag code');
+    if (activeTag && (activeTag.textContent || '').trim() === screenKey) {
+      return true;
     }
 
     return false;
@@ -84,38 +89,38 @@ export class ErpNavigatorService {
 
     const config = this.screenRegistry[screenKey] || { labels: [screenKey] };
 
-    // 1. Check for dedicated mock screen buttons first
+    // 1. Dispatch custom event first so host / mock listeners switch screen immediately
+    window.dispatchEvent(new CustomEvent('lms:navigate', {
+      bubbles: true,
+      composed: true,
+      detail: { screenKey }
+    }));
+
+    // 2. Check for dedicated mock screen buttons
     const mockButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.screen-btn'));
     for (const btn of mockButtons) {
+      const btnKey = btn.getAttribute('data-screen');
       const text = btn.textContent || '';
-      if (text.includes(screenKey) || config.labels.some(l => text.includes(l))) {
+      if (btnKey === screenKey || config.labels.some(l => text.includes(l))) {
         btn.click();
         return await this.waitForScreenReady(screenKey, 3000);
       }
     }
 
-    // 2. Check for real ERP Shell Navigation Cards (.dp-mods__card)
+    // 3. Check for real ERP Shell Navigation Cards (.dp-mods__card)
     const moduleCards = Array.from(document.querySelectorAll<HTMLElement>('.dp-mods__card, .dp-hdr__tab, .dp-cats__chip'));
     for (const card of moduleCards) {
+      const cardKey = card.getAttribute('data-screen');
       const text = card.textContent || '';
-      if (config.labels.some(l => text.includes(l))) {
+      if (cardKey === screenKey || config.labels.some(l => text.includes(l))) {
         card.click();
         await this.delay(400);
 
-        // If clicking a module opened submenu or navigated, check if screen is ready
         if (this.isScreenActive(screenKey)) {
           return true;
         }
       }
     }
-
-    // 3. Dispatch a window custom event for ERP parent host integration
-    const navEvent = new CustomEvent('lms:navigate', {
-      bubbles: true,
-      composed: true,
-      detail: { screenKey }
-    });
-    window.dispatchEvent(navEvent);
 
     return await this.waitForScreenReady(screenKey, 2000);
   }
@@ -212,8 +217,13 @@ export class ErpNavigatorService {
       if (el.closest(badContainers)) continue;
       if (!this.isElementVisible(el)) continue;
 
-      const rawText = (el.textContent || '').trim();
-      if (!rawText || rawText.length < 2 || rawText.length > 50) continue;
+      // Extract clean label: prioritize inner label element if present, else sanitize textContent
+      const labelSpan = el.querySelector('.screen-label, .dp-mods__title, .dp-hdr__tabtxt, .dp-cats__txt');
+      let rawText = (labelSpan?.textContent || el.textContent || '').trim();
+      // Remove bracketed codes like [PURCHASE_INVOICE] from text for cleaner matching
+      rawText = rawText.replace(/\[.*?\]/g, '').trim();
+
+      if (!rawText || rawText.length < 2 || rawText.length > 150) continue;
 
       const normalized = normalizeArabicText(rawText);
       if (seenLabels.has(normalized)) continue;
@@ -267,16 +277,20 @@ export class ErpNavigatorService {
     }
 
     try {
-      const res = await firstValueFrom(
-        this.copilotService.resolveErpNavigation({
-          user_message: userMessage,
-          candidates,
-          current_path: []
-        })
-      );
+      const res = await this.copilotService.resolveErpNavigation({
+        user_message: userMessage,
+        candidates,
+        current_path: []
+      });
+      console.info('%c[ErpNavigator] resolve response from backend:', 'color:#8b5cf6;font-weight:bold', res);
 
       if (res.decision === 'go' && res.candidates.length > 0) {
         const top = res.candidates[0];
+        window.dispatchEvent(new CustomEvent('lms:navigate', {
+          bubbles: true,
+          composed: true,
+          detail: { screenKey: top.id }
+        }));
         const targetEl = this.candidateElementsMap.get(top.id);
 
         if (targetEl) {

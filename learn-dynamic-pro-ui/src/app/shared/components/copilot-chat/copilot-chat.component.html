@@ -93,6 +93,24 @@
               </ng-template>
             </div>
 
+            <!-- Interactive Ambiguity Chips (decision: 'ask') -->
+            <div *ngIf="msg.askOptions && msg.askOptions.length > 0" class="nav-ask-options-card">
+              <div class="nav-ask-header">
+                <span class="nav-ask-icon">🧭</span>
+                <strong>اختر الشاشة المستهدفة:</strong>
+              </div>
+              <div class="nav-ask-chips">
+                <button *ngFor="let opt of msg.askOptions"
+                        type="button"
+                        class="nav-ask-chip-btn"
+                        (click)="selectAskOption(opt, msg.relatedUserQuery)">
+                  <span class="chip-icon">{{ opt.id === 'PURCHASE_INVOICE' ? '📦' : opt.id === 'SALES_INVOICE' ? '🧾' : opt.id === 'NEW_CUSTOMER' ? '👤' : opt.id === 'JOURNAL_ENTRY' ? '📑' : '📊' }}</span>
+                  <span class="chip-label">{{ getScreenDisplayName(opt.id) }}</span>
+                  <span class="chip-conf">{{ (opt.confidence * 100) | number:'1.0-0' }}%</span>
+                </button>
+              </div>
+            </div>
+
             <!-- Sources Panel (shown after bot response has sources) -->
             <div *ngIf="msg.sources && msg.sources.length > 0" class="msg-sources-box">
               <div class="sources-header">

@@ -8,7 +8,8 @@ import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData } from '../../../core/services/copilot.service';
 import { ErpFormDriverService } from '../../../core/services/erp-form-driver.service';
 import { ErpBatchStepperService } from '../../../core/services/erp-batch-stepper.service';
-import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem } from '../../../core/models/erp-form.models';
+import { ErpNavigatorService } from '../../../core/services/erp-navigator.service';
+import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } from '../../../core/models/erp-form.models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
@@ -42,6 +43,8 @@ export interface ChatMessage {
   formFillReport?: FormFillExecutionReport;
   /** Whether batch stepper execution was triggered for this message */
   batchExecutionActive?: boolean;
+  /** Interactive navigation options suggested when intent is ambiguous (decision: 'ask') */
+  askOptions?: NavScored[];
 }
 
 @Component({
@@ -54,6 +57,7 @@ export interface ChatMessage {
 export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked, OnDestroy {
   private copilotService = inject(CopilotService);
   private formDriver = inject(ErpFormDriverService);
+  private navigator = inject(ErpNavigatorService);
   batchStepper = inject(ErpBatchStepperService);
   private router = inject(Router, { optional: true });
   private cdr = inject(ChangeDetectorRef);
@@ -633,10 +637,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     if (!msg.formFillData || typeof document === 'undefined') return;
 
     try {
-      const report = await this.formDriver.applyFormFill(
+      const report = await this.formDriver.applyProgressiveFill(
         msg.formFillData.fields,
         msg.formFillData.rows,
-        this.elRef?.nativeElement
+        this.elRef?.nativeElement,
+        this.copilotService,
+        msg.relatedUserQuery
       );
 
       msg.formFillApplied = report.success;
@@ -674,9 +680,60 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     return (msg.formFillData?.batch_items || []) as ErpBatchItem[];
   }
 
+  async selectAskOption(option: NavScored, originalQuery?: string) {
+    console.info('%c[Copilot Navigation] User clicked ambiguity chip:', 'color:#3b82f6;font-weight:bold', option);
+    // 1. Navigate to chosen screen
+    await this.navigator.navigateToScreen(option.id);
+    this.erpKey = option.id;
+    // 2. Wait for DOM to settle
+    await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
+    // 3. Re-run streamQuery on the newly selected screen
+    if (originalQuery) {
+      await this.streamQuery(originalQuery, true, true);
+    }
+  }
+
+  getScreenDisplayName(key: string): string {
+    const map: Record<string, string> = {
+      'PURCHASE_INVOICE': 'فاتورة المشتريات',
+      'SALES_INVOICE': 'فاتورة المبيعات',
+      'NEW_CUSTOMER': 'تسجيل عميل جديد',
+      'JOURNAL_ENTRY': 'قيود اليومية العامة',
+      'INVENTORY_AUDIT': 'الجرد والتسويات المخزنية'
+    };
+    return map[key] || key;
+  }
+
   /** Core stream method — shared by sendMessage() and retryMessage() */
-  private async streamQuery(query: string, skipCache: boolean = false) {
+  private async streamQuery(query: string, skipCache: boolean = false, skipNavCheck: boolean = false) {
     this.isStreaming = true;
+
+    // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
+    if (!skipNavCheck && typeof document !== 'undefined') {
+      try {
+        const navRes = await this.navigator.resolveAndNavigate(query);
+        if (navRes.success && navRes.chosen) {
+          console.info('%c[Copilot Navigation] Auto-navigated to target screen:', 'color:#10b981;font-weight:bold', navRes.chosen.id);
+          this.erpKey = navRes.chosen.id;
+          // Wait for DOM & Angular components to settle on the new screen
+          await this.formDriver.settle(undefined, { quietMs: 300, maxMs: 1500 });
+        } else if (navRes.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
+          console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
+          this.messages.push({
+            sender: 'assistant',
+            text: 'طلبك يحتمل أكثر من شاشة في النظام، يرجى اختيار الشاشة التي تود التوجه إليها لتعبئة البيانات:',
+            relatedUserQuery: query,
+            askOptions: navRes.askOptions,
+            filters: { ...this.activeFilter }
+          });
+          this.isStreaming = false;
+          this.cdr.markForCheck();
+          return; // STOP! Don't stream search on the wrong screen
+        }
+      } catch (navErr) {
+        console.warn('[Copilot Navigation] resolveAndNavigate error:', navErr);
+      }
+    }
 
     // Detect ERP/Host context and gather schema from active page
     const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);

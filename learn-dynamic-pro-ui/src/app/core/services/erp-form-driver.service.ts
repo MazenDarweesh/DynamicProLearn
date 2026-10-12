@@ -341,14 +341,12 @@ export class ErpFormDriverService {
 
           if (newUnmappedFields.length > 0) {
             try {
-              const leftoverRes: LeftoverResponse = await firstValueFrom(
-                copilotService.resolveErpLeftover({
-                  user_message: userMessage,
-                  extracted_data: fields || {},
-                  filled: filledFields,
-                  new_fields: newUnmappedFields,
-                })
-              );
+              const leftoverRes: LeftoverResponse = await copilotService.resolveErpLeftover({
+                user_message: userMessage,
+                extracted_data: fields || {},
+                filled: filledFields,
+                new_fields: newUnmappedFields,
+              });
 
               if (leftoverRes && leftoverRes.fields && Object.keys(leftoverRes.fields).length > 0) {
                 Object.assign(pendingFields, leftoverRes.fields);

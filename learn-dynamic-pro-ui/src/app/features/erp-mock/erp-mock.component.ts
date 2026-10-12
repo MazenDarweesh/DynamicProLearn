@@ -1,4 +1,4 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
@@ -52,6 +52,7 @@ interface ErpScreen {
           <button *ngFor="let s of erpScreens"
                   type="button"
                   class="screen-btn"
+                  [attr.data-screen]="s.key"
                   [class.active]="activeScreen.key === s.key"
                   (click)="switchScreen(s)">
             <span class="screen-badge">{{ s.category }}</span>
@@ -73,7 +74,7 @@ interface ErpScreen {
                 <span class="screen-tag">ERP Key: <code>{{ activeScreen.key }}</code></span>
               </div>
               <div class="header-actions">
-                <button type="button" class="btn-erp btn-outline" title="فاتورة جديدة" (click)="clearMockPurchaseForm()">✨ جديد / تفريغ</button>
+                <button type="button" class="btn-erp btn-outline" title="تفريغ النموذج الحالي" (click)="clearCurrentScreenForm()">✨ جديد / تفريغ</button>
                 <button class="btn-erp btn-primary">💾 حفظ</button>
                 <button class="btn-erp btn-secondary">🖨️ طباعة</button>
                 <button class="btn-erp btn-outline">↺ تراجع</button>
@@ -83,28 +84,76 @@ interface ErpScreen {
             <div class="card-body">
               <p class="screen-desc">{{ activeScreen.description }}</p>
 
-              <!-- Simulated ERP Data Form -->
-              <div *ngIf="activeScreen.key === 'NEW_CUSTOMER'" class="erp-form-grid">
+              <!-- 1. Simulated New Customer Form -->
+              <div *ngIf="activeScreen.key === 'NEW_CUSTOMER'" class="erp-form-grid" data-screen-content="NEW_CUSTOMER">
+                <div class="form-group">
+                  <label>كود العميل:</label>
+                  <input type="text" name="CustomerCode" id="CustomerCode" class="erp-input" value="CUST-2026-0188" readonly />
+                </div>
                 <div class="form-group">
                   <label>اسم العميل / الشركة:</label>
                   <input type="text" name="CustomerName" id="CustomerName" class="erp-input" placeholder="اكتب اسم العميل أو دعه يتعبأ آلياً..." />
+                </div>
+                <div class="form-group">
+                  <label>تصنيف / فئة العميل:</label>
+                  <select name="CustomerCategory" id="CustomerCategory" class="erp-input">
+                    <option value="">-- اختر التصنيف --</option>
+                    <option value="قطاع جملة">قطاع جملة (خصم خاص)</option>
+                    <option value="نصف جملة">نصف جملة</option>
+                    <option value="تجزئة">تجزئة / أفراد</option>
+                    <option value="كبار عملاء VIP">كبار عملاء VIP</option>
+                  </select>
                 </div>
                 <div class="form-group">
                   <label>رقم الهاتف / الموبايل:</label>
                   <input type="text" name="Phone" id="Phone" class="erp-input" placeholder="010..." />
                 </div>
                 <div class="form-group">
+                  <label>البريد الإلكتروني:</label>
+                  <input type="email" name="Email" id="CustomerEmail" class="erp-input" placeholder="info@company.com" />
+                </div>
+                <div class="form-group">
                   <label>العنوان / المقر:</label>
                   <input type="text" name="Address" id="Address" class="erp-input" placeholder="المدينة، الحي، الشارع..." />
                 </div>
                 <div class="form-group">
+                  <label>السجل التجاري:</label>
+                  <input type="text" name="CommercialReg" id="CommercialReg" class="erp-input" placeholder="CR-99201" />
+                </div>
+                <div class="form-group">
+                  <label>البطاقة الضريبية:</label>
+                  <input type="text" name="TaxId" id="CustomerTaxId" class="erp-input" placeholder="TAX-7721-00" />
+                </div>
+                <div class="form-group">
                   <label>الحد الائتماني (ج.م):</label>
-                  <input type="number" name="CreditLimit" id="CreditLimit" class="erp-input" placeholder="مثال: 50000" />
+                  <input type="number" name="CreditLimit" id="CreditLimit" class="erp-input" placeholder="مثال: 150000" />
+                </div>
+                <div class="form-group">
+                  <label>فترة السداد المسموحة:</label>
+                  <select name="PaymentTerms" id="CustomerPaymentTerms" class="erp-input">
+                    <option value="نقدي فوري">نقدي فوري</option>
+                    <option value="آجل 30 يوم">آجل 30 يوم</option>
+                    <option value="آجل 60 يوم">آجل 60 يوم</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>المندوب المسؤول:</label>
+                  <select name="SalesRep" id="CustomerSalesRep" class="erp-input">
+                    <option value="أحمد مصطفى">أحمد مصطفى (القاهرة)</option>
+                    <option value="محمود حسني">محمود حسني (الجيزة والإسكندرية)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>حالة الحساب:</label>
+                  <select name="Status" id="CustomerStatus" class="erp-input">
+                    <option value="نشط">نشط (معتمد للتعامل)</option>
+                    <option value="معلق">قيد المراجعة الائتمانية</option>
+                  </select>
                 </div>
               </div>
 
-              <!-- Simulated Purchase Invoice Form (DynamicPro Real Schema) -->
-              <div *ngIf="activeScreen.key === 'PURCHASE_INVOICE'" class="erp-form-grid">
+              <!-- 2. Simulated Purchase Invoice Form (DynamicPro Real Schema) -->
+              <div *ngIf="activeScreen.key === 'PURCHASE_INVOICE'" class="erp-form-grid" data-screen-content="PURCHASE_INVOICE">
                 <div class="form-group">
                   <label>المورد:</label>
                   <select name="Supplier" id="Supplier" class="erp-input" (change)="onMockSupplierChange($event)">
@@ -151,34 +200,153 @@ interface ErpScreen {
                 </div>
               </div>
 
-              <!-- Simulated General ERP Form for Other Screens -->
-              <div *ngIf="activeScreen.key !== 'NEW_CUSTOMER' && activeScreen.key !== 'PURCHASE_INVOICE'" class="erp-form-grid">
+              <!-- 3. Simulated Sales Invoice Form -->
+              <div *ngIf="activeScreen.key === 'SALES_INVOICE'" class="erp-form-grid" data-screen-content="SALES_INVOICE">
                 <div class="form-group">
-                  <label>رقم المستند / الفاتورة:</label>
+                  <label>رقم فاتورة المبيعات:</label>
                   <input type="text" name="InvoiceNumber" id="InvoiceNumber" class="erp-input" value="INV-2026-0922" readonly />
                 </div>
                 <div class="form-group">
                   <label>الطرف / العميل:</label>
-                  <input type="text" name="CustomerName" id="CustomerName" class="erp-input" value="شركة الأمل للتجارة والتوزيع" />
+                  <input type="text" name="CustomerName" id="CustomerName" class="erp-input" placeholder="اسم العميل..." />
                 </div>
                 <div class="form-group">
-                  <label>تاريخ المعاملة:</label>
-                  <input type="date" name="DocDate" id="DocDate" class="erp-input" value="2026-09-22" />
+                  <label>تصنيف العميل:</label>
+                  <select name="CustomerCategory" id="SalesCustomerCategory" class="erp-input">
+                    <option value="">-- اختر التصنيف --</option>
+                    <option value="قطاع جملة">قطاع جملة (أسعار الموزعين)</option>
+                    <option value="نصف جملة">نصف جملة</option>
+                    <option value="قطاعي">تجزئة / قطاعي</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>مخزن الصرف:</label>
+                  <select name="Warehouse" id="SalesWarehouse" class="erp-input">
+                    <option value="القاهرة">مخزن القاهرة الرئيسي</option>
+                    <option value="الإسكندرية">مخزن الإسكندرية</option>
+                    <option value="العاشر">مخزن العاشر من رمضان</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>تاريخ الفاتورة:</label>
+                  <input type="date" name="DocDate" id="DocDate" class="erp-input" value="2026-10-11" />
                 </div>
                 <div class="form-group">
                   <label>طريقة الدفع:</label>
                   <select name="PaymentMethod" id="PaymentMethod" class="erp-input">
-                    <option>آجل (استحقاق 30 يوم)</option>
-                    <option>نقداً (الخزينة الرئيسية)</option>
-                    <option>تحويل بنكي</option>
+                    <option value="">-- اختر طريقة الدفع --</option>
+                    <option value="نقداً">نقداً (الخزينة الرئيسية)</option>
+                    <option value="آجل">آجل (استحقاق 30 يوم)</option>
+                    <option value="تحويل بنكي">تحويل بنكي</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>مندوب المبيعات:</label>
+                  <select name="SalesRep" id="SalesInvoiceRep" class="erp-input">
+                    <option value="أحمد مصطفى">أحمد مصطفى</option>
+                    <option value="محمود حسني">محمود حسني</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>مركز التكلفة:</label>
+                  <select name="CostCenter" id="SalesCostCenter" class="erp-input">
+                    <option value="إدارة المبيعات">إدارة المبيعات المركزية</option>
+                    <option value="فرع القاهرة">فرع القاهرة</option>
                   </select>
                 </div>
               </div>
 
-              <!-- Purchase Invoice Items Grid -->
+              <!-- 4. Simulated Journal Entry Form -->
+              <div *ngIf="activeScreen.key === 'JOURNAL_ENTRY'" class="erp-form-grid" data-screen-content="JOURNAL_ENTRY">
+                <div class="form-group">
+                  <label>رقم القيد المحاسبي:</label>
+                  <input type="text" name="EntryNumber" id="EntryNumber" class="erp-input" value="JV-2026-0104" readonly />
+                </div>
+                <div class="form-group">
+                  <label>تاريخ القيد:</label>
+                  <input type="date" name="Date" id="EntryDate" class="erp-input" value="2026-10-11" />
+                </div>
+                <div class="form-group">
+                  <label>نوع القيد:</label>
+                  <select name="EntryType" id="EntryType" class="erp-input">
+                    <option value="يومية عامة">يومية عامة</option>
+                    <option value="تسوية">تسوية جردية / مالية</option>
+                    <option value="رواتب وأجور">قيود رواتب وأجور</option>
+                    <option value="إقفال">قيد إقفال</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>الفترة المالية:</label>
+                  <input type="text" name="FiscalPeriod" id="FiscalPeriod" class="erp-input" value="2026 - الربع الرابع" readonly />
+                </div>
+                <div class="form-group">
+                  <label>رقم المستند المرجعي:</label>
+                  <input type="text" name="RefNumber" id="RefNumber" class="erp-input" placeholder="مثال: إذن صرف 402" />
+                </div>
+                <div class="form-group">
+                  <label>العملة:</label>
+                  <select name="Currency" id="EntryCurrency" class="erp-input">
+                    <option value="EGP">جنيه مصري (EGP)</option>
+                    <option value="USD">دولار أمريكي (USD)</option>
+                  </select>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                  <label>البيان العام للقيد:</label>
+                  <input type="text" name="Description" id="EntryDescription" class="erp-input" placeholder="شرح المعاملة أو القيد المحاسبي..." />
+                </div>
+              </div>
+
+              <!-- 5. Simulated Inventory Audit Form -->
+              <div *ngIf="activeScreen.key === 'INVENTORY_AUDIT'" class="erp-form-grid" data-screen-content="INVENTORY_AUDIT">
+                <div class="form-group">
+                  <label>رقم محضر الجرد:</label>
+                  <input type="text" name="AuditNumber" id="AuditNumber" class="erp-input" value="AUD-2026-0042" readonly />
+                </div>
+                <div class="form-group">
+                  <label>المخزن المستهدف:</label>
+                  <select name="Warehouse" id="AuditWarehouse" class="erp-input">
+                    <option value="">-- اختر المخزن --</option>
+                    <option value="القاهرة">مخزن القاهرة الرئيسي</option>
+                    <option value="الإسكندرية">مخزن الإسكندرية</option>
+                    <option value="العاشر">مخزن العاشر من رمضان</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>تاريخ الجرد:</label>
+                  <input type="date" name="AuditDate" id="AuditDate" class="erp-input" value="2026-10-11" />
+                </div>
+                <div class="form-group">
+                  <label>نوع التسوية:</label>
+                  <select name="AdjustmentType" id="AdjustmentType" class="erp-input">
+                    <option value="تسوية جردية">تسوية جردية دورية</option>
+                    <option value="عجز مخزني">إثبات عجز مخزني</option>
+                    <option value="زيادة مخزنية">إثبات زيادة مخزنية</option>
+                    <option value="تالف">إثبات بضاعة تالفة</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>رئيس لجنة الجرد:</label>
+                  <input type="text" name="AuditorName" id="AuditorName" class="erp-input" value="م. تامر ممدوح (مدير المخازن)" />
+                </div>
+                <div class="form-group">
+                  <label>حالة الاعتماد:</label>
+                  <select name="AuditStatus" id="AuditStatus" class="erp-input">
+                    <option value="مسودة">مسودة (قيد الفحص)</option>
+                    <option value="معتمد">معتمد للتسوية</option>
+                  </select>
+                </div>
+                <div class="form-group" style="grid-column: 1 / -1;">
+                  <label>ملاحظات محضر الجرد:</label>
+                  <input type="text" name="AuditNotes" id="AuditNotes" class="erp-input" placeholder="ملاحظات وتوصيات لجنة الجرد..." />
+                </div>
+              </div>
+
+              <!-- ── Dedicated Tables per Active Screen ─────────────────────────── -->
+
+              <!-- 1. Purchase Invoice Table -->
               <div class="erp-table-box" *ngIf="activeScreen.key === 'PURCHASE_INVOICE'">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-                  <strong style="font-size:13px;">جدول الأصناف الموردة:</strong>
+                  <strong style="font-size:13px;">📦 جدول الأصناف الموردة:</strong>
                   <button type="button" class="btn-erp btn-primary" (click)="addMockRow()">+ إضافة سطر صنف</button>
                 </div>
                 <table class="erp-table">
@@ -214,41 +382,189 @@ interface ErpScreen {
                 </div>
               </div>
 
-              <!-- Simulated General ERP Table for Other Screens -->
-              <div class="erp-table-box" *ngIf="activeScreen.key !== 'PURCHASE_INVOICE'">
+              <!-- 2. Sales Invoice Table -->
+              <div class="erp-table-box" *ngIf="activeScreen.key === 'SALES_INVOICE'">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <strong style="font-size:13px;">🧾 جدول أصناف المبيعات والأسعار:</strong>
+                  <button type="button" class="btn-erp btn-primary" (click)="addSalesRow()">+ إضافة سطر مبيعات</button>
+                </div>
                 <table class="erp-table">
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>كود البند</th>
-                      <th>الوصف</th>
+                      <th>اسم الصنف</th>
+                      <th>الوحدة</th>
                       <th>الكمية</th>
-                      <th>سعر الوحدة</th>
-                      <th>ضريبة QVAT (14%)</th>
+                      <th>سعر البيع</th>
+                      <th>الخصم</th>
                       <th>الإجمالي</th>
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td>1</td>
-                      <td><code>ITM-1029</code></td>
-                      <td>شاشات حاسوب 27 بوصة IPS 4K</td>
-                      <td>10</td>
-                      <td>8,500 ج.م</td>
-                      <td>11,900 ج.م</td>
-                      <td><strong>96,900 ج.م</strong></td>
-                    </tr>
-                    <tr>
-                      <td>2</td>
-                      <td><code>ITM-3301</code></td>
-                      <td>كابلات شبكة CAT6 معتمدة 305م</td>
-                      <td>5</td>
-                      <td>2,200 ج.م</td>
-                      <td>1,540 ج.م</td>
-                      <td><strong>12,540 ج.م</strong></td>
+                    <tr *ngFor="let row of mockSalesRows; let rIdx = index">
+                      <td>{{ rIdx + 1 }}</td>
+                      <td><input type="text" name="ItemName" [(ngModel)]="row.itemName" class="erp-input" style="padding:4px;" placeholder="اسم الصنف..." /></td>
+                      <td><input type="text" name="Unit" [(ngModel)]="row.unit" class="erp-input" style="padding:4px; width:70px;" /></td>
+                      <td><input type="number" name="Quantity" [(ngModel)]="row.quantity" (input)="calcSalesTotals()" class="erp-input" style="padding:4px; width:75px;" /></td>
+                      <td><input type="number" name="Price" [(ngModel)]="row.price" (input)="calcSalesTotals()" class="erp-input" style="padding:4px; width:90px;" /></td>
+                      <td><input type="number" name="Discount" [(ngModel)]="row.discount" (input)="calcSalesTotals()" class="erp-input" style="padding:4px; width:70px;" /></td>
+                      <td><strong>{{ (((row.quantity * row.price) - (row.discount || 0)) | number) }} ج.م</strong></td>
                     </tr>
                   </tbody>
                 </table>
+
+                <div style="display:flex; justify-content:flex-end; gap:16px; margin-top:12px; padding:10px; background:#f8fafc; border-radius:6px; flex-wrap:wrap;">
+                  <div>
+                    <label style="font-size:11px; color:#64748b; font-weight:600;">قبل الضريبة:</label>
+                    <input type="text" name="SubTotal" [value]="salesSubTotal | number" readonly class="erp-input" style="width:100px; font-weight:600;" />
+                  </div>
+                  <div>
+                    <label style="font-size:11px; color:#64748b; font-weight:600;">ضريبة VAT (14%):</label>
+                    <input type="text" name="TaxAmount" [value]="salesTax | number" readonly class="erp-input" style="width:90px; color:#dc2626; font-weight:600;" />
+                  </div>
+                  <div>
+                    <label style="font-size:11px; color:#1e40af; font-weight:600;">الإجمالي الصافي:</label>
+                    <input type="text" name="TotalAmount" id="SalesTotalAmount" [value]="salesTotal | number" readonly class="erp-input" style="width:110px; font-weight:700; color:#1e40af;" />
+                  </div>
+                  <div>
+                    <label style="font-size:11px; color:#059669; font-weight:600;">المسدد نقداً:</label>
+                    <input type="number" name="PaidAmount" [(ngModel)]="salesPaid" (input)="calcSalesTotals()" class="erp-input" style="width:100px; border-color:#059669;" />
+                  </div>
+                  <div>
+                    <label style="font-size:11px; color:#d97706; font-weight:600;">المتبقي آجل:</label>
+                    <input type="text" name="RemainingAmount" [value]="salesRemaining | number" readonly class="erp-input" style="width:100px; font-weight:600; color:#d97706;" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- 3. New Customer Branches Table -->
+              <div class="erp-table-box" *ngIf="activeScreen.key === 'NEW_CUSTOMER'">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <strong style="font-size:13px;">🏢 فروع ومواقع العميل:</strong>
+                  <button type="button" class="btn-erp btn-primary" (click)="addCustomerBranch()">+ إضافة فرع / موقع</button>
+                </div>
+                <table class="erp-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>اسم الفرع / الموقع</th>
+                      <th>مسؤول الاتصال</th>
+                      <th>رقم الهاتف</th>
+                      <th>المدينة / العنوان</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let b of mockCustomerBranches; let bIdx = index">
+                      <td>{{ bIdx + 1 }}</td>
+                      <td><input type="text" name="BranchName" [(ngModel)]="b.branchName" class="erp-input" style="padding:4px;" placeholder="المقر..." /></td>
+                      <td><input type="text" name="ContactPerson" [(ngModel)]="b.contactPerson" class="erp-input" style="padding:4px;" placeholder="اسم المسؤول..." /></td>
+                      <td><input type="text" name="BranchPhone" [(ngModel)]="b.phone" class="erp-input" style="padding:4px;" placeholder="010..." /></td>
+                      <td><input type="text" name="BranchCity" [(ngModel)]="b.city" class="erp-input" style="padding:4px;" placeholder="العنوان..." /></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+
+              <!-- 4. Journal Entry Rows Table -->
+              <div class="erp-table-box" *ngIf="activeScreen.key === 'JOURNAL_ENTRY'">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <strong style="font-size:13px;">📑 أطراف القيد المحاسبي المزدوج:</strong>
+                  <button type="button" class="btn-erp btn-primary" (click)="addJournalRow()">+ إضافة طرف قيد</button>
+                </div>
+                <table class="erp-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>كود الحساب</th>
+                      <th>اسم الحساب المحاسبي</th>
+                      <th>مركز التكلفة</th>
+                      <th>مدين (ج.م)</th>
+                      <th>دائن (ج.م)</th>
+                      <th>البيان التحليلي</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of mockJournalRows; let rIdx = index">
+                      <td>{{ rIdx + 1 }}</td>
+                      <td><input type="text" name="AccountCode" [(ngModel)]="row.accountCode" class="erp-input" style="padding:4px; width:80px;" placeholder="10101" /></td>
+                      <td><input type="text" name="AccountName" [(ngModel)]="row.accountName" class="erp-input" style="padding:4px;" placeholder="اسم الحساب..." /></td>
+                      <td><input type="text" name="CostCenter" [(ngModel)]="row.costCenter" class="erp-input" style="padding:4px;" placeholder="مركز التكلفة..." /></td>
+                      <td><input type="number" name="Debit" [(ngModel)]="row.debit" (input)="calcJournalTotals()" class="erp-input" style="padding:4px; width:90px; color:#1e40af; font-weight:600;" /></td>
+                      <td><input type="number" name="Credit" [(ngModel)]="row.credit" (input)="calcJournalTotals()" class="erp-input" style="padding:4px; width:90px; color:#059669; font-weight:600;" /></td>
+                      <td><input type="text" name="LineNotes" [(ngModel)]="row.lineNotes" class="erp-input" style="padding:4px;" placeholder="شرح..." /></td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div style="display:flex; justify-content:flex-end; gap:20px; align-items:center; margin-top:12px; padding:10px; background:#f8fafc; border-radius:6px; flex-wrap:wrap;">
+                  <div>
+                    <label style="font-size:12px; color:#1e40af; font-weight:600;">إجمالي المدين:</label>
+                    <input type="text" name="TotalDebit" [value]="journalTotalDebit | number" readonly class="erp-input" style="width:110px; font-weight:700; color:#1e40af;" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px; color:#059669; font-weight:600;">إجمالي الدائن:</label>
+                    <input type="text" name="TotalCredit" [value]="journalTotalCredit | number" readonly class="erp-input" style="width:110px; font-weight:700; color:#059669;" />
+                  </div>
+                  <div style="padding:6px 12px; border-radius:6px; font-size:12px; font-weight:700;"
+                       [style.background]="journalTotalDebit === journalTotalCredit ? '#dcfce7' : '#fee2e2'"
+                       [style.color]="journalTotalDebit === journalTotalCredit ? '#15803d' : '#b91c1c'">
+                    {{ journalTotalDebit === journalTotalCredit ? '🟢 القيد متزن ومطابق' : '🔴 القيد غير متزن (الفرق: ' + ((journalTotalDebit - journalTotalCredit) | number) + ' ج.م)' }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 5. Inventory Audit Items Table -->
+              <div class="erp-table-box" *ngIf="activeScreen.key === 'INVENTORY_AUDIT'">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                  <strong style="font-size:13px;">📊 أصناف الجرد وحساب الفروقات:</strong>
+                  <button type="button" class="btn-erp btn-primary" (click)="addAuditRow()">+ إضافة صنف للجرد</button>
+                </div>
+                <table class="erp-table">
+                  <thead>
+                    <tr>
+                      <th>#</th>
+                      <th>كود الصنف</th>
+                      <th>اسم الصنف</th>
+                      <th>الوحدة</th>
+                      <th>الرصيد الدفتري</th>
+                      <th>الرصيد الفعلي</th>
+                      <th>الفرق (عجز / زيادة)</th>
+                      <th>تكلفة الوحدة</th>
+                      <th>قيمة الفرق</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr *ngFor="let row of mockAuditRows; let rIdx = index">
+                      <td>{{ rIdx + 1 }}</td>
+                      <td><input type="text" name="ItemCode" [(ngModel)]="row.itemCode" class="erp-input" style="padding:4px; width:85px;" placeholder="ITM-..." /></td>
+                      <td><input type="text" name="ItemName" [(ngModel)]="row.itemName" class="erp-input" style="padding:4px;" placeholder="اسم الصنف..." /></td>
+                      <td><input type="text" name="Unit" [(ngModel)]="row.unit" class="erp-input" style="padding:4px; width:65px;" /></td>
+                      <td><input type="number" name="BookQty" [(ngModel)]="row.bookQty" (input)="calcAuditTotals()" class="erp-input" style="padding:4px; width:75px;" /></td>
+                      <td><input type="number" name="ActualQty" [(ngModel)]="row.actualQty" (input)="calcAuditTotals()" class="erp-input" style="padding:4px; width:75px;" /></td>
+                      <td [style.color]="(row.actualQty - row.bookQty) < 0 ? '#dc2626' : (row.actualQty - row.bookQty) > 0 ? '#16a34a' : '#64748b'">
+                        <strong>{{ (row.actualQty - row.bookQty) }}</strong>
+                        <small>{{ (row.actualQty - row.bookQty) < 0 ? ' (عجز)' : (row.actualQty - row.bookQty) > 0 ? ' (زيادة)' : ' (مطابق)' }}</small>
+                      </td>
+                      <td><input type="number" name="UnitCost" [(ngModel)]="row.unitCost" (input)="calcAuditTotals()" class="erp-input" style="padding:4px; width:80px;" /></td>
+                      <td><strong>{{ (((row.actualQty - row.bookQty) * row.unitCost) | number) }} ج.م</strong></td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <div style="display:flex; justify-content:flex-end; gap:20px; margin-top:12px; padding:10px; background:#f8fafc; border-radius:6px; flex-wrap:wrap;">
+                  <div>
+                    <label style="font-size:12px; color:#64748b; font-weight:600;">إجمالي الدفتري:</label>
+                    <input type="text" name="TotalBookQty" [value]="auditTotalBook | number" readonly class="erp-input" style="width:80px; font-weight:600;" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px; color:#1e40af; font-weight:600;">إجمالي الفعلي:</label>
+                    <input type="text" name="TotalActualQty" [value]="auditTotalActual | number" readonly class="erp-input" style="width:80px; font-weight:600;" />
+                  </div>
+                  <div>
+                    <label style="font-size:12px; color:#b91c1c; font-weight:600;">صافي تسوية الفروق:</label>
+                    <input type="text" name="NetVarianceAmount" [value]="auditNetVariance | number" readonly class="erp-input" style="width:110px; font-weight:700;" [style.color]="auditNetVariance < 0 ? '#dc2626' : '#16a34a'" />
+                  </div>
+                </div>
               </div>
 
               <!-- Integration Info Callout -->
@@ -861,6 +1177,7 @@ interface ErpScreen {
 export class ErpMockComponent implements OnInit {
   authService = inject(AuthService);
   copilotService = inject(CopilotService);
+  private cdr = inject(ChangeDetectorRef);
   isFloatingMode = false;
   isCopilotMinimized = false;
   isSpecsOpen = true;
@@ -903,41 +1220,42 @@ export class ErpMockComponent implements OnInit {
       key: 'SALES_INVOICE',
       name: 'فاتورة المبيعات',
       category: 'المبيعات والعملاء',
-      description: 'شاشة إصدار فواتير المبيعات للعملاء واحتساب ضريبة القيمة المضافة وإرسال الفاتورة الإلكترونية.',
-      sampleQuery: 'كيف أقوم بإصدار فاتورة مبيعات مع تطبيق خصم تجاري؟'
+      description: 'شاشة إصدار فواتير المبيعات للعملاء وتحديد طريقة الدفع ومخزن الصرف والأصناف المباعة واحتساب ضريبة القيمة المضافة.',
+      sampleQuery: 'عايز اسجل فاتورة مبيعات للعميل شركة النيل للتجارة قطاع جملة صنف شاشات حاسوب كمية 5 بسعر 8500 والدفع نقداً'
     },
     {
       key: 'NEW_CUSTOMER',
-      name: 'تسجيل عميل جديد (تجربة التعبئة بالذكاء الاصطناعي)',
+      name: 'تسجيل عميل جديد',
       category: 'العملاء والحسابات',
-      description: 'شاشة فتح بطاقة عميل جديد في الـ ERP وتسجيل بيانات الاتصال والحد الائتماني.',
-      sampleQuery: 'سجل لي عميل جديد باسم شركة الأمل للتجارة وتليفونه 01012345678 وعنوانه مدينة نصر وحد ائتماني 50000'
+      description: 'شاشة فتح بطاقة عميل جديد في الـ ERP وتسجيل بيانات الاتصال والتصنيف والحد الائتماني والبيانات الضريبية.',
+      sampleQuery: 'سجل لي عميل جديد باسم شركة الأمل الدولية وتليفونه 01122334455 وعنوانه المعادي ومبلغ الحد الائتماني 150000 وتصنيف جملة'
     },
     {
       key: 'PURCHASE_INVOICE',
-      name: 'فاتورة المشتريات (تجربة تعبئة الأصناف والدفعات المتكررة)',
+      name: 'فاتورة المشتريات',
       category: 'المخازن والمشتريات',
       description: 'شاشة تسجيل أوامر التوريد وفواتير المشتريات وتوريد الأصناف وإثبات السداد وسحب الحقول التابعة تلقائياً.',
-      sampleQuery: 'سجل لي دفعة من 3 فواتير مشتريات: الأولى من شركة التوحيد خامات المنتج كابلات شبكة CAT6 الكمية 10 وسعر 150 نقدي، الثانية من شركة الحمد للتجارة المنتج رواتر 5 وسعر 800، الثالثة من مؤسسة النور توريدات المنتج سويتشات 2 وسعر 1200'
+      sampleQuery: 'سجل لي فاتورة مشتريات من المورد شركة التوحيد خامات المنتج كابلات شبكة CAT6 الكمية 10 وسعر 150 نقدي'
     },
     {
       key: 'JOURNAL_ENTRY',
       name: 'قيود اليومية العامة',
       category: 'الحسابات العامة',
-      description: 'شاشة تسجيل قيود اليومية المحاسبية المزدوجة والتوجيه المحاسبي لشجرة الحسابات.',
-      sampleQuery: 'كيف أوازن قيد اليومية وأربطه مع مركز التكلفة؟'
+      description: 'شاشة تسجيل قيود اليومية المحاسبية المزدوجة والتوجيه المحاسبي لمراكز التكلفة والتأكد من توازن القيد.',
+      sampleQuery: 'سجل لي قيد يومية صرف مرتبات بقيمة 5000 جنيه من حساب الصندوق الرئيسي إلى حساب الرواتب والأجور'
     },
     {
       key: 'INVENTORY_AUDIT',
       name: 'الجرد والتسويات المخزنية',
       category: 'إدارة المستودعات',
-      description: 'شاشة الجرد الفعلي للمخزون وتسجيل العجز والزيادة وأذون الصرف والإضافة.',
-      sampleQuery: 'كيف أقوم بتسجيل تسوية جردية بعد الجرد السنوي؟'
+      description: 'شاشة الجرد الفعلي للمخزون وتسجيل الرصيد الفعلي وحساب العجز أو الزيادة والتسوية الجردية آلياً.',
+      sampleQuery: 'عايز اعمل محضر جرد لمخزن القاهرة نوع التسوية تسوية جردية لصنف شاشات حاسوب الرصيد الفعلي 8'
     }
   ];
 
   activeScreen: ErpScreen = this.erpScreens[0];
 
+  // 1. Purchase Invoice State
   mockSupplierDetails = { name: '', address: '', phone: '', taxFile: '' };
   mockRows = [
     { itemName: '', quantity: 0, cost: 0 }
@@ -975,6 +1293,109 @@ export class ErpMockComponent implements OnInit {
     if (cashInput) cashInput.value = '';
   }
 
+  // 2. Sales Invoice State
+  mockSalesRows = [
+    { itemName: 'شاشات حاسوب 27 بوصة IPS 4K', unit: 'قطعة', quantity: 5, price: 8500, discount: 0 }
+  ];
+  salesSubTotal = 42500;
+  salesTax = 5950;
+  salesTotal = 48450;
+  salesPaid = 48450;
+  salesRemaining = 0;
+
+  addSalesRow() {
+    this.mockSalesRows.push({ itemName: '', unit: 'قطعة', quantity: 1, price: 0, discount: 0 });
+    this.calcSalesTotals();
+  }
+
+  calcSalesTotals() {
+    this.salesSubTotal = this.mockSalesRows.reduce((sum, r) => {
+      const q = Number(r.quantity) || 0;
+      const p = Number(r.price) || 0;
+      const d = Number(r.discount) || 0;
+      return sum + Math.max(0, (q * p) - d);
+    }, 0);
+    this.salesTax = Math.round(this.salesSubTotal * 0.14);
+    this.salesTotal = this.salesSubTotal + this.salesTax;
+    this.salesRemaining = Math.max(0, this.salesTotal - (Number(this.salesPaid) || 0));
+  }
+
+  // 3. New Customer Branches State
+  mockCustomerBranches = [
+    { branchName: 'المقر الرئيسي', contactPerson: 'أحمد سعيد', phone: '01011223344', city: 'القاهرة' },
+    { branchName: 'فرع الإسكندرية', contactPerson: 'كريم ممدوح', phone: '01299887766', city: 'الإسكندرية' }
+  ];
+
+  addCustomerBranch() {
+    this.mockCustomerBranches.push({ branchName: '', contactPerson: '', phone: '', city: '' });
+  }
+
+  // 4. Journal Entry State
+  mockJournalRows = [
+    { accountCode: '10101', accountName: 'الرواتب والأجور', costCenter: 'الإدارة العامة', debit: 5000, credit: 0, lineNotes: 'صرف راتب شهر أكتوبر' },
+    { accountCode: '10201', accountName: 'الصندوق الرئيسي', costCenter: 'الخزينة المركزية', debit: 0, credit: 5000, lineNotes: 'صرف نقدي من الخزينة' }
+  ];
+  journalTotalDebit = 5000;
+  journalTotalCredit = 5000;
+
+  addJournalRow() {
+    this.mockJournalRows.push({ accountCode: '', accountName: '', costCenter: '', debit: 0, credit: 0, lineNotes: '' });
+    this.calcJournalTotals();
+  }
+
+  calcJournalTotals() {
+    this.journalTotalDebit = this.mockJournalRows.reduce((sum, r) => sum + (Number(r.debit) || 0), 0);
+    this.journalTotalCredit = this.mockJournalRows.reduce((sum, r) => sum + (Number(r.credit) || 0), 0);
+  }
+
+  // 5. Inventory Audit State
+  mockAuditRows = [
+    { itemCode: 'ITM-1029', itemName: 'شاشات حاسوب 27 بوصة IPS 4K', unit: 'قطعة', bookQty: 10, actualQty: 8, unitCost: 8500 },
+    { itemCode: 'ITM-3301', itemName: 'كابلات شبكة CAT6 معتمدة 305م', unit: 'لفة', bookQty: 5, actualQty: 5, unitCost: 2200 }
+  ];
+  auditTotalBook = 15;
+  auditTotalActual = 13;
+  auditNetVariance = -17000;
+
+  addAuditRow() {
+    this.mockAuditRows.push({ itemCode: '', itemName: '', unit: 'قطعة', bookQty: 0, actualQty: 0, unitCost: 0 });
+    this.calcAuditTotals();
+  }
+
+  calcAuditTotals() {
+    this.auditTotalBook = this.mockAuditRows.reduce((sum, r) => sum + (Number(r.bookQty) || 0), 0);
+    this.auditTotalActual = this.mockAuditRows.reduce((sum, r) => sum + (Number(r.actualQty) || 0), 0);
+    this.auditNetVariance = this.mockAuditRows.reduce((sum, r) => {
+      const diff = (Number(r.actualQty) || 0) - (Number(r.bookQty) || 0);
+      return sum + (diff * (Number(r.unitCost) || 0));
+    }, 0);
+  }
+
+  clearCurrentScreenForm() {
+    if (this.activeScreen.key === 'PURCHASE_INVOICE') {
+      this.clearMockPurchaseForm();
+    } else if (this.activeScreen.key === 'SALES_INVOICE') {
+      this.mockSalesRows = [{ itemName: '', unit: 'قطعة', quantity: 1, price: 0, discount: 0 }];
+      this.salesPaid = 0;
+      this.calcSalesTotals();
+      const custInput = document.querySelector('input[name="CustomerName"]') as HTMLInputElement;
+      if (custInput) custInput.value = '';
+    } else if (this.activeScreen.key === 'NEW_CUSTOMER') {
+      const inputs = document.querySelectorAll('.erp-form-grid input');
+      inputs.forEach(i => (i as HTMLInputElement).value = '');
+    } else if (this.activeScreen.key === 'JOURNAL_ENTRY') {
+      this.mockJournalRows = [
+        { accountCode: '', accountName: '', costCenter: '', debit: 0, credit: 0, lineNotes: '' }
+      ];
+      this.calcJournalTotals();
+    } else if (this.activeScreen.key === 'INVENTORY_AUDIT') {
+      this.mockAuditRows = [
+        { itemCode: '', itemName: '', unit: 'قطعة', bookQty: 0, actualQty: 0, unitCost: 0 }
+      ];
+      this.calcAuditTotals();
+    }
+  }
+
   mockDevToken = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJlcnAtbW9jay1hZG1pbiIsIm5hbWUiOiJcdTA2NDVcdTA2MjdcdTA2MzJcdTA2NDYgXHUwNjJmXHUwNjMxXHUwNjQ4XHUwNjRhXHUwNjM0Iiwicm9sZSI6IkFkbWluIiwidGVuYW50X2lkIjoidGVuYW50LXRlc3QiLCJkZXBhcnRtZW50X2lkIjoiZGVwdC10ZXN0IiwiaXNzIjoiRHluYW1pY1Byb0xlYXJuIiwiYXVkIjoiRHluYW1pY1Byb0xlYXJuQ2xpZW50IiwiZXhwIjoxODIyOTE0ODc2fQ.t7-b2keNiYiFEuzB5QYqrNNzmYTyIDjAFdVM_s3C3DQ';
 
   get effectiveToken(): string {
@@ -998,6 +1419,20 @@ export class ErpMockComponent implements OnInit {
 
   switchScreen(screen: ErpScreen) {
     this.activeScreen = screen;
+    this.cdr.detectChanges();
+  }
+
+  @HostListener('window:lms:navigate', ['$event'])
+  onLmsNavigate(e: Event) {
+    const customEvt = e as CustomEvent;
+    const key = customEvt.detail?.screenKey;
+    if (key) {
+      const found = this.erpScreens.find(s => s.key === key || s.name.includes(key));
+      if (found) {
+        console.info('%c[ErpMock] Switched active screen via lms:navigate to:', 'color:#10b981;font-weight:bold', found.name);
+        this.switchScreen(found);
+      }
+    }
   }
 
   copyPrompt(text: string) {
