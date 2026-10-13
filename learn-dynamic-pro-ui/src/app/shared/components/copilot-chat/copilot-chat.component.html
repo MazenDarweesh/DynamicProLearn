@@ -134,14 +134,14 @@
             </div>
 
             <!-- In-DOM Action Card: Auto-Fill Suggestion -->
-            <div *ngIf="hasFormFillData(msg) && !msg.isStreaming" class="form-fill-card animate-fade-in">
+            <div *ngIf="hasFormFillData(msg) && !msg.isStreaming && msg.formFillData as ffd" class="form-fill-card animate-fade-in">
               
               <!-- ── Case A: Batch Mode (Multiple Invoices / Documents) ── -->
-              <ng-container *ngIf="msg.formFillData.batch_mode && msg.formFillData.batch_items && msg.formFillData.batch_items.length > 0">
+              <ng-container *ngIf="ffd.batch_mode && ffd.batch_items && ffd.batch_items.length > 0">
                 <div class="form-fill-header batch-hdr">
                   <div class="form-fill-title-wrap">
                     <span class="form-fill-icon">🔄</span>
-                    <span class="form-fill-title">حلقة تنفيذ متتابعة ({{ msg.formFillData.batch_items.length }} مستندات)</span>
+                    <span class="form-fill-title">حلقة تنفيذ متتابعة ({{ ffd.batch_items.length }} مستندات)</span>
                   </div>
                   <span class="form-fill-badge batch-badge">
                     {{ msg.batchExecutionActive ? (batchStepper.state().status === 'completed' ? 'اكتملت ✅' : (batchStepper.state().status === 'paused' ? 'متوقف ⏸️' : 'جارٍ التنفيذ ⚡')) : 'جاهز للبدء' }}
@@ -256,7 +256,7 @@
               </ng-container>
 
               <!-- ── Case B: Single Document Mode (Standard) ── -->
-              <ng-container *ngIf="!msg.formFillData.batch_mode">
+              <ng-container *ngIf="!ffd.batch_mode">
                 <div class="form-fill-header">
                   <div class="form-fill-title-wrap">
                     <span class="form-fill-icon">🪄</span>
@@ -266,16 +266,16 @@
                 </div>
 
                 <div class="form-fill-body">
-                  <ng-container *ngIf="msg.formFillData.fields">
-                    <div *ngFor="let item of (msg.formFillData.fields | keyvalue)" class="form-fill-item">
+                  <ng-container *ngIf="ffd.fields">
+                    <div *ngFor="let item of (ffd.fields | keyvalue)" class="form-fill-item">
                       <span class="field-label">{{ item.key }}</span>
                       <span class="field-value">{{ item.value }}</span>
                     </div>
                   </ng-container>
 
-                  <ng-container *ngIf="msg.formFillData.rows && msg.formFillData.rows.length > 0">
-                    <div class="form-fill-rows-title">📦 الأصناف ({{ msg.formFillData.rows.length }} سطر):</div>
-                    <div *ngFor="let row of msg.formFillData.rows; let rIdx = index" class="form-fill-row-box">
+                  <ng-container *ngIf="ffd.rows && ffd.rows.length > 0">
+                    <div class="form-fill-rows-title">📦 الأصناف ({{ ffd.rows.length }} سطر):</div>
+                    <div *ngFor="let row of ffd.rows; let rIdx = index" class="form-fill-row-box">
                       <span class="row-num">#{{ rIdx + 1 }}</span>
                       <span *ngFor="let col of (row | keyvalue)" class="row-col">
                         <strong class="col-k">{{ col.key }}:</strong> {{ col.value }}
