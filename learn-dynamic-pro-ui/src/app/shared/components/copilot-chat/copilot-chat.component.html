@@ -274,7 +274,9 @@
                   </ng-container>
 
                   <ng-container *ngIf="ffd.rows && ffd.rows.length > 0">
-                    <div class="form-fill-rows-title">📦 الأصناف ({{ ffd.rows.length }} سطر):</div>
+                    <div class="form-fill-rows-title">
+                      {{ ffd.screenKey === 'NEW_CUSTOMER' || (ffd.rows[0]['BranchName'] || ffd.rows[0]['ContactPerson']) ? '🏢 الفروع والمواقع' : (ffd.screenKey === 'JOURNAL_ENTRY' ? '📑 أطراف القيد' : '📦 الأصناف / البنود') }} ({{ ffd.rows.length }} سطر):
+                    </div>
                     <div *ngFor="let row of ffd.rows; let rIdx = index" class="form-fill-row-box">
                       <span class="row-num">#{{ rIdx + 1 }}</span>
                       <span *ngFor="let col of (row | keyvalue)" class="row-col">
