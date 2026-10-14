@@ -637,6 +637,15 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     if (!msg.formFillData || typeof document === 'undefined') return;
 
     try {
+      // 🚀 Safety Guard: Ensure ERP has navigated to the target screen before filling!
+      const targetScreen = msg.formFillData.screenKey;
+      if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
+        console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
+        await this.navigator.navigateToScreen(targetScreen);
+        this.erpKey = targetScreen;
+        await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
+      }
+
       const report = await this.formDriver.applyProgressiveFill(
         msg.formFillData.fields,
         msg.formFillData.rows,
@@ -657,14 +666,22 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   /**
    * Starts sequential batch stepper loop for multi-document extractions.
    */
-  startBatchExecution(msg: ChatMessage, autoAdvance = false): void {
+  async startBatchExecution(msg: ChatMessage, autoAdvance = false): Promise<void> {
     const items = msg.formFillData?.batch_items;
     if (!items || items.length === 0) return;
+
+    const targetScreen = msg.formFillData?.screenKey || this.erpKey;
+    if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
+      console.info('%c[Copilot Batch] Screen mismatch! Navigating to:', 'color:#3b82f6;font-weight:bold', targetScreen);
+      await this.navigator.navigateToScreen(targetScreen);
+      this.erpKey = targetScreen;
+      await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
+    }
 
     msg.batchExecutionActive = true;
     this.batchStepper.startBatch(
       items,
-      msg.formFillData?.screenKey || this.erpKey,
+      targetScreen,
       autoAdvance
     );
     this.cdr.markForCheck();
@@ -741,6 +758,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   private async streamQuery(query: string, skipCache: boolean = false, skipNavCheck: boolean = false) {
     this.isStreaming = true;
 
+    let pendingAskOptions: NavScored[] | undefined = undefined;
+
     // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
     if (!skipNavCheck && typeof document !== 'undefined') {
       try {
@@ -751,17 +770,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
           // Wait for DOM & Angular components to settle on the new screen
           await this.formDriver.settle(undefined, { quietMs: 300, maxMs: 1500 });
         } else if (navRes.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
-          console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
-          this.messages.push({
-            sender: 'assistant',
-            text: 'طلبك يحتمل أكثر من شاشة في النظام، يرجى اختيار الشاشة التي تود التوجه إليها لتعبئة البيانات:',
-            relatedUserQuery: query,
-            askOptions: navRes.askOptions,
-            filters: { ...this.activeFilter }
-          });
-          this.isStreaming = false;
-          this.cdr.markForCheck();
-          return; // STOP! Don't stream search on the wrong screen
+          console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options without blocking stream:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
+          pendingAskOptions = navRes.askOptions;
         }
       } catch (navErr) {
         console.warn('[Copilot Navigation] resolveAndNavigate error:', navErr);
@@ -779,9 +789,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     const assistantMsgIndex = this.messages.length;
     this.messages.push({
       sender: 'assistant',
-      text: '',
+      text: pendingAskOptions ? 'طلبك يحتمل أكثر من شاشة في النظام، يمكنك اختيار الشاشة المستهدفة أدناه أو متابعة قراءة الإجابة:\n\n' : '',
       sources: [],
       isStreaming: true,
+      askOptions: pendingAskOptions,
       relatedUserQuery: query,
       filters: { ...this.activeFilter },
       lessonId: this.activeFilter.lessonId,
