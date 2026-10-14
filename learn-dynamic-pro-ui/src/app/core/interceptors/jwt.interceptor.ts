@@ -39,9 +39,11 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
 
         // 2. If no refresh token is stored, session has truly ended
         if (!authService.refreshTokenValue()) {
-          Dialog.alert('انتهت صلاحية الجلسة. الرجاء تسجيل الدخول مجدداً.', 'تنبيه', 'error');
-          authService.logout();
-          router?.navigate(['/login']);
+          if (router) {
+            Dialog.alert('انتهت صلاحية الجلسة. الرجاء تسجيل الدخول مجدداً.', 'تنبيه', 'error');
+            authService.logout();
+            router.navigate(['/login']);
+          }
           return throwError(() => error);
         }
 
@@ -65,9 +67,11 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
             }),
             catchError((refreshErr) => {
               isRefreshing = false;
-              Dialog.alert('انتهت صلاحية الجلسة. الرجاء تسجيل الدخول مجدداً.', 'تنبيه', 'error');
-              authService.logout();
-              router?.navigate(['/login']);
+              if (router) {
+                Dialog.alert('انتهت صلاحية الجلسة. الرجاء تسجيل الدخول مجدداً.', 'تنبيه', 'error');
+                authService.logout();
+                router.navigate(['/login']);
+              }
               return throwError(() => refreshErr);
             })
           );

@@ -14,30 +14,62 @@ export class ErpNavigatorService {
    * Detects if the specified screen is currently active in the DOM.
    * Completely dynamic: checks screen attributes and tags without hardcoded dictionaries.
    */
+  /**
+   * Detects if the specified screen is currently active in the DOM.
+   * Completely dynamic: checks screen attributes, tabs, and page headers without hardcoded dictionaries.
+   */
   isScreenActive(screenKey: string): boolean {
     if (!screenKey) return false;
+    const normalizedKey = normalizeArabicText(screenKey);
 
     // 1. Check active tab or button with .active / .is-active specifically for this screenKey
     const activeTab = document.querySelector(
-      `.screen-btn.active[data-screen="${screenKey}"], .dp-hdr__tab.is-active[data-screen="${screenKey}"], .dp-mods__card.is-active[data-screen="${screenKey}"]`
+      `.screen-btn.active[data-screen="${screenKey}"], .dp-hdr__tab.is-active[data-screen="${screenKey}"], .dp-mods__card.is-active[data-screen="${screenKey}"], .dp-pgs__mod.is-active[data-screen="${screenKey}"]`
     );
     if (activeTab && this.isElementVisible(activeTab)) {
       return true;
     }
 
-    // 2. Check if the active form content matches this screenKey
+    // 2. Check active header tab text
+    const activeHdrTab = document.querySelector('.dp-hdr__tab.is-active .dp-hdr__tab-name, .dp-hdr__tab.is-active, .dp-hdr__trig-label');
+    if (activeHdrTab && normalizeArabicText(activeHdrTab.textContent || '') === normalizedKey) {
+      return true;
+    }
+
+    // 3. Check active module text
+    const activeMod = document.querySelector('.dp-pgs__mod.is-active .dp-pgs__mod-name, .dp-pgs__mod.is-active');
+    if (activeMod && normalizeArabicText(activeMod.textContent || '') === normalizedKey) {
+      return true;
+    }
+
+    // 4. Check if the active form content matches this screenKey
     const formContent = document.querySelector(`[data-screen-content="${screenKey}"]`);
     if (formContent && this.isElementVisible(formContent)) {
       return true;
     }
 
-    // 3. Check active screen tag in ERP card header
-    const activeTag = document.querySelector('.screen-tag code');
-    if (activeTag && (activeTag.textContent || '').trim() === screenKey) {
+    // 5. Check active screen tag in ERP card header or main page title
+    const activeTag = document.querySelector('.screen-tag code, .page-title, h1, .dp-hdr__title');
+    if (activeTag && normalizeArabicText(activeTag.textContent || '') === normalizedKey) {
       return true;
     }
 
     return false;
+  }
+
+  /**
+   * Simulates a natural user click event sequence on an ERP DOM element.
+   * Dispatches mousedown, mouseup, and click with bubbles and cancelable flags.
+   */
+  simulateClick(el: HTMLElement): void {
+    if (!el) return;
+    try {
+      el.focus?.();
+    } catch {}
+    el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, view: window }));
+    el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, view: window }));
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+    el.click();
   }
 
   /**
@@ -56,18 +88,31 @@ export class ErpNavigatorService {
       detail: { screenKey }
     }));
 
-    // 2. Look for element with exact [data-screen="${screenKey}"]
-    const directTarget = document.querySelector<HTMLElement>(`[data-screen="${screenKey}"]`);
-    if (directTarget && this.isElementVisible(directTarget)) {
-      directTarget.click();
+    // 2. Candidate map lookup
+    const mapped = this.candidateElementsMap.get(screenKey);
+    if (mapped) {
+      this.simulateClick(mapped);
       return await this.waitForScreenReady(screenKey, 3000);
     }
 
-    // 3. Candidate map lookup
-    const mapped = this.candidateElementsMap.get(screenKey);
-    if (mapped) {
-      mapped.click();
+    // 3. Look for element with exact [data-screen="${screenKey}"]
+    const directTarget = document.querySelector<HTMLElement>(`[data-screen="${screenKey}"]`);
+    if (directTarget && this.isElementVisible(directTarget)) {
+      this.simulateClick(directTarget);
       return await this.waitForScreenReady(screenKey, 3000);
+    }
+
+    // 4. Fallback: match text against tiles, modules, or tabs
+    const normalizedTarget = normalizeArabicText(screenKey);
+    const candidateEls = Array.from(document.querySelectorAll<HTMLElement>(
+      '.dp-pgs__tile, .dp-pgs__mod, .dp-hdr__tab, [routerlink], .nav-link'
+    ));
+    for (const el of candidateEls) {
+      const text = normalizeArabicText(el.textContent || '');
+      if (text && (text === normalizedTarget || text.includes(normalizedTarget))) {
+        this.simulateClick(el);
+        return await this.waitForScreenReady(screenKey, 3000);
+      }
     }
 
     return await this.waitForScreenReady(screenKey, 2000);
@@ -141,7 +186,7 @@ export class ErpNavigatorService {
         if (newFormId) {
           const btn = elementMap.get(newFormId);
           if (btn) {
-            btn.click();
+            this.simulateClick(btn);
             await this.delay(300);
             return true;
           }
@@ -157,7 +202,7 @@ export class ErpNavigatorService {
       if (!el) continue;
       const dataAction = el.getAttribute('data-action') || '';
       if (el.classList.contains('dp-btn--new') || dataAction === 'new') {
-        el.click();
+        this.simulateClick(el);
         await this.delay(300);
         return true;
       }
@@ -167,8 +212,8 @@ export class ErpNavigatorService {
   }
 
   /**
-   * Scans visible ERP screen items (cards, tabs, chips, mock buttons) from the active DOM.
-   * Excludes any settings modals, headers, and Copilot widget elements.
+   * Scans visible ERP screen items (tiles, modules, tabs, cards, chips) from the active DOM.
+   * Dynamically inspects DynamicPro ERP DOM hierarchy and extracts rich contextual paths.
    */
   scanVisibleCandidates(): NavCandidateIn[] {
     this.candidateElementsMap.clear();
@@ -180,8 +225,23 @@ export class ErpNavigatorService {
     }
 
     const badContainers = '.dp-set, #dpSettingsLabel, lms-ai-copilot, app-copilot-chat';
-    const domSelectors = '.dp-mods__card, .dp-hdr__tab, .dp-cats__chip, .screen-btn, [data-screen]';
+    const domSelectors = [
+      '.dp-pgs__tile',
+      '.dp-pgs__mod',
+      '.dp-hdr__tab',
+      '.dp-mods__card',
+      '.dp-cats__chip',
+      '.screen-btn',
+      '[data-screen]',
+      'app-menu-master-category-selector button',
+      'app-fast-screen button'
+    ].join(', ');
+
     const elements = Array.from(document.querySelectorAll<HTMLElement>(domSelectors));
+
+    // Detect currently active module name for hierarchical path context
+    const activeModEl = document.querySelector<HTMLElement>('.dp-pgs__mod.is-active .dp-pgs__mod-name, .dp-pgs__mod.is-active');
+    const activeModuleName = (activeModEl?.textContent || '').trim() || 'الرئيسية';
 
     let index = 1;
     for (const el of elements) {
@@ -189,7 +249,9 @@ export class ErpNavigatorService {
       if (!this.isElementVisible(el)) continue;
 
       // Extract clean label: prioritize inner label element if present, else sanitize textContent
-      const labelSpan = el.querySelector('.screen-label, .dp-mods__title, .dp-hdr__tabtxt, .dp-cats__txt');
+      const labelSpan = el.querySelector<HTMLElement>(
+        '.dp-pgs__tile-name, .dp-pgs__mod-name, .screen-label, .dp-mods__title, .dp-hdr__tabtxt, .dp-hdr__tab-name, .dp-cats__txt'
+      );
       let rawText = (labelSpan?.textContent || el.textContent || '').trim();
       // Remove bracketed codes like [PURCHASE_INVOICE] from text for cleaner matching
       rawText = rawText.replace(/\[.*?\]/g, '').trim();
@@ -203,10 +265,29 @@ export class ErpNavigatorService {
       const candidateId = el.getAttribute('data-screen') || el.id || `candidate_${index++}`;
       this.candidateElementsMap.set(candidateId, el);
 
+      // Determine contextual hierarchical path for AI reasoning
+      const path: string[] = [];
+      if (el.classList.contains('dp-pgs__tile')) {
+        path.push(activeModuleName);
+        // Look for preceding group head inside page
+        const cell = el.closest('.dp-pgs__cell');
+        const prevGroup = cell?.previousElementSibling?.querySelector('.dp-grouphead__name') ||
+                          el.closest('[class*="group"]')?.querySelector('.dp-grouphead__name');
+        if (prevGroup && prevGroup.textContent) {
+          path.push(prevGroup.textContent.trim());
+        }
+      } else if (el.classList.contains('dp-pgs__mod')) {
+        path.push('الوحدات والبرامج الرئيسية');
+      } else if (el.classList.contains('dp-hdr__tab')) {
+        path.push('التبويبات المفتوحة');
+      } else {
+        path.push(activeModuleName);
+      }
+
       candidates.push({
         id: candidateId,
         label: rawText,
-        path: ['الرئيسية']
+        path
       });
     }
 
@@ -249,12 +330,12 @@ export class ErpNavigatorService {
         window.dispatchEvent(new CustomEvent('lms:navigate', {
           bubbles: true,
           composed: true,
-          detail: { screenKey: top.id }
+          detail: { screenKey: top.id, label: top.label }
         }));
         const targetEl = this.candidateElementsMap.get(top.id);
 
         if (targetEl) {
-          targetEl.click();
+          this.simulateClick(targetEl);
         } else {
           await this.navigateToScreen(top.id);
         }

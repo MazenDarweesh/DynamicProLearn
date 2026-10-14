@@ -191,6 +191,7 @@ export class CopilotService {
    */
   getCopilotFilters(forceRefresh = false): Observable<StudentCopilotFilterData> {
     if (!this.filterData$ || forceRefresh) {
+      this.filterData$ = undefined;
       const url = this.backendBaseUrl ? `${this.backendBaseUrl}/api/student/copilot-filters` : '/api/student/copilot-filters';
       this.filterData$ = this.http.get<StudentCopilotFilterData>(url).pipe(
         shareReplay(1)

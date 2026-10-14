@@ -11,6 +11,8 @@ import {
   CopilotFilterState
 } from '../../../core/services/copilot.service';
 
+import { AuthService } from '../../../core/services/auth.service';
+
 @Component({
   selector: 'app-copilot-top-filter-bar',
   standalone: true,

@@ -69,6 +69,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
 
   @Input() erpKey?: string;
+  @Input() activeScreenKey?: string;
   @Input() activeLessonId?: string;
   @Input() lmsPageId?: string;
   @Input() token?: string;
@@ -174,16 +175,18 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
     const clean = (val?: string) => {
       if (!val) return undefined;
-      let res = val.trim().replace(/[<>]/g, '');
-      if (res.includes('.devtunnels.ms')) {
-        res = res.replace(/^http:\/\//i, 'https://').replace(/:80(?=\/|$)/, '');
-      }
-      return res;
+      return val.trim().replace(/[<>]/g, '');
     };
 
     this.apiUrl = clean(this.apiUrl || getAttr('api-url', 'apiUrl'));
     this.backendUrl = clean(this.backendUrl || getAttr('backend-url', 'backendUrl'));
-    this.erpKey = clean(this.erpKey || getAttr('erp-key', 'erpKey'));
+    this.erpKey = clean(
+      this.erpKey ||
+      this.activeScreenKey ||
+      getAttr('active-screen-key', 'activeScreenKey') ||
+      getAttr('erp-key', 'erpKey') ||
+      getAttr('active-screen', 'activeScreen')
+    );
     this.lmsPageId = clean(this.lmsPageId || getAttr('lms-page-id', 'lmsPageId'));
     this.u = clean(this.u || getAttr('u', 'u'));
     this.p = clean(this.p || getAttr('p', 'p'));
@@ -211,7 +214,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
     this.attrObserver.observe(hostEl, {
       attributes: true,
-      attributeFilter: ['api-url', 'apiUrl', 'backend-url', 'backendUrl', 'erp-key', 'erpKey', 'lms-page-id', 'lmsPageId', 'u', 'p', 'token', 'hide-header', 'inline']
+      attributeFilter: [
+        'api-url', 'apiUrl', 'backend-url', 'backendUrl',
+        'erp-key', 'erpKey', 'active-screen-key', 'activeScreenKey', 'active-screen', 'activeScreen',
+        'lms-page-id', 'lmsPageId', 'u', 'p', 'token', 'hide-header', 'inline'
+      ]
     });
   }
 

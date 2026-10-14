@@ -21,7 +21,9 @@ export class AuthService {
   private backendBaseUrl = '';
 
   setBackendUrl(url?: string) {
-    if (url) this.backendBaseUrl = url.replace(/\/+$/, '');
+    if (url) {
+      this.backendBaseUrl = url.trim().replace(/\/+$/, '');
+    }
   }
 
   erpLogin(username: string, password: string, erpKey: string | null) {
