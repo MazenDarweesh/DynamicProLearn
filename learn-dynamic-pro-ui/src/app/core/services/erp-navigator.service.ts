@@ -1,6 +1,5 @@
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
-import { NavCandidateIn, NavResolution, NavScored } from '../models/erp-form.models';
+import { NavCandidateIn, NavResolution, NavScored, ControlIn } from '../models/erp-form.models';
 import { normalizeArabicText } from './erp-form-driver.service';
 import { CopilotService } from './copilot.service';
 
@@ -12,40 +11,11 @@ export class ErpNavigatorService {
   private candidateElementsMap = new Map<string, HTMLElement>();
 
   /**
-   * Screen dictionary mapping keys to common Arabic labels and selectors
-   */
-  /**
-   * Screen dictionary mapping keys to common Arabic labels and selectors
-   */
-  private readonly screenRegistry: Record<string, { labels: string[]; selectorHint?: string }> = {
-    'PURCHASE_INVOICE': {
-      labels: ['فاتورة المشتريات', 'الموردين و المشتريات', 'المشتريات'],
-      selectorHint: 'select[name="Supplier"]'
-    },
-    'SALES_INVOICE': {
-      labels: ['فاتورة المبيعات', 'العملاء  و المبيعات', 'المبيعات'],
-      selectorHint: 'input[name="InvoiceNumber"]'
-    },
-    'NEW_CUSTOMER': {
-      labels: ['تسجيل عميل جديد', 'العملاء والحسابات', 'عميل جديد'],
-      selectorHint: 'input[name="CustomerName"]'
-    },
-    'JOURNAL_ENTRY': {
-      labels: ['قيود اليومية العامة', 'الحسابات العامة', 'قيود اليومية'],
-      selectorHint: 'input[name="EntryNumber"]'
-    },
-    'INVENTORY_AUDIT': {
-      labels: ['الجرد والتسويات المخزنية', 'إدارة المستودعات', 'محضر الجرد'],
-      selectorHint: 'input[name="AuditNumber"]'
-    }
-  };
-
-  /**
    * Detects if the specified screen is currently active in the DOM.
+   * Completely dynamic: checks screen attributes and tags without hardcoded dictionaries.
    */
   isScreenActive(screenKey: string): boolean {
-    const config = this.screenRegistry[screenKey];
-    if (!config) return false;
+    if (!screenKey) return false;
 
     // 1. Check active tab or button with .active / .is-active specifically for this screenKey
     const activeTab = document.querySelector(
@@ -61,15 +31,7 @@ export class ErpNavigatorService {
       return true;
     }
 
-    // 3. Check specific inputs that only exist when this specific screen is open
-    if (config.selectorHint) {
-      const el = document.querySelector(config.selectorHint);
-      if (el && this.isElementVisible(el)) {
-        return true;
-      }
-    }
-
-    // 4. Check active screen tag in ERP card header
+    // 3. Check active screen tag in ERP card header
     const activeTag = document.querySelector('.screen-tag code');
     if (activeTag && (activeTag.textContent || '').trim() === screenKey) {
       return true;
@@ -87,8 +49,6 @@ export class ErpNavigatorService {
       return true;
     }
 
-    const config = this.screenRegistry[screenKey] || { labels: [screenKey] };
-
     // 1. Dispatch custom event first so host / mock listeners switch screen immediately
     window.dispatchEvent(new CustomEvent('lms:navigate', {
       bubbles: true,
@@ -96,30 +56,18 @@ export class ErpNavigatorService {
       detail: { screenKey }
     }));
 
-    // 2. Check for dedicated mock screen buttons
-    const mockButtons = Array.from(document.querySelectorAll<HTMLButtonElement>('.screen-btn'));
-    for (const btn of mockButtons) {
-      const btnKey = btn.getAttribute('data-screen');
-      const text = btn.textContent || '';
-      if (btnKey === screenKey || config.labels.some(l => text.includes(l))) {
-        btn.click();
-        return await this.waitForScreenReady(screenKey, 3000);
-      }
+    // 2. Look for element with exact [data-screen="${screenKey}"]
+    const directTarget = document.querySelector<HTMLElement>(`[data-screen="${screenKey}"]`);
+    if (directTarget && this.isElementVisible(directTarget)) {
+      directTarget.click();
+      return await this.waitForScreenReady(screenKey, 3000);
     }
 
-    // 3. Check for real ERP Shell Navigation Cards (.dp-mods__card)
-    const moduleCards = Array.from(document.querySelectorAll<HTMLElement>('.dp-mods__card, .dp-hdr__tab, .dp-cats__chip'));
-    for (const card of moduleCards) {
-      const cardKey = card.getAttribute('data-screen');
-      const text = card.textContent || '';
-      if (cardKey === screenKey || config.labels.some(l => text.includes(l))) {
-        card.click();
-        await this.delay(400);
-
-        if (this.isScreenActive(screenKey)) {
-          return true;
-        }
-      }
+    // 3. Candidate map lookup
+    const mapped = this.candidateElementsMap.get(screenKey);
+    if (mapped) {
+      mapped.click();
+      return await this.waitForScreenReady(screenKey, 3000);
     }
 
     return await this.waitForScreenReady(screenKey, 2000);
@@ -140,58 +88,81 @@ export class ErpNavigatorService {
   }
 
   /**
-   * Helper: Click the "New Document / Clear Form" button if present on the screen
+   * Scans visible interactive controls within a container for AI role classification.
+   */
+  scanVisibleControls(container?: HTMLElement): { controls: ControlIn[]; elementMap: Map<string, HTMLElement> } {
+    const parent = container || (document.querySelector('[role="main"]') as HTMLElement) || document.body;
+    const candidates = Array.from(parent.querySelectorAll<HTMLElement>('button, a[role="button"], input[type="button"], input[type="submit"]'));
+    const controls: ControlIn[] = [];
+    const elementMap = new Map<string, HTMLElement>();
+    let idx = 1;
+
+    for (const el of candidates) {
+      if (el.closest('lms-ai-copilot, app-copilot-chat, nav, .dp-hdr')) continue;
+      if (!this.isElementVisible(el)) continue;
+
+      const id = el.getAttribute('data-action') || el.id || `ctrl_${idx++}`;
+      const text = (el.textContent || el.getAttribute('title') || el.getAttribute('aria-label') || '').trim();
+      if (!text && !el.getAttribute('class')) continue;
+
+      controls.push({
+        id,
+        label: text.slice(0, 80) || id
+      });
+      elementMap.set(id, el);
+    }
+    return { controls, elementMap };
+  }
+
+  /**
+   * Click the "New Document / Clear Form" button if present on the screen
    * to ensure a clean slate before filling each batch item.
-   * Scoped strictly to the active form / card container to avoid accidental clicks on navigation tabs.
+   * Uses AI backend to resolve the button role with clean structural fallback.
    */
   async prepareFreshForm(): Promise<boolean> {
-    // 1. Target form card action containers first
-    const actionContainers = Array.from(document.querySelectorAll<HTMLElement>(
+    const actionContainers = document.querySelectorAll<HTMLElement>(
       '.header-actions, .card-header, .erp-card, .dp-form-actions, [role="main"]'
-    ));
+    );
+    const container = actionContainers.length > 0 ? actionContainers[0] : undefined;
+    const { controls, elementMap } = this.scanVisibleControls(container);
 
-    const candidateButtons: HTMLButtonElement[] = [];
+    if (controls.length === 0) return false;
 
-    if (actionContainers.length > 0) {
-      for (const container of actionContainers) {
-        const btns = Array.from(container.querySelectorAll<HTMLButtonElement>('button, a'));
-        for (const btn of btns) {
-          if (!btn.closest('.screen-tabs, .erp-nav-bar, nav, header, .dp-hdr, aside, lms-ai-copilot, app-copilot-chat')) {
-            candidateButtons.push(btn);
+    // 1. AI-driven role classification
+    if (this.copilotService) {
+      try {
+        const screenId = document.querySelector('.screen-tag code')?.textContent?.trim() || 'CURRENT_SCREEN';
+        const res = await this.copilotService.resolveErpControls({
+          screen_id: screenId,
+          controls
+        });
+
+        const newFormId = res.roles ? res.roles['new_form'] : undefined;
+        if (newFormId) {
+          const btn = elementMap.get(newFormId);
+          if (btn) {
+            btn.click();
+            await this.delay(300);
+            return true;
           }
         }
-      }
-    } else {
-      const allBtns = Array.from(document.querySelectorAll<HTMLButtonElement>('button, a'));
-      for (const btn of allBtns) {
-        if (!btn.closest('.screen-tabs, .erp-nav-bar, nav, header, .dp-hdr, aside, lms-ai-copilot, app-copilot-chat')) {
-          candidateButtons.push(btn);
-        }
+      } catch (e) {
+        console.warn('[ErpNavigator] AI control resolution fallback:', e);
       }
     }
 
-    // 2. Strict matching on intent (avoid matching general words like 'تسجيل عميل جديد')
-    for (const btn of candidateButtons) {
-      const title = (btn.getAttribute('title') || '').trim();
-      const text = (btn.textContent || '').trim();
-
-      const isExactNewOrClear =
-        title === 'جديد' ||
-        title === 'فاتورة جديدة' ||
-        title === 'تفريغ' ||
-        text === 'جديد' ||
-        text === 'تفريغ' ||
-        text.includes('جديد / تفريغ') ||
-        text.includes('جديد/تفريغ') ||
-        text === '✨ جديد / تفريغ' ||
-        btn.classList.contains('dp-btn--new');
-
-      if (isExactNewOrClear) {
-        btn.click();
+    // 2. Structural attribute fallback (zero static keyword dictionaries)
+    for (const ctrl of controls) {
+      const el = elementMap.get(ctrl.id);
+      if (!el) continue;
+      const dataAction = el.getAttribute('data-action') || '';
+      if (el.classList.contains('dp-btn--new') || dataAction === 'new') {
+        el.click();
         await this.delay(300);
         return true;
       }
     }
+
     return false;
   }
 
@@ -239,17 +210,6 @@ export class ErpNavigatorService {
       });
     }
 
-    // Fallback: If on an empty/detached screen or mock buttons not in DOM, populate from registry
-    if (candidates.length === 0) {
-      for (const [key, val] of Object.entries(this.screenRegistry)) {
-        candidates.push({
-          id: key,
-          label: val.labels[0] || key,
-          path: ['الرئيسية']
-        });
-      }
-    }
-
     return candidates;
   }
 
@@ -265,6 +225,7 @@ export class ErpNavigatorService {
     chosen?: NavScored;
     askOptions?: NavScored[];
     message?: string;
+    rawResolution?: NavResolution;
   }> {
     const candidates = this.scanVisibleCandidates();
     if (candidates.length === 0) {
@@ -272,7 +233,6 @@ export class ErpNavigatorService {
     }
 
     if (!this.copilotService) {
-      // Fallback if CopilotService not available
       return { success: false, decision: 'clarify', message: 'خدمة الذكاء الاصطناعي غير متصلة.' };
     }
 
@@ -296,7 +256,6 @@ export class ErpNavigatorService {
         if (targetEl) {
           targetEl.click();
         } else {
-          // Try navigating by key/label in screenRegistry
           await this.navigateToScreen(top.id);
         }
 
@@ -307,19 +266,22 @@ export class ErpNavigatorService {
         return {
           success: true,
           decision: 'go',
-          chosen: top
+          chosen: top,
+          rawResolution: res
         };
       } else if (res.decision === 'ask') {
         return {
           success: false,
           decision: 'ask',
-          askOptions: res.candidates.slice(0, 3)
+          askOptions: res.candidates.slice(0, 3),
+          rawResolution: res
         };
       } else {
         return {
           success: false,
           decision: 'clarify',
-          message: 'يرجى توضيح اسم الشاشة أو العملية المطلوبة (مثال: فاتورة مشتريات، تسجيل عميل).'
+          message: 'يرجى توضيح اسم الشاشة أو العملية المطلوبة (مثال: فاتورة مشتريات، تسجيل عميل).',
+          rawResolution: res
         };
       }
     } catch (err: any) {
@@ -341,3 +303,4 @@ export class ErpNavigatorService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
+

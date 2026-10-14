@@ -43,6 +43,8 @@ export interface ChatMessage {
   formFillReport?: FormFillExecutionReport;
   /** Whether batch stepper execution was triggered for this message */
   batchExecutionActive?: boolean;
+  /** ID of AI routing decision for user confirmation feedback */
+  decisionId?: string | null;
   /** Interactive navigation options suggested when intent is ambiguous (decision: 'ask') */
   askOptions?: NavScored[];
 }
@@ -658,6 +660,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       msg.formFillReport = report;
       this.cdr.markForCheck();
       console.info('%c[Copilot FormFill] Execution report:', 'color:#10b981;font-weight:bold', report);
+
+      // 🧠 Train Decision Memory: If navigation decision was attached and fill succeeded, confirm to backend
+      if (report.success && msg.decisionId && this.copilotService) {
+        this.copilotService.feedbackErpNavigation(msg.decisionId, 'applied');
+      }
     } catch (err) {
       console.error('[Copilot FormFill] Execution error:', err);
     }
@@ -759,11 +766,16 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     this.isStreaming = true;
 
     let pendingAskOptions: NavScored[] | undefined = undefined;
+    let resolvedIntent: string | undefined = undefined;
+    let resolvedDecisionId: string | null | undefined = undefined;
 
     // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
     if (!skipNavCheck && typeof document !== 'undefined') {
       try {
         const navRes = await this.navigator.resolveAndNavigate(query);
+        resolvedIntent = navRes.rawResolution?.intent;
+        resolvedDecisionId = navRes.rawResolution?.decision_id;
+
         if (navRes.success && navRes.chosen) {
           console.info('%c[Copilot Navigation] Auto-navigated to target screen:', 'color:#10b981;font-weight:bold', navRes.chosen.id);
           this.erpKey = navRes.chosen.id;
@@ -794,6 +806,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       isStreaming: true,
       askOptions: pendingAskOptions,
       relatedUserQuery: query,
+      decisionId: resolvedDecisionId,
       filters: { ...this.activeFilter },
       lessonId: this.activeFilter.lessonId,
       lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
@@ -838,7 +851,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
           this.cdr.markForCheck();
         }
       },
-      formSchema
+      formSchema,
+      resolvedIntent
     );
   }
 

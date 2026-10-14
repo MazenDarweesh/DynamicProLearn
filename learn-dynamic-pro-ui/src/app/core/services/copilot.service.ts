@@ -7,7 +7,9 @@ import {
   NavRequest,
   NavResolution,
   LeftoverRequest,
-  LeftoverResponse
+  LeftoverResponse,
+  ControlRolesRequest,
+  ControlRolesResponse
 } from '../models/erp-form.models';
 
 export interface CopilotSource {
@@ -210,7 +212,8 @@ export class CopilotService {
     visibleFields?: string[],
     erpKey?: string,
     onFormFill?: (fillData: CopilotFormFillData) => void,
-    formSchema?: any[]
+    formSchema?: any[],
+    erpIntent?: string
   ): Promise<void> {
     const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
 
@@ -219,6 +222,11 @@ export class CopilotService {
       skip_cache: skipCache,
       skipCache: skipCache
     };
+
+    if (erpIntent) {
+      payload['erp_intent'] = erpIntent;
+      payload['erpIntent'] = erpIntent;
+    }
 
     if (visibleFields && visibleFields.length > 0) {
       payload['visible_fields'] = visibleFields;
@@ -462,5 +470,41 @@ export class CopilotService {
       throw new Error(`Leftover resolve failed with status ${res.status}`);
     }
     return await res.json();
+  }
+
+  /**
+   * Resolves functional button roles (add_row / new_form) via AI / backend cache.
+   */
+  async resolveErpControls(req: ControlRolesRequest): Promise<ControlRolesResponse> {
+    const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${this.aiBaseUrl}/v1/erp/controls/resolve`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(req)
+    });
+    if (!res.ok) {
+      throw new Error(`Controls resolve failed with status ${res.status}`);
+    }
+    return await res.json();
+  }
+
+  /**
+   * Sends applied / rejected feedback on an AI navigation decision to train the decision memory.
+   */
+  async feedbackErpNavigation(decisionId: string, outcome: 'applied' | 'rejected'): Promise<void> {
+    const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    try {
+      await fetch(`${this.aiBaseUrl}/v1/erp/navigation/feedback`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ decision_id: decisionId, outcome })
+      });
+    } catch (err) {
+      console.warn('[Copilot Service] Feedback delivery failed silently:', err);
+    }
   }
 }

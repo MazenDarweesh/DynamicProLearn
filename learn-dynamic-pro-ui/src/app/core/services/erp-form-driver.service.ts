@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import {
   FormFieldSchema,
@@ -8,7 +8,9 @@ import {
   FieldGroup,
   FieldSignatureIn,
   LeftoverResponse,
+  ControlIn,
 } from '../models/erp-form.models';
+import { CopilotService } from './copilot.service';
 
 /**
  * Normalizes Arabic text for flexible matching:
@@ -35,6 +37,8 @@ export function normalizeArabicText(text: string): string {
   providedIn: 'root',
 })
 export class ErpFormDriverService {
+  private copilotService = inject(CopilotService, { optional: true });
+
   /**
    * Waits for a condition to be satisfied using MutationObserver without arbitrary setTimeout.
    */
@@ -793,7 +797,7 @@ export class ErpFormDriverService {
         let targetRow: HTMLElement | null | undefined = rowEls[rIdx];
 
         if (!targetRow) {
-          const addBtn = this.findAddRowButton(table, excludeContainer);
+          const addBtn = await this.findAddRowButton(table, excludeContainer);
           if (addBtn) {
             addBtn.click();
             targetRow = (await this.waitFor<HTMLElement>(() => {
@@ -887,7 +891,7 @@ export class ErpFormDriverService {
     return filledRowsCount;
   }
 
-  private findAddRowButton(table: HTMLElement, excludeContainer?: HTMLElement): HTMLElement | null {
+  private async findAddRowButton(table: HTMLElement, excludeContainer?: HTMLElement): Promise<HTMLElement | null> {
     const candidates: HTMLElement[] = [];
     let current: HTMLElement | null = table;
 
@@ -916,40 +920,54 @@ export class ErpFormDriverService {
       if (!candidates.includes(btn)) candidates.push(btn);
     }
 
-    const blacklisted = [
-      'حفظ', 'ترحيل', 'اعتماد', 'حذف', 'تعديل', 'save', 'post', 'delete',
-      'تراجع', 'طباعه', 'طباعة', 'تفريغ'
-    ];
+    const controlList: ControlIn[] = [];
+    const elementMap = new Map<string, HTMLElement>();
+    let cIdx = 1;
 
     for (const btn of candidates) {
       if (excludeContainer && excludeContainer.contains(btn)) continue;
-      const rawText = (btn.textContent || '').trim();
-      const text = normalizeArabicText(rawText);
-      if (!text && !rawText) continue;
+      if (!btn.offsetWidth && !btn.offsetHeight && !btn.getClientRects().length) continue;
+      const rawText = (btn.textContent || btn.getAttribute('title') || btn.getAttribute('aria-label') || '').trim();
+      const id = btn.getAttribute('data-action') || btn.id || `grid_btn_${cIdx++}`;
+      controlList.push({
+        id,
+        label: rawText.slice(0, 80) || id
+      });
+      elementMap.set(id, btn);
+    }
 
-      if (blacklisted.some((b) => text.includes(normalizeArabicText(b)))) continue;
-      if (text === 'جديد' || text.includes('تفريغ') || text.includes('سجل جديد')) continue;
+    // 1. AI-driven role classification for add_row
+    if (this.copilotService && controlList.length > 0) {
+      try {
+        const screenId = document.querySelector('.screen-tag code')?.textContent?.trim() || 'CURRENT_SCREEN';
+        const res = await this.copilotService.resolveErpControls({
+          screen_id: screenId,
+          controls: controlList
+        });
 
-      if (
-        text.includes('اضافه') ||
-        text.includes('اضافة') ||
-        text.includes('سطر') ||
-        text.includes('طرف') ||
-        text.includes('قيد') ||
-        text.includes('صنف') ||
-        text.includes('فرع') ||
-        text.includes('موقع') ||
-        text.includes('بند') ||
-        text.includes('جديد') ||
-        text.includes('add') ||
-        text.includes('row') ||
-        text.includes('item') ||
-        text.includes('line') ||
-        rawText.includes('+')
-      ) {
-        return btn;
+        const addRowId = res.roles ? res.roles['add_row'] : undefined;
+        if (addRowId) {
+          const btn = elementMap.get(addRowId);
+          if (btn) return btn;
+        }
+      } catch (err) {
+        console.warn('[ErpFormDriver] AI add_row resolution failed, checking attributes:', err);
       }
     }
+
+    // 2. Structural fallback: data-action, standard CSS classes, or '+' icon (zero static keyword dictionaries)
+    for (const ctrl of controlList) {
+      const el = elementMap.get(ctrl.id);
+      if (!el) continue;
+      const dataAction = (el.getAttribute('data-action') || '').toLowerCase();
+      const cls = el.className || '';
+      const text = (el.textContent || '').trim();
+      if (dataAction.includes('add') || cls.includes('btn--add') || cls.includes('add-row') || text === '+') {
+        return el;
+      }
+    }
+
     return null;
   }
 }
+

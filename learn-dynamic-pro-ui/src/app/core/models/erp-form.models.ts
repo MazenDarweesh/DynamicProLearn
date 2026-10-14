@@ -91,9 +91,34 @@ export interface NavScored {
   reason: string;
 }
 
+export type ErpIntent = 'question' | 'navigate' | 'action' | 'unknown';
+
 export interface NavResolution {
   decision: 'go' | 'ask' | 'clarify';
   candidates: NavScored[];
+  intent?: ErpIntent;
+  source?: 'ai' | 'memory' | 'lexical';
+  decision_id?: string | null;
+}
+
+export interface ControlIn {
+  id: string;
+  label: string;
+}
+
+export interface ControlRolesRequest {
+  screen_id: string;
+  controls: ControlIn[];
+}
+
+export interface ControlRolesResponse {
+  roles: Record<string, string>;
+  source: 'ai' | 'memory';
+}
+
+export interface NavFeedbackRequest {
+  decision_id: string;
+  outcome: 'applied' | 'rejected';
 }
 
 export interface FieldSignatureIn {
