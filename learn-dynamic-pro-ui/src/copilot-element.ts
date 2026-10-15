@@ -6,6 +6,11 @@ import { provideMarkdown } from 'ngx-markdown';
 import { CopilotChatComponent } from './app/shared/components/copilot-chat/copilot-chat.component';
 import { jwtInterceptor } from './app/core/interceptors/jwt.interceptor';
 
+// Flag embedded environment immediately
+if (typeof window !== 'undefined') {
+  (window as any).__LMS_COPILOT_EMBEDDED__ = true;
+}
+
 // Zone / Zoneless change detection provider
 const changeDetectionProvider = typeof (window as any)?.Zone !== 'undefined'
   ? provideZoneChangeDetection({ eventCoalescing: true })

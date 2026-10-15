@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable, firstValueFrom, shareReplay, BehaviorSubject } from 'rxjs';
+import { Observable, firstValueFrom, shareReplay, BehaviorSubject, of, catchError } from 'rxjs';
 import { AuthService } from './auth.service';
 import {
   ErpBatchItem,
@@ -193,7 +193,13 @@ export class CopilotService {
     if (!this.filterData$ || forceRefresh) {
       this.filterData$ = undefined;
       const url = this.backendBaseUrl ? `${this.backendBaseUrl}/api/student/copilot-filters` : '/api/student/copilot-filters';
-      this.filterData$ = this.http.get<StudentCopilotFilterData>(url).pipe(
+      this.filterData$ = this.http.get<StudentCopilotFilterData>(url, {
+        headers: {
+          'X-Skip-Auth-Redirect': 'true',
+          'X-Copilot-Silent': 'true'
+        }
+      }).pipe(
+        catchError(() => of({ modules: [], levels: [], types: [] })),
         shareReplay(1)
       );
     }
