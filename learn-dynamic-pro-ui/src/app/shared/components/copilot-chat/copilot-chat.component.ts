@@ -9,6 +9,7 @@ import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterSta
 import { ErpFormDriverService } from '../../../core/services/erp-form-driver.service';
 import { ErpBatchStepperService } from '../../../core/services/erp-batch-stepper.service';
 import { ErpNavigatorService } from '../../../core/services/erp-navigator.service';
+import { ErpBridgeService } from '../../../core/services/erp-bridge.service';
 import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } from '../../../core/models/erp-form.models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
@@ -47,6 +48,10 @@ export interface ChatMessage {
   decisionId?: string | null;
   /** Interactive navigation options suggested when intent is ambiguous (decision: 'ask') */
   askOptions?: NavScored[];
+  /** Save lifecycle after the form was filled (manual confirm or optional auto-save) */
+  saveStatus?: 'saving' | 'saved' | 'failed';
+  /** User-facing result of the save attempt */
+  saveMessage?: string;
 }
 
 @Component({
@@ -60,7 +65,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   private copilotService = inject(CopilotService);
   private formDriver = inject(ErpFormDriverService);
   private navigator = inject(ErpNavigatorService);
+  private bridge = inject(ErpBridgeService);
   batchStepper = inject(ErpBatchStepperService);
+  /** Optional: when on, saves right after a clean (fully filled) form fill. Off by default. */
+  autoSaveAfterFill = false;
   private router = inject(Router, { optional: true });
   private cdr = inject(ChangeDetectorRef);
   private elRef = inject(ElementRef);
@@ -651,9 +659,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
         console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
         await this.navigator.navigateToScreen(targetScreen);
-        this.erpKey = targetScreen;
         await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
       }
+      this.syncErpKey(targetScreen);
+
+      // Ensure form entry is prepared/opened if currently on a list view
+      await this.navigator.prepareFreshForm();
 
       const report = await this.formDriver.applyProgressiveFill(
         msg.formFillData.fields,
@@ -672,9 +683,50 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       if (report.success && msg.decisionId && this.copilotService) {
         this.copilotService.feedbackErpNavigation(msg.decisionId, 'applied');
       }
+
+      // 💾 Optional auto-save: only if every requested field was filled cleanly
+      const hasUnresolved = report.results.some(r => r.status === 'not_found' || r.status === 'ambiguous');
+      if (this.autoSaveAfterFill && report.success && !hasUnresolved) {
+        await this.confirmSave(msg);
+      }
     } catch (err) {
       console.error('[Copilot FormFill] Execution error:', err);
     }
+  }
+
+  /**
+   * Saves the currently open ERP form through the official bridge.
+   * Triggered only by the user's explicit click or by the opt-in auto-save toggle.
+   */
+  async confirmSave(msg: ChatMessage): Promise<void> {
+    if (msg.saveStatus === 'saving' || msg.saveStatus === 'saved') return;
+
+    msg.saveStatus = 'saving';
+    msg.saveMessage = undefined;
+    this.cdr.markForCheck();
+
+    if (!this.bridge.isAvailable) {
+      msg.saveStatus = 'failed';
+      msg.saveMessage = 'جسر الـ ERP غير متاح هنا. اضغط زر الحفظ يدوياً داخل الشاشة.';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    const ok = await this.bridge.submitActiveForm();
+    msg.saveStatus = ok ? 'saved' : 'failed';
+    msg.saveMessage = ok
+      ? 'تم إرسال أمر الحفظ إلى الـ ERP. راجع الشاشة للتأكد من نجاح العملية.'
+      : 'تعذر إرسال أمر الحفظ. راجع الحقول في الشاشة ثم اضغط حفظ يدوياً.';
+    console.info('[Copilot Save] submitActiveForm result:', { ok });
+    this.cdr.markForCheck();
+  }
+
+  /**
+   * Keeps erpKey aligned with the real active ERP screen (bridge) instead of temporary DOM ids.
+   */
+  private syncErpKey(fallback?: string): void {
+    const next = this.bridge.getActiveScreen()?.pageName || fallback;
+    if (next) this.erpKey = next;
   }
 
   /**
@@ -688,7 +740,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
       console.info('%c[Copilot Batch] Screen mismatch! Navigating to:', 'color:#3b82f6;font-weight:bold', targetScreen);
       await this.navigator.navigateToScreen(targetScreen);
-      this.erpKey = targetScreen;
+      this.syncErpKey(targetScreen);
       await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
     }
 
@@ -748,7 +800,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     console.info('%c[Copilot Navigation] User clicked ambiguity chip:', 'color:#3b82f6;font-weight:bold', option);
     // 1. Navigate to chosen screen
     await this.navigator.navigateToScreen(option.id);
-    this.erpKey = option.id;
+    this.syncErpKey(option.id);
     // 2. Wait for DOM to settle
     await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
     // 3. Re-run streamQuery on the newly selected screen
@@ -785,7 +837,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
         if (navRes.success && navRes.chosen) {
           console.info('%c[Copilot Navigation] Auto-navigated to target screen:', 'color:#10b981;font-weight:bold', navRes.chosen.id);
-          this.erpKey = navRes.chosen.id;
+          this.syncErpKey(navRes.chosen.id);
           // Wait for DOM & Angular components to settle on the new screen
           await this.formDriver.settle(undefined, { quietMs: 300, maxMs: 1500 });
         } else if (navRes.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {

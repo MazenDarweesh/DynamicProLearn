@@ -40,6 +40,19 @@ export class ErpFormDriverService {
   private copilotService = inject(CopilotService, { optional: true });
 
   /**
+   * Resolves the live form container so hidden background tabs are never inspected.
+   * Order: floating modal form → visible tab's form → visible tab → whole document (non-ERP/mock hosts).
+   */
+  getActiveFormRoot(): ParentNode {
+    if (typeof document === 'undefined') return document;
+    const root =
+      document.querySelector('.cdk-overlay-container .dp-modal app-add-or-edit') ||
+      document.querySelector('.dp-shell__pages > div:not([hidden]) app-add-or-edit') ||
+      document.querySelector('.dp-shell__pages > div:not([hidden])');
+    return root || document;
+  }
+
+  /**
    * Waits for a condition to be satisfied using MutationObserver without arbitrary setTimeout.
    */
   async waitFor<T>(
@@ -165,9 +178,11 @@ export class ErpFormDriverService {
       const schemas: FormFieldSchema[] = [];
       const seenKeys = new Set<string>();
 
+      const formRoot = this.getActiveFormRoot();
+
       // 1. Gather custom dropdown hosts (e.g. <eg-select>, <ng-select>, <mat-select>)
       const customSelectHosts = Array.from(
-        document.querySelectorAll('eg-select, ng-select, mat-select')
+        formRoot.querySelectorAll('eg-select, ng-select, mat-select')
       ) as HTMLElement[];
 
       for (const host of customSelectHosts) {
@@ -203,7 +218,7 @@ export class ErpFormDriverService {
 
       // 2. Gather standard input, select, textarea elements
       const inputs = Array.from(
-        document.querySelectorAll('input, select, textarea')
+        formRoot.querySelectorAll('input, select, textarea')
       ) as (HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement)[];
 
       for (const el of inputs) {
@@ -213,8 +228,15 @@ export class ErpFormDriverService {
         if (el.closest('ng-select, eg-select, mat-select')) continue;
         if (el.type === 'hidden') continue;
 
+        // Skip table pagination, master-list internal search bar, and numeric row checkboxes
+        if (el.closest('.dp-table__pagination, app-master-list-switch, .dataTables_paginate')) continue;
+
         const rawName = el.getAttribute('name') || el.id || el.getAttribute('placeholder') || '';
         const cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
+
+        // Filter out non-business grid controls
+        if (/^(dpCheckAll|pageSeachValue|dpLimit|\d+)$/i.test(cleanName)) continue;
+
         const labelText = this.findLabelForElement(el);
 
         const key = cleanName || (labelText ? `field_${labelText}` : '');
@@ -649,7 +671,7 @@ export class ErpFormDriverService {
     ];
 
     for (const sel of selectors) {
-      const el = document.querySelector(sel) as HTMLInputElement;
+      const el = this.getActiveFormRoot().querySelector(sel) as HTMLInputElement;
       if (el && el.value && el.value.trim()) {
         const num = el.value.trim().replace(/,/g, '');
         if (!isNaN(Number(num))) return num;
@@ -657,7 +679,7 @@ export class ErpFormDriverService {
     }
 
     // Try finding label with "إجمالي" or "صافي"
-    const labels = Array.from(document.querySelectorAll('label'));
+    const labels = Array.from(this.getActiveFormRoot().querySelectorAll('label'));
     for (const lbl of labels) {
       const text = normalizeArabicText(lbl.textContent || '');
       if (text.includes('اجمالي') || text.includes('صافي')) {
@@ -682,10 +704,11 @@ export class ErpFormDriverService {
     if (typeof document === 'undefined' || !key) return null;
 
     const clean = key.trim().replace(/^['"]|['"]$/g, '');
+    const formRoot = this.getActiveFormRoot();
 
     // 1. Check custom dropdown hosts first
     const customCandidates = Array.from(
-      document.querySelectorAll(`eg-select[name="${clean}" i], ng-select[name="${clean}" i], [name="${clean}" i]`)
+      formRoot.querySelectorAll(`eg-select[name="${clean}" i], ng-select[name="${clean}" i], [name="${clean}" i]`)
     ) as HTMLElement[];
 
     for (const cand of customCandidates) {
@@ -695,7 +718,7 @@ export class ErpFormDriverService {
 
     // 2. Check standard inputs / selects / textareas
     const safeSelector = `input[name="${clean}" i], select[name="${clean}" i], textarea[name="${clean}" i], [data-testid="${clean}" i]`;
-    const elements = Array.from(document.querySelectorAll(safeSelector)) as HTMLElement[];
+    const elements = Array.from(formRoot.querySelectorAll(safeSelector)) as HTMLElement[];
     for (const el of elements) {
       if (excludeContainer && excludeContainer.contains(el)) continue;
       return el;
@@ -703,7 +726,7 @@ export class ErpFormDriverService {
 
     // 3. Fallback: match by label text
     const normalizedKey = normalizeArabicText(clean);
-    const labels = Array.from(document.querySelectorAll('label'));
+    const labels = Array.from(formRoot.querySelectorAll('label'));
     for (const lbl of labels) {
       if (excludeContainer && excludeContainer.contains(lbl)) continue;
       const lblText = normalizeArabicText(lbl.textContent || '');
@@ -770,7 +793,7 @@ export class ErpFormDriverService {
     let filledRowsCount = 0;
     try {
       const tables = Array.from(
-        document.querySelectorAll('table, mat-table, ag-grid, [role="grid"]')
+        this.getActiveFormRoot().querySelectorAll('table, mat-table, ag-grid, [role="grid"]')
       ) as HTMLElement[];
 
       const table = tables.find((t) => !excludeContainer || !excludeContainer.contains(t));

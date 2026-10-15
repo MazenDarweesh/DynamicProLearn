@@ -287,15 +287,40 @@
                 </div>
 
                 <div class="form-fill-footer">
+                  <label *ngIf="!msg.formFillApplied" class="auto-save-toggle" title="يحفظ تلقائياً فقط إذا تمت تعبئة كل الحقول بنجاح">
+                    <input type="checkbox" [(ngModel)]="autoSaveAfterFill" name="autoSaveAfterFill">
+                    <span>💾 حفظ تلقائي بعد التعبئة</span>
+                  </label>
                   <button *ngIf="!msg.formFillApplied" type="button" class="btn-apply-form-fill" (click)="applyFormFill(msg)">
                     <span class="btn-icon">✨</span>
                     <span>تعبئة شاشة الـ ERP الآن</span>
                   </button>
-                  <div *ngIf="msg.formFillApplied" class="form-fill-applied-badge">
+                </div>
+
+                <!-- Save confirmation card (shown after the fields were filled) -->
+                <div *ngIf="msg.formFillApplied" class="form-fill-save-card">
+                  <div class="form-fill-applied-badge">
                     <span>✅</span>
-                    <span>تم ملء الحقول بنجاح في الصفحة! راجع البيانات واضغط حفظ.</span>
+                    <span>تم ملء الحقول في الصفحة. راجع البيانات ثم أكّد الحفظ.</span>
+                  </div>
+
+                  <div *ngIf="msg.saveStatus !== 'saved'" class="save-actions">
+                    <button type="button" class="btn-confirm-save"
+                            [disabled]="msg.saveStatus === 'saving'"
+                            (click)="confirmSave(msg)">
+                      <span class="btn-icon">💾</span>
+                      <span>{{ msg.saveStatus === 'saving' ? 'جارٍ الحفظ...' : (msg.saveStatus === 'failed' ? 'إعادة محاولة الحفظ' : 'تأكيد وحفظ الآن') }}</span>
+                    </button>
+                    <span class="save-hint">أو راجع الحقول في الشاشة واحفظ بنفسك.</span>
+                  </div>
+
+                  <div *ngIf="msg.saveMessage" class="save-result"
+                       [class.save-result-ok]="msg.saveStatus === 'saved'"
+                       [class.save-result-err]="msg.saveStatus === 'failed'">
+                    {{ msg.saveMessage }}
                   </div>
                 </div>
+
               </ng-container>
 
             </div>

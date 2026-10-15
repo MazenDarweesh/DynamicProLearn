@@ -2,12 +2,14 @@ import { Injectable, inject } from '@angular/core';
 import { NavCandidateIn, NavResolution, NavScored, ControlIn } from '../models/erp-form.models';
 import { normalizeArabicText } from './erp-form-driver.service';
 import { CopilotService } from './copilot.service';
+import { ErpBridgeService } from './erp-bridge.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ErpNavigatorService {
   private copilotService = inject(CopilotService, { optional: true });
+  private bridge = inject(ErpBridgeService);
   private candidateElementsMap = new Map<string, HTMLElement>();
 
   /**
@@ -21,6 +23,12 @@ export class ErpNavigatorService {
   isScreenActive(screenKey: string): boolean {
     if (!screenKey) return false;
     const normalizedKey = normalizeArabicText(screenKey);
+
+    // 0. Official ERP bridge (authoritative positive match)
+    const active = this.bridge.getActiveScreen();
+    if (active?.pageName && normalizeArabicText(active.pageName) === normalizedKey) {
+      return true;
+    }
 
     // 1. Check active tab or button with .active / .is-active specifically for this screenKey
     const activeTab = document.querySelector(
@@ -79,6 +87,14 @@ export class ErpNavigatorService {
   async navigateToScreen(screenKey: string): Promise<boolean> {
     if (this.isScreenActive(screenKey)) {
       return true;
+    }
+
+    // Priority 1: official ERP bridge
+    if (await this.bridge.navigateToScreen(screenKey)) {
+      if (await this.waitForScreenReady(screenKey, 3000)) {
+        return true;
+      }
+      console.warn('[ErpNavigator] Bridge navigation did not reach target, falling back to DOM:', screenKey);
     }
 
     // 1. Dispatch custom event first so host / mock listeners switch screen immediately
@@ -148,11 +164,12 @@ export class ErpNavigatorService {
 
       const id = el.getAttribute('data-action') || el.id || `ctrl_${idx++}`;
       const text = (el.textContent || el.getAttribute('title') || el.getAttribute('aria-label') || '').trim();
-      if (!text && !el.getAttribute('class')) continue;
+      const cleanLabel = (text || el.getAttribute('title') || id).slice(0, 80).trim();
+      if (!cleanLabel) continue;
 
       controls.push({
         id,
-        label: text.slice(0, 80) || id
+        label: cleanLabel
       });
       elementMap.set(id, el);
     }
@@ -160,21 +177,53 @@ export class ErpNavigatorService {
   }
 
   /**
-   * Click the "New Document / Clear Form" button if present on the screen
-   * to ensure a clean slate before filling each batch item.
-   * Uses AI backend to resolve the button role with clean structural fallback.
+   * Clicks the "New Document / اضافة جديد" button on the screen or master list
+   * to open the creation form before filling data.
+   * Completely dynamic: recognizes DynamicPro ERP master list actions, fa-plus, and AI role classification.
    */
   async prepareFreshForm(): Promise<boolean> {
+    // 0. Official ERP bridge: opens the add/edit form natively
+    if (await this.bridge.triggerAddNew()) {
+      await this.delay(300);
+      return true;
+    }
+
+    // 1. Direct DynamicPro ERP Master-List action button (.dp-btn--primary.dp-list__act, or .fa-plus)
+    const masterAddBtn = document.querySelector<HTMLElement>(
+      'button.dp-btn--primary.dp-list__act, .dp-list__act.dp-btn--primary, button.dp-list__act i.fa-plus, button.dp-btn--new, [data-action="new"]'
+    );
+    const targetAddBtn = masterAddBtn?.closest('button') || masterAddBtn;
+    if (targetAddBtn && this.isElementVisible(targetAddBtn)) {
+      console.info('%c[ErpNavigator] Triggered "اضافة جديد" on Master List:', 'color:#10b981;font-weight:bold', targetAddBtn);
+      this.simulateClick(targetAddBtn);
+      await this.delay(600);
+      return true;
+    }
+
+    // 2. Text-based matching for action toolbar buttons ("اضافة جديد" / "جديد")
+    const allButtons = Array.from(document.querySelectorAll<HTMLElement>(
+      'app-master-list button, .dp-list__actions button, .header-actions button, button'
+    ));
+    for (const btn of allButtons) {
+      if (btn.closest('lms-ai-copilot, app-copilot-chat, nav, .dp-hdr')) continue;
+      if (!this.isElementVisible(btn)) continue;
+      const text = normalizeArabicText(btn.textContent || '');
+      if (text === 'اضافة جديد' || text === 'اضافه جديد' || text === 'جديد' || text === 'اضافة' || text === 'اضافه') {
+        console.info('%c[ErpNavigator] Triggered Add New by text match:', 'color:#10b981;font-weight:bold', text);
+        this.simulateClick(btn);
+        await this.delay(600);
+        return true;
+      }
+    }
+
+    // 3. AI-driven role classification for custom/unfamiliar screens
     const actionContainers = document.querySelectorAll<HTMLElement>(
       '.header-actions, .card-header, .erp-card, .dp-form-actions, [role="main"]'
     );
     const container = actionContainers.length > 0 ? actionContainers[0] : undefined;
     const { controls, elementMap } = this.scanVisibleControls(container);
 
-    if (controls.length === 0) return false;
-
-    // 1. AI-driven role classification
-    if (this.copilotService) {
+    if (controls.length > 0 && this.copilotService) {
       try {
         const screenId = document.querySelector('.screen-tag code')?.textContent?.trim() || 'CURRENT_SCREEN';
         const res = await this.copilotService.resolveErpControls({
@@ -187,24 +236,12 @@ export class ErpNavigatorService {
           const btn = elementMap.get(newFormId);
           if (btn) {
             this.simulateClick(btn);
-            await this.delay(300);
+            await this.delay(500);
             return true;
           }
         }
       } catch (e) {
         console.warn('[ErpNavigator] AI control resolution fallback:', e);
-      }
-    }
-
-    // 2. Structural attribute fallback (zero static keyword dictionaries)
-    for (const ctrl of controls) {
-      const el = elementMap.get(ctrl.id);
-      if (!el) continue;
-      const dataAction = el.getAttribute('data-action') || '';
-      if (el.classList.contains('dp-btn--new') || dataAction === 'new') {
-        this.simulateClick(el);
-        await this.delay(300);
-        return true;
       }
     }
 
@@ -222,6 +259,16 @@ export class ErpNavigatorService {
 
     if (typeof document === 'undefined') {
       return candidates;
+    }
+
+    // Official catalog from the ERP bridge (ids are real page names, never candidate_N)
+    const catalog = this.bridge.listScreens();
+    if (catalog && catalog.length > 0) {
+      return catalog.map(s => ({
+        id: s.pageName,
+        label: s.title || s.pageName,
+        path: s.module ? [s.module] : []
+      }));
     }
 
     const badContainers = '.dp-set, #dpSettingsLabel, lms-ai-copilot, app-copilot-chat';
@@ -327,12 +374,14 @@ export class ErpNavigatorService {
 
       if (res.decision === 'go' && res.candidates.length > 0) {
         const top = res.candidates[0];
+        const targetEl = this.candidateElementsMap.get(top.id);
+        const targetLabel = (targetEl?.textContent || top.id).trim();
+
         window.dispatchEvent(new CustomEvent('lms:navigate', {
           bubbles: true,
           composed: true,
-          detail: { screenKey: top.id, label: top.label }
+          detail: { screenKey: top.id, label: targetLabel }
         }));
-        const targetEl = this.candidateElementsMap.get(top.id);
 
         if (targetEl) {
           this.simulateClick(targetEl);

@@ -25,7 +25,21 @@ interface ErpScreen {
           <div class="erp-logo">🏢</div>
           <div>
             <h1 class="erp-title">DynamicPro ERP Enterprise</h1>
-            <span class="erp-subtitle">محاكي نظام تخطيط الموارد المؤسسية (بيئة الاختبار والتكامل)</span>
+            <span class="erp-subtitle">محاكي نظام تخطيط الموارد المؤسسية (بيئة الاختبار والتكامل الحية)</span>
+          </div>
+        </div>
+
+        <!-- ── Live Open Tabs (.dp-hdr__tab) ────────────────────────── -->
+        <div class="dp-hdr__tabs-strip" *ngIf="openTabs.length > 0">
+          <div *ngFor="let s of openTabs"
+               class="dp-hdr__tab"
+               [class.is-active]="activeScreen.key === s.key"
+               [attr.data-screen]="s.key"
+               (click)="switchScreen(s)">
+            <button type="button" class="dp-hdr__tab-open">
+              <span class="dp-hdr__tab-name">{{ s.name }}</span>
+            </button>
+            <span class="dp-hdr__tab-close" (click)="$event.stopPropagation(); closeTab(s)">×</span>
           </div>
         </div>
 
@@ -41,24 +55,57 @@ interface ErpScreen {
         </div>
       </header>
 
-      <!-- ── Screen Switcher Bar (Simulating ERP Navigation) ─────────────── -->
-      <nav class="erp-nav-bar">
-        <div class="nav-headline">
-          <span class="nav-icon">🧭</span>
-          <span>شاشات الـ ERP (انقر لاختبار استجابة الشات الفورية لكل شاشة):</span>
+      <!-- ── DynamicPro Real ERP Navigation Bar ──────────────────────── -->
+      <nav class="erp-nav-bar dp-menu-container">
+        <!-- 1. ERP Modules (.dp-pgs__mod) -->
+        <div class="dp-nav-section">
+          <div class="nav-headline">
+            <span class="nav-icon">📦</span>
+            <span>وحدات الـ ERP الرئيسية (الموديولات):</span>
+          </div>
+          <div class="dp-modules-bar">
+            <button *ngFor="let mod of erpModules"
+                    type="button"
+                    class="dp-pgs__mod"
+                    [class.is-active]="activeModule === mod"
+                    (click)="selectModule(mod)">
+              <span class="dp-pgs__mod-name">{{ mod }}</span>
+            </button>
+          </div>
         </div>
 
-        <div class="screen-tabs">
-          <button *ngFor="let s of erpScreens"
-                  type="button"
-                  class="screen-btn"
-                  [attr.data-screen]="s.key"
-                  [class.active]="activeScreen.key === s.key"
-                  (click)="switchScreen(s)">
-            <span class="screen-badge">{{ s.category }}</span>
-            <span class="screen-label">{{ s.name }}</span>
-            <code class="screen-code">[{{ s.key }}]</code>
-          </button>
+        <!-- 2. Categories / Filter Chips (.dp-cats__chip) -->
+        <div class="dp-nav-section">
+          <div class="dp-cats-bar">
+            <button *ngFor="let cat of filterChips"
+                    type="button"
+                    class="dp-cats__chip"
+                    [class.is-on]="activeChip === cat"
+                    (click)="activeChip = cat">
+              <span class="dp-cats__txt">{{ cat }}</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. Screen Tiles (.dp-pgs__tile) -->
+        <div class="dp-nav-section">
+          <div class="nav-headline">
+            <span class="nav-icon">🧭</span>
+            <span>الشاشات والبرامج المتاحة (انقر أو اطلب من الكوبيلوت التنقل والملء آلياً):</span>
+          </div>
+          <div class="screen-tabs dp-tiles-grid">
+            <div *ngFor="let s of getScreensForActiveModule()" class="dp-pgs__cell">
+              <button type="button"
+                      class="dp-pgs__tile screen-btn"
+                      [attr.data-screen]="s.key"
+                      [class.active]="activeScreen.key === s.key"
+                      (click)="switchScreen(s)">
+                <span class="screen-badge">{{ s.category }}</span>
+                <span class="dp-pgs__tile-name screen-label">{{ s.name }}</span>
+                <code class="screen-code">[{{ s.key }}]</code>
+              </button>
+            </div>
+          </div>
         </div>
       </nav>
 
@@ -74,7 +121,7 @@ interface ErpScreen {
                 <span class="screen-tag">ERP Key: <code>{{ activeScreen.key }}</code></span>
               </div>
               <div class="header-actions">
-                <button type="button" class="btn-erp btn-outline" title="تفريغ النموذج الحالي" (click)="clearCurrentScreenForm()">✨ جديد / تفريغ</button>
+                <button type="button" class="btn-erp btn-outline dp-btn--new" data-action="new" title="تفريغ النموذج الحالي" (click)="clearCurrentScreenForm()">✨ جديد / تفريغ</button>
                 <button class="btn-erp btn-primary">💾 حفظ</button>
                 <button class="btn-erp btn-secondary">🖨️ طباعة</button>
                 <button class="btn-erp btn-outline">↺ تراجع</button>
@@ -567,6 +614,40 @@ interface ErpScreen {
                 </div>
               </div>
 
+              <!-- 6. Simulated Employees Form (.dp-pgs__tile: الموظفين) -->
+              <div *ngIf="activeScreen.key === 'EMPLOYEES'" class="erp-form-grid" data-screen-content="EMPLOYEES">
+                <div class="form-group">
+                  <label>كود الموظف:</label>
+                  <input type="text" name="EmployeeCode" id="EmployeeCode" class="erp-input" value="EMP-2026-0089" readonly />
+                </div>
+                <div class="form-group">
+                  <label>اسم الموظف:</label>
+                  <input type="text" name="EmployeeName" id="EmployeeName" class="erp-input" placeholder="اكتب اسم الموظف..." />
+                </div>
+                <div class="form-group">
+                  <label>القسم / الإدارة:</label>
+                  <select name="Department" id="Department" class="erp-input">
+                    <option value="">-- اختر القسم --</option>
+                    <option value="الحسابات والمالية">الحسابات والمالية</option>
+                    <option value="المبيعات والتسويق">المبيعات والتسويق</option>
+                    <option value="المخازن واللوجستيات">المخازن واللوجستيات</option>
+                    <option value="الموارد البشرية">الموارد البشرية</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label>المسمى الوظيفي:</label>
+                  <input type="text" name="JobTitle" id="JobTitle" class="erp-input" placeholder="مثال: محاسب عام، أخصائي مبيعات..." />
+                </div>
+                <div class="form-group">
+                  <label>الراتب الأساسي:</label>
+                  <input type="number" name="BasicSalary" id="BasicSalary" class="erp-input" placeholder="0.00" />
+                </div>
+                <div class="form-group">
+                  <label>رقم الهاتف:</label>
+                  <input type="text" name="Phone" id="Phone" class="erp-input" placeholder="01xxxxxxxxx" />
+                </div>
+              </div>
+
               <!-- Integration Info Callout -->
               <div class="integration-callout">
                 <div class="callout-icon">💡</div>
@@ -707,14 +788,71 @@ interface ErpScreen {
     }
     .conn-status.connected { color: #4ade80; border-color: #22c55e; }
 
-    /* ── Screen Navigation ─────────────────────────────── */
+    /* ── Live ERP Header Tabs (.dp-hdr__tab) ──────────── */
+    .dp-hdr__tabs-strip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      margin: 0 16px;
+    }
+    .dp-hdr__tab {
+      display: inline-flex;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 6px 6px 0 0;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-size: 11px;
+      color: #cbd5e1;
+      transition: all 0.2s;
+    }
+    .dp-hdr__tab:hover {
+      background: rgba(255, 255, 255, 0.18);
+      color: #ffffff;
+    }
+    .dp-hdr__tab.is-active {
+      background: #ffffff;
+      color: #1e293b;
+      font-weight: 700;
+      border-color: #ffffff;
+      box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
+    }
+    .dp-hdr__tab-open {
+      background: transparent;
+      border: none;
+      color: inherit;
+      font-family: inherit;
+      font-size: inherit;
+      font-weight: inherit;
+      cursor: pointer;
+      padding: 0;
+    }
+    .dp-hdr__tab-close {
+      margin-right: 6px;
+      font-size: 14px;
+      color: #94a3b8;
+      cursor: pointer;
+    }
+    .dp-hdr__tab-close:hover {
+      color: #ef4444;
+    }
+
+    /* ── Live ERP Navigation Bar ───────────────────────── */
     .erp-nav-bar {
       background: #ffffff;
-      padding: 10px 24px;
+      padding: 12px 24px;
       border-bottom: 1px solid #e2e8f0;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+    .dp-nav-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
     }
     .nav-headline {
       font-size: 12px;
@@ -724,30 +862,91 @@ interface ErpScreen {
       align-items: center;
       gap: 6px;
     }
-    .screen-tabs {
+
+    /* 1. Modules Bar (.dp-pgs__mod) */
+    .dp-modules-bar {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .dp-pgs__mod {
+      padding: 6px 14px;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.18s;
+    }
+    .dp-pgs__mod:hover {
+      background: #f1f5f9;
+      border-color: #cbd5e1;
+    }
+    .dp-pgs__mod.is-active {
+      background: #1e293b;
+      color: #ffffff;
+      border-color: #1e293b;
+      box-shadow: 0 2px 6px rgba(30, 41, 59, 0.2);
+    }
+
+    /* 2. Filter Chips (.dp-cats__chip) */
+    .dp-cats-bar {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .dp-cats__chip {
+      padding: 3px 10px;
+      border-radius: 14px;
+      border: 1px solid #cbd5e1;
+      background: #ffffff;
+      color: #64748b;
+      font-size: 11px;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .dp-cats__chip:hover {
+      background: #f8fafc;
+    }
+    .dp-cats__chip.is-on {
+      background: #3b82f6;
+      color: #ffffff;
+      border-color: #3b82f6;
+      font-weight: 600;
+    }
+
+    /* 3. Screen Tiles (.dp-pgs__tile) */
+    .dp-tiles-grid {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
     }
-    .screen-btn {
+    .dp-pgs__cell {
+      display: inline-flex;
+    }
+    .dp-pgs__tile, .screen-btn {
       display: flex;
       align-items: center;
       gap: 8px;
       padding: 8px 14px;
       border-radius: 8px;
       border: 1px solid #cbd5e1;
-      background: #f8fafc;
+      background: #ffffff;
       color: #334155;
       cursor: pointer;
       font-size: 12px;
       font-family: inherit;
       transition: all 0.2s;
     }
-    .screen-btn:hover {
-      background: #f1f5f9;
+    .dp-pgs__tile:hover, .screen-btn:hover {
+      background: #f8fafc;
       border-color: #94a3b8;
     }
-    .screen-btn.active {
+    .dp-pgs__tile.active, .screen-btn.active {
       background: #eff6ff;
       border-color: #3b82f6;
       color: #1d4ed8;
@@ -761,7 +960,7 @@ interface ErpScreen {
       border-radius: 4px;
       color: #475569;
     }
-    .screen-btn.active .screen-badge {
+    .dp-pgs__tile.active .screen-badge, .screen-btn.active .screen-badge {
       background: #dbeafe;
       color: #1e40af;
     }
@@ -1250,10 +1449,61 @@ export class ErpMockComponent implements OnInit {
       category: 'إدارة المستودعات',
       description: 'شاشة الجرد الفعلي للمخزون وتسجيل الرصيد الفعلي وحساب العجز أو الزيادة والتسوية الجردية آلياً.',
       sampleQuery: 'عايز اعمل محضر جرد لمخزن القاهرة نوع التسوية تسوية جردية لصنف شاشات حاسوب الرصيد الفعلي 8'
+    },
+    {
+      key: 'EMPLOYEES',
+      name: 'الموظفين',
+      category: 'شئون الموظفين',
+      description: 'شاشة إدارة ملفات وبيانات الموظفين والرواتب والأقسام والتكويدات العامة في النظام.',
+      sampleQuery: 'عايز اضيف موظف جديد باسم احمد علي في قسم المبيعات براتب 8000 جنيه'
     }
   ];
 
   activeScreen: ErpScreen = this.erpScreens[0];
+
+  erpModules: string[] = [
+    'الجميع',
+    'العملاء و المبيعات',
+    'الموردين و المشتريات',
+    'المخازن',
+    'الحسابات العامه',
+    'شئون الموظفين'
+  ];
+
+  activeModule: string = 'الجميع';
+
+  filterChips: string[] = ['الجميع', 'الحركات', 'التكويدات', 'التقارير'];
+  activeChip: string = 'الجميع';
+
+  openTabs: ErpScreen[] = [];
+
+  selectModule(mod: string) {
+    this.activeModule = mod;
+    this.cdr.detectChanges();
+  }
+
+  getScreensForActiveModule(): ErpScreen[] {
+    if (!this.activeModule || this.activeModule === 'الجميع') {
+      return this.erpScreens;
+    }
+    const moduleMap: Record<string, string[]> = {
+      'العملاء و المبيعات': ['SALES_INVOICE', 'NEW_CUSTOMER'],
+      'الموردين و المشتريات': ['PURCHASE_INVOICE'],
+      'المخازن': ['INVENTORY_AUDIT'],
+      'الحسابات العامه': ['JOURNAL_ENTRY'],
+      'شئون الموظفين': ['EMPLOYEES']
+    };
+    const allowed = moduleMap[this.activeModule] || [];
+    return this.erpScreens.filter(s => allowed.includes(s.key));
+  }
+
+  closeTab(screen: ErpScreen) {
+    this.openTabs = this.openTabs.filter(s => s.key !== screen.key);
+    if (this.activeScreen.key === screen.key && this.openTabs.length > 0) {
+      this.switchScreen(this.openTabs[this.openTabs.length - 1]);
+    }
+    this.cdr.detectChanges();
+  }
 
   // 1. Purchase Invoice State
   mockSupplierDetails = { name: '', address: '', phone: '', taxFile: '' };
@@ -1398,6 +1648,9 @@ export class ErpMockComponent implements OnInit {
         { itemCode: '', itemName: '', unit: 'قطعة', bookQty: 0, actualQty: 0, unitCost: 0 }
       ];
       this.calcAuditTotals();
+    } else if (this.activeScreen.key === 'EMPLOYEES') {
+      const inputs = document.querySelectorAll('[data-screen-content="EMPLOYEES"] input, [data-screen-content="EMPLOYEES"] select');
+      inputs.forEach(i => (i as HTMLInputElement).value = '');
     }
   }
 
@@ -1420,10 +1673,14 @@ export class ErpMockComponent implements OnInit {
         this.authService.login(this.mockDevToken);
       }
     }
+    this.openTabs = [this.activeScreen];
   }
 
   switchScreen(screen: ErpScreen) {
     this.activeScreen = screen;
+    if (!this.openTabs.some(t => t.key === screen.key)) {
+      this.openTabs.push(screen);
+    }
     this.cdr.detectChanges();
   }
 
@@ -1431,8 +1688,20 @@ export class ErpMockComponent implements OnInit {
   onLmsNavigate(e: Event) {
     const customEvt = e as CustomEvent;
     const key = customEvt.detail?.screenKey;
-    if (key) {
-      const found = this.erpScreens.find(s => s.key === key || s.name.includes(key));
+    const label = customEvt.detail?.label;
+    if (key || label) {
+      // 1. Check if matches a module name
+      if (this.erpModules.includes(label) || this.erpModules.includes(key)) {
+        const targetMod = this.erpModules.find(m => m === label || m === key);
+        if (targetMod) {
+          console.info('%c[ErpMock] Switched active module via lms:navigate to:', 'color:#10b981;font-weight:bold', targetMod);
+          this.selectModule(targetMod);
+          return;
+        }
+      }
+
+      // 2. Check if matches a screen
+      const found = this.erpScreens.find(s => s.key === key || s.name.includes(key) || (label && s.name.includes(label)));
       if (found) {
         console.info('%c[ErpMock] Switched active screen via lms:navigate to:', 'color:#10b981;font-weight:bold', found.name);
         this.switchScreen(found);
