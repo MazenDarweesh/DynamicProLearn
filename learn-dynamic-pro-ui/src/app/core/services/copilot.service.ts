@@ -222,7 +222,10 @@ export class CopilotService {
     formSchema?: any[],
     erpIntent?: string
   ): Promise<void> {
-    const token = this.authService.token() || localStorage.getItem('jwt_token') || '';
+    let token = this.authService.token() || (typeof localStorage !== 'undefined' ? localStorage.getItem('jwt_token') : null) || '';
+    if (token && this.authService.isTokenExpired(token)) {
+      token = '';
+    }
 
     const payload: Record<string, any> = {
       query: query,
@@ -298,33 +301,57 @@ export class CopilotService {
     console.info('%c[CoPilot SSE] STREAM_START', 'color:#6366f1;font-weight:bold', { query, lessonId, filters });
 
     try {
+      const initialHeaders: Record<string, string> = {
+        'Accept': 'text/event-stream',
+        'Content-Type': 'application/json'
+      };
+      if (token) {
+        initialHeaders['Authorization'] = `Bearer ${token}`;
+      }
+
       let activeResponse = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Accept': 'text/event-stream',
-          'Content-Type': 'application/json'
-        },
+        headers: initialHeaders,
         body: JSON.stringify(payload)
       });
 
       if (activeResponse.status === 401) {
-        console.warn('[CoPilot SSE] 401 Unauthorized. Attempting silent token refresh...');
-        try {
-          const refreshRes = await firstValueFrom(this.authService.refreshToken());
-          const newToken = refreshRes?.token || this.authService.token() || '';
+        const isEmbedded = typeof window !== 'undefined' && !!(
+          (window as any).__LMS_COPILOT_EMBEDDED__ ||
+          (window as any).__ERP_HOST__ ||
+          (window as any).DynamicERP
+        );
+        const hasRefreshToken = typeof localStorage !== 'undefined' && !!localStorage.getItem('refresh_token');
+
+        if (hasRefreshToken && !isEmbedded) {
+          console.warn('[CoPilot SSE] 401 Unauthorized. Attempting silent token refresh...');
+          try {
+            const refreshRes = await firstValueFrom(this.authService.refreshToken());
+            const newToken = refreshRes?.token || this.authService.token() || '';
+            const retryHeaders: Record<string, string> = {
+              'Accept': 'text/event-stream',
+              'Content-Type': 'application/json'
+            };
+            if (newToken) retryHeaders['Authorization'] = `Bearer ${newToken}`;
+            activeResponse = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {
+              method: 'POST',
+              headers: retryHeaders,
+              body: JSON.stringify(payload)
+            });
+          } catch (refreshErr) {
+            console.error('[CoPilot SSE] Silent refresh failed:', refreshErr);
+            throw new Error('TOKEN_EXPIRED');
+          }
+        } else {
+          console.warn('[CoPilot SSE] 401 in ERP/Guest mode. Retrying stream without token...');
           activeResponse = await fetch(`${this.aiBaseUrl}/v1/search/stream`, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${newToken}`,
               'Accept': 'text/event-stream',
               'Content-Type': 'application/json'
             },
             body: JSON.stringify(payload)
           });
-        } catch (refreshErr) {
-          console.error('[CoPilot SSE] Silent refresh failed:', refreshErr);
-          throw new Error('TOKEN_EXPIRED');
         }
       }
 
