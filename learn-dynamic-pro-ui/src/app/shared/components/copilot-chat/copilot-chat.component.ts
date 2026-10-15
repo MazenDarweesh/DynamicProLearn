@@ -52,6 +52,8 @@ export interface ChatMessage {
   saveStatus?: 'saving' | 'saved' | 'failed';
   /** User-facing result of the save attempt */
   saveMessage?: string;
+  /** Immediate debouncing and loading state when user clicks apply button */
+  isApplyingFormFill?: boolean;
 }
 
 @Component({
@@ -651,7 +653,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
    * Handles text, number, date, checkbox, ng-select, native selects, and calculated total fields.
    */
   async applyFormFill(msg: ChatMessage): Promise<void> {
-    if (!msg.formFillData || typeof document === 'undefined') return;
+    if (!msg.formFillData || typeof document === 'undefined' || msg.isApplyingFormFill) return;
+
+    msg.isApplyingFormFill = true;
+    this.cdr.detectChanges();
 
     try {
       // 🚀 Safety Guard: Ensure ERP has navigated to the target screen before filling!
@@ -659,7 +664,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
         console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
         await this.navigator.navigateToScreen(targetScreen);
-        await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
+        await this.formDriver.settle(undefined, { quietMs: 60, maxMs: 500 });
       }
       this.syncErpKey(targetScreen);
 
@@ -691,8 +696,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       }
     } catch (err) {
       console.error('[Copilot FormFill] Execution error:', err);
+    } finally {
+      msg.isApplyingFormFill = false;
+      this.cdr.detectChanges();
     }
   }
+
 
   /**
    * Saves the currently open ERP form through the official bridge.
@@ -712,14 +721,24 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       return;
     }
 
-    const ok = await this.bridge.submitActiveForm();
-    msg.saveStatus = ok ? 'saved' : 'failed';
-    msg.saveMessage = ok
-      ? 'تم إرسال أمر الحفظ إلى الـ ERP. راجع الشاشة للتأكد من نجاح العملية.'
-      : 'تعذر إرسال أمر الحفظ. راجع الحقول في الشاشة ثم اضغط حفظ يدوياً.';
-    console.info('[Copilot Save] submitActiveForm result:', { ok });
+    const res = await this.bridge.submitActiveForm();
+    if (res.success) {
+      msg.saveStatus = 'saved';
+      msg.saveMessage = res.docId
+        ? `✅ تم الحفظ بنجاح في نظام الـ ERP! رقم المستند: #${res.docId}`
+        : (res.message || '✅ تم إرسال أمر الحفظ بنجاح إلى الـ ERP.');
+    } else {
+      msg.saveStatus = 'failed';
+      if (res.errors && res.errors.length > 0) {
+        msg.saveMessage = `⚠️ لم يتم الحفظ لوجود حقول إلزامية ناقصة: ${res.errors.join('، ')}`;
+      } else {
+        msg.saveMessage = res.message || '⚠️ تعذر إرسال أمر الحفظ. راجع الحقول في الشاشة ثم اضغط حفظ يدوياً.';
+      }
+    }
+    console.info('[Copilot Save] submitActiveForm result:', res);
     this.cdr.markForCheck();
   }
+
 
   /**
    * Keeps erpKey aligned with the real active ERP screen (bridge) instead of temporary DOM ids.

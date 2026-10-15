@@ -23,43 +23,85 @@ export class ErpNavigatorService {
   isScreenActive(screenKey: string): boolean {
     if (!screenKey) return false;
     const normalizedKey = normalizeArabicText(screenKey);
+    const upperKey = screenKey.toUpperCase().trim();
 
     // 0. Official ERP bridge (authoritative positive match)
     const active = this.bridge.getActiveScreen();
-    if (active?.pageName && normalizeArabicText(active.pageName) === normalizedKey) {
-      return true;
+    if (active) {
+      if (active.pageName && (
+        normalizeArabicText(active.pageName) === normalizedKey ||
+        active.pageName.toUpperCase().trim() === upperKey
+      )) {
+        return true;
+      }
+      if (active.title && (
+        normalizeArabicText(active.title) === normalizedKey ||
+        active.title.toUpperCase().trim() === upperKey
+      )) {
+        return true;
+      }
+      // If bridge has listScreens(), check if active page corresponds to the requested screenKey
+      const screens = this.bridge.listScreens();
+      if (screens) {
+        const matchedTarget = screens.find(s =>
+          (s.pageName && s.pageName.toUpperCase().trim() === upperKey) ||
+          (s.title && normalizeArabicText(s.title) === normalizedKey) ||
+          String(s.pageId) === screenKey
+        );
+        if (matchedTarget && (matchedTarget.pageId === active.pageId || matchedTarget.pageName === active.pageName)) {
+          return true;
+        }
+      }
     }
 
     // 1. Check active tab or button with .active / .is-active specifically for this screenKey
     const activeTab = document.querySelector(
-      `.screen-btn.active[data-screen="${screenKey}"], .dp-hdr__tab.is-active[data-screen="${screenKey}"], .dp-mods__card.is-active[data-screen="${screenKey}"], .dp-pgs__mod.is-active[data-screen="${screenKey}"]`
+      `.screen-btn.active[data-screen="${screenKey}"], .screen-btn.active[data-screen="${upperKey}"], .dp-hdr__tab.is-active[data-screen="${screenKey}"], .dp-mods__card.is-active[data-screen="${screenKey}"], .dp-pgs__mod.is-active[data-screen="${screenKey}"]`
     );
     if (activeTab && this.isElementVisible(activeTab)) {
       return true;
     }
 
     // 2. Check active header tab text
-    const activeHdrTab = document.querySelector('.dp-hdr__tab.is-active .dp-hdr__tab-name, .dp-hdr__tab.is-active, .dp-hdr__trig-label');
-    if (activeHdrTab && normalizeArabicText(activeHdrTab.textContent || '') === normalizedKey) {
-      return true;
+    const activeHdrTabs = Array.from(document.querySelectorAll<HTMLElement>(
+      '.dp-hdr__tab.is-active .dp-hdr__tab-name, .dp-hdr__tab.is-active, .dp-hdr__trig-label'
+    ));
+    for (const tab of activeHdrTabs) {
+      const text = normalizeArabicText(tab.textContent || '');
+      if (text && (text === normalizedKey || text.includes(normalizedKey) || normalizedKey.includes(text))) {
+        return true;
+      }
     }
 
     // 3. Check active module text
-    const activeMod = document.querySelector('.dp-pgs__mod.is-active .dp-pgs__mod-name, .dp-pgs__mod.is-active');
-    if (activeMod && normalizeArabicText(activeMod.textContent || '') === normalizedKey) {
-      return true;
+    const activeMods = Array.from(document.querySelectorAll<HTMLElement>(
+      '.dp-pgs__mod.is-active .dp-pgs__mod-name, .dp-pgs__mod.is-active'
+    ));
+    for (const mod of activeMods) {
+      const text = normalizeArabicText(mod.textContent || '');
+      if (text && (text === normalizedKey || text.includes(normalizedKey))) {
+        return true;
+      }
     }
 
     // 4. Check if the active form content matches this screenKey
-    const formContent = document.querySelector(`[data-screen-content="${screenKey}"]`);
+    const formContent = document.querySelector(
+      `[data-screen-content="${screenKey}"], [data-screen-content="${upperKey}"]`
+    );
     if (formContent && this.isElementVisible(formContent)) {
       return true;
     }
 
-    // 5. Check active screen tag in ERP card header or main page title
-    const activeTag = document.querySelector('.screen-tag code, .page-title, h1, .dp-hdr__title');
-    if (activeTag && normalizeArabicText(activeTag.textContent || '') === normalizedKey) {
-      return true;
+    // 5. Check active screen tag in ERP card header or main page title (h1, h2, code)
+    const activeHeaders = Array.from(document.querySelectorAll<HTMLElement>(
+      '.card-header h2, .erp-card h2, .screen-tag code, .page-title, h1, h2, .dp-hdr__title'
+    ));
+    for (const hdr of activeHeaders) {
+      const text = normalizeArabicText(hdr.textContent || '');
+      const rawText = (hdr.textContent || '').toUpperCase().trim();
+      if (text === normalizedKey || rawText === upperKey || text.includes(normalizedKey)) {
+        return true;
+      }
     }
 
     return false;
@@ -91,31 +133,36 @@ export class ErpNavigatorService {
 
     // Priority 1: official ERP bridge
     if (await this.bridge.navigateToScreen(screenKey)) {
-      if (await this.waitForScreenReady(screenKey, 3000)) {
+      if (await this.waitForScreenReady(screenKey, 2500)) {
         return true;
       }
       console.warn('[ErpNavigator] Bridge navigation did not reach target, falling back to DOM:', screenKey);
     }
 
-    // 1. Dispatch custom event first so host / mock listeners switch screen immediately
+    // 1. Dispatch custom events so host / mock listeners switch screen immediately
     window.dispatchEvent(new CustomEvent('lms:navigate', {
       bubbles: true,
       composed: true,
       detail: { screenKey }
+    }));
+    window.dispatchEvent(new CustomEvent('window:lms:navigate', {
+      bubbles: true,
+      composed: true,
+      detail: { screenName: screenKey }
     }));
 
     // 2. Candidate map lookup
     const mapped = this.candidateElementsMap.get(screenKey);
     if (mapped) {
       this.simulateClick(mapped);
-      return await this.waitForScreenReady(screenKey, 3000);
+      return await this.waitForScreenReady(screenKey, 2500);
     }
 
     // 3. Look for element with exact [data-screen="${screenKey}"]
-    const directTarget = document.querySelector<HTMLElement>(`[data-screen="${screenKey}"]`);
+    const directTarget = document.querySelector<HTMLElement>(`[data-screen="${screenKey}"], [data-screen="${screenKey.toUpperCase().trim()}"]`);
     if (directTarget && this.isElementVisible(directTarget)) {
       this.simulateClick(directTarget);
-      return await this.waitForScreenReady(screenKey, 3000);
+      return await this.waitForScreenReady(screenKey, 2500);
     }
 
     // 4. Fallback: match text against tiles, modules, or tabs
@@ -127,25 +174,66 @@ export class ErpNavigatorService {
       const text = normalizeArabicText(el.textContent || '');
       if (text && (text === normalizedTarget || text.includes(normalizedTarget))) {
         this.simulateClick(el);
-        return await this.waitForScreenReady(screenKey, 3000);
+        return await this.waitForScreenReady(screenKey, 2500);
       }
     }
 
-    return await this.waitForScreenReady(screenKey, 2000);
+    return await this.waitForScreenReady(screenKey, 1500);
   }
 
   /**
-   * Waits for target screen DOM elements to become visible and ready.
+   * Waits for target screen DOM elements to become visible AND fully loaded.
+   * Handles slow ERP screens, background network requests, and @defer component rendering.
    */
-  async waitForScreenReady(screenKey: string, timeoutMs = 3000): Promise<boolean> {
+  async waitForScreenReady(screenKey: string, timeoutMs = 2500): Promise<boolean> {
     const startTime = Date.now();
+    let tabActivated = false;
+
     while (Date.now() - startTime < timeoutMs) {
       if (this.isScreenActive(screenKey)) {
-        return true;
+        tabActivated = true;
+        // Verify screen content itself has finished rendering and is not busy
+        if (this.isScreenContentLoaded()) {
+          return true;
+        }
       }
-      await this.delay(150);
+      await this.delay(50);
     }
-    return this.isScreenActive(screenKey);
+    return tabActivated;
+  }
+
+  /**
+   * Checks whether the active screen content has rendered its primary container
+   * and is not currently blocked by a busy state or loading spinner.
+   */
+  isScreenContentLoaded(): boolean {
+    if (typeof document === 'undefined') return true;
+
+    // 1. Check if the bridge reports PageBusyService is active
+    if (this.bridge.isPageBusy()) {
+      return false;
+    }
+
+    // 2. Identify the active screen container in DynamicPro shell
+    const activeContainer =
+      (document.querySelector('.dp-shell__pages > div:not([hidden])') as HTMLElement) ||
+      (document.querySelector('[role="main"]') as HTMLElement) ||
+      document.body;
+
+    // 3. Check for active loading spinners inside container
+    const spinner = activeContainer.querySelector(
+      '.dp-spinner, .loading-spinner, .dp-busy, .spinner-border, [role="progressbar"], .mat-progress-spinner, app-loading'
+    );
+    if (spinner && this.isElementVisible(spinner)) {
+      return false;
+    }
+
+    // 4. Check if standard ERP elements exist (Grid, Table, MasterList, or Form)
+    const hasCoreComponent = activeContainer.querySelector(
+      '#dpGrid, app-master-list, .dp-table, .dp-list__act, button.dp-btn--primary, app-add-or-edit, .dp-form, input, select'
+    );
+
+    return !!hasCoreComponent;
   }
 
   /**
@@ -179,14 +267,77 @@ export class ErpNavigatorService {
   /**
    * Clicks the "New Document / اضافة جديد" button on the screen or master list
    * to open the creation form before filling data.
-   * Completely dynamic: recognizes DynamicPro ERP master list actions, fa-plus, and AI role classification.
+   * Completely dynamic and resilient to slow screen loading:
+   * 1. Checks if form is already open
+   * 2. Tries official bridge triggerAddNew()
+   * 3. Falls back to DOM buttons with retry polling
+   * 4. Confirms that the AddOrEdit form container has rendered in the DOM
    */
-  async prepareFreshForm(): Promise<boolean> {
-    // 0. Official ERP bridge: opens the add/edit form natively
-    if (await this.bridge.triggerAddNew()) {
-      await this.delay(300);
+  async prepareFreshForm(maxWaitMs = 3000): Promise<boolean> {
+    // 0. If form is already open and ready, proceed immediately in 0ms!
+    if (this.isFormAlreadyOpen()) {
       return true;
     }
+
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitMs) {
+      // Priority 1: Official ERP bridge
+      if (this.bridge.isAvailable) {
+        const opened = await this.bridge.triggerAddNew();
+        if (opened) {
+          const ready = await this.waitForFormContainer(1200);
+          if (ready) return true;
+        }
+      }
+
+      // Priority 2: DOM Add-New button fallback
+      const clicked = this.triggerDomAddNew();
+      if (clicked) {
+        const ready = await this.waitForFormContainer(1200);
+        if (ready) return true;
+      }
+
+      await this.delay(100);
+
+      if (this.isFormAlreadyOpen()) {
+        return true;
+      }
+    }
+
+    return this.isFormAlreadyOpen();
+  }
+
+  /**
+   * Checks whether an AddOrEdit form container, modal, or mock form is currently open in the DOM.
+   */
+  isFormAlreadyOpen(): boolean {
+    if (typeof document === 'undefined') return false;
+    const form = document.querySelector(
+      '.cdk-overlay-container .dp-modal app-add-or-edit, .dp-shell__pages > div:not([hidden]) app-add-or-edit, .cdk-overlay-container .dp-modal, app-add-or-edit, .dp-form, .erp-card, [data-screen-content], .erp-form-grid, [role="main"] form'
+    );
+    return !!(form && this.isElementVisible(form));
+  }
+
+  /**
+   * Waits for the AddOrEdit form container to appear in the DOM with fast responsive polling.
+   */
+  async waitForFormContainer(timeoutMs = 1200): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+      if (this.isFormAlreadyOpen()) {
+        return true;
+      }
+      await this.delay(50);
+    }
+    return this.isFormAlreadyOpen();
+  }
+
+  /**
+   * Attempts to locate and click the Add New button via DOM selectors and text matching.
+   */
+  private triggerDomAddNew(): boolean {
+    if (typeof document === 'undefined') return false;
 
     // 1. Direct DynamicPro ERP Master-List action button (.dp-btn--primary.dp-list__act, or .fa-plus)
     const masterAddBtn = document.querySelector<HTMLElement>(
@@ -196,7 +347,6 @@ export class ErpNavigatorService {
     if (targetAddBtn && this.isElementVisible(targetAddBtn)) {
       console.info('%c[ErpNavigator] Triggered "اضافة جديد" on Master List:', 'color:#10b981;font-weight:bold', targetAddBtn);
       this.simulateClick(targetAddBtn);
-      await this.delay(600);
       return true;
     }
 
@@ -211,42 +361,12 @@ export class ErpNavigatorService {
       if (text === 'اضافة جديد' || text === 'اضافه جديد' || text === 'جديد' || text === 'اضافة' || text === 'اضافه') {
         console.info('%c[ErpNavigator] Triggered Add New by text match:', 'color:#10b981;font-weight:bold', text);
         this.simulateClick(btn);
-        await this.delay(600);
         return true;
       }
     }
-
-    // 3. AI-driven role classification for custom/unfamiliar screens
-    const actionContainers = document.querySelectorAll<HTMLElement>(
-      '.header-actions, .card-header, .erp-card, .dp-form-actions, [role="main"]'
-    );
-    const container = actionContainers.length > 0 ? actionContainers[0] : undefined;
-    const { controls, elementMap } = this.scanVisibleControls(container);
-
-    if (controls.length > 0 && this.copilotService) {
-      try {
-        const screenId = document.querySelector('.screen-tag code')?.textContent?.trim() || 'CURRENT_SCREEN';
-        const res = await this.copilotService.resolveErpControls({
-          screen_id: screenId,
-          controls
-        });
-
-        const newFormId = res.roles ? res.roles['new_form'] : undefined;
-        if (newFormId) {
-          const btn = elementMap.get(newFormId);
-          if (btn) {
-            this.simulateClick(btn);
-            await this.delay(500);
-            return true;
-          }
-        }
-      } catch (e) {
-        console.warn('[ErpNavigator] AI control resolution fallback:', e);
-      }
-    }
-
     return false;
   }
+
 
   /**
    * Scans visible ERP screen items (tiles, modules, tabs, cards, chips) from the active DOM.
@@ -264,12 +384,16 @@ export class ErpNavigatorService {
     // Official catalog from the ERP bridge (ids are real page names, never candidate_N)
     const catalog = this.bridge.listScreens();
     if (catalog && catalog.length > 0) {
-      return catalog.map(s => ({
-        id: s.pageName,
-        label: s.title || s.pageName,
-        path: s.module ? [s.module] : []
-      }));
+      return catalog.map(s => {
+        const mod = s.moduleName || s.module;
+        return {
+          id: s.pageName || (s.pageId ? String(s.pageId) : 'screen'),
+          label: s.title || s.pageName,
+          path: mod ? [mod] : []
+        };
+      });
     }
+
 
     const badContainers = '.dp-set, #dpSettingsLabel, lms-ai-copilot, app-copilot-chat';
     const domSelectors = [
@@ -382,6 +506,12 @@ export class ErpNavigatorService {
           composed: true,
           detail: { screenKey: top.id, label: targetLabel }
         }));
+        window.dispatchEvent(new CustomEvent('window:lms:navigate', {
+          bubbles: true,
+          composed: true,
+          detail: { screenName: top.id }
+        }));
+
 
         if (targetEl) {
           this.simulateClick(targetEl);

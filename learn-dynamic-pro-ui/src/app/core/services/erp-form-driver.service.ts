@@ -99,8 +99,8 @@ export class ErpFormDriverService {
   ): Promise<void> {
     if (typeof document === 'undefined') return;
 
-    const quietMs = options.quietMs ?? 250;
-    const maxMs = options.maxMs ?? 3000;
+    const quietMs = options.quietMs ?? 60;
+    const maxMs = options.maxMs ?? 800;
     const target = container || document.body;
 
     return new Promise<void>((resolve) => {
@@ -448,7 +448,10 @@ export class ErpFormDriverService {
             message: 'تم إدخال القيمة بنجاح',
           });
           // Quiesce/settle DOM after each successful input to trigger dependent reactive fields
-          await this.settle(targetElement.closest('form, app-base') as HTMLElement || undefined);
+          await this.settle(
+            (targetElement.closest('form, app-base, .erp-card, [data-screen-content]') as HTMLElement) || undefined,
+            { quietMs: 50, maxMs: 400 }
+          );
         } else {
           results.push({
             field: cleanKey,
@@ -466,7 +469,7 @@ export class ErpFormDriverService {
     if (rows && rows.length > 0) {
       const rowFilledCount = await this.fillGridRows(rows, excludeContainer, results);
       filledCount += rowFilledCount;
-      await this.settle();
+      await this.settle(undefined, { quietMs: 60, maxMs: 400 });
     }
 
     // ──────────────────────────────────────────────

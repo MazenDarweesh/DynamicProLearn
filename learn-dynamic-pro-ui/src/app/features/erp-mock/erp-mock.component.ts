@@ -1,4 +1,4 @@
-import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, inject, ChangeDetectorRef, HostListener } from '@angular/core';
+import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, OnDestroy, inject, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../core/services/auth.service';
@@ -1373,7 +1373,7 @@ interface ErpScreen {
     }
   `]
 })
-export class ErpMockComponent implements OnInit {
+export class ErpMockComponent implements OnInit, OnDestroy {
   authService = inject(AuthService);
   copilotService = inject(CopilotService);
   private cdr = inject(ChangeDetectorRef);
@@ -1674,7 +1674,56 @@ export class ErpMockComponent implements OnInit {
       }
     }
     this.openTabs = [this.activeScreen];
+
+    // Expose simulated DynamicERP native bridge on window for 100% faithful local testing
+    if (typeof window !== 'undefined') {
+      window.DynamicERP = {
+        listScreens: () => this.erpScreens.map((s, idx) => ({
+          pageId: 1000 + idx,
+          pageName: s.key,
+          title: s.name,
+          moduleId: idx + 1,
+          moduleName: s.category
+        })),
+        getActiveScreen: () => ({
+          pageId: 1000 + this.erpScreens.findIndex(s => s.key === this.activeScreen.key),
+          pageName: this.activeScreen.key
+        }),
+        navigateToScreen: (screenNameOrId: string | number) => {
+          const found = this.erpScreens.find(s =>
+            s.key === screenNameOrId ||
+            s.name === screenNameOrId ||
+            String(1000 + this.erpScreens.indexOf(s)) === String(screenNameOrId)
+          );
+          if (found) {
+            this.switchScreen(found);
+            return true;
+          }
+          return false;
+        },
+        triggerAddNew: () => {
+          this.clearCurrentScreenForm();
+          return true;
+        },
+        submitActiveForm: () => {
+          const fakeDocId = Math.floor(1000 + Math.random() * 9000).toString();
+          return {
+            success: true,
+            docId: fakeDocId,
+            message: `تم الحفظ بنجاح في محاكي الـ ERP! رقم المستند: #${fakeDocId}`
+          };
+        },
+        isPageBusy: () => false
+      };
+    }
   }
+
+  ngOnDestroy() {
+    if (typeof window !== 'undefined' && window.DynamicERP) {
+      delete window.DynamicERP;
+    }
+  }
+
 
   switchScreen(screen: ErpScreen) {
     this.activeScreen = screen;
