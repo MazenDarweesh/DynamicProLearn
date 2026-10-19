@@ -12,6 +12,7 @@ import {
 } from '../models/erp-form.models';
 import { CopilotService } from './copilot.service';
 import { ErpTelemetryService } from './erp-telemetry.service';
+import { ErpBridgeService } from './erp-bridge.service';
 
 /**
  * Normalizes Arabic text for flexible matching:
@@ -40,6 +41,7 @@ export function normalizeArabicText(text: string): string {
 export class ErpFormDriverService {
   private copilotService = inject(CopilotService, { optional: true });
   private telemetry = inject(ErpTelemetryService, { optional: true });
+  private bridge = inject(ErpBridgeService, { optional: true });
 
   /**
    * Resolves the live form container so hidden background tabs are never inspected.
@@ -354,6 +356,13 @@ export class ErpFormDriverService {
         return schemaField && !schemaField.disabled;
       });
 
+      // Sort readyKeys by DOM appearance in currentSchema to respect natural top-to-bottom cascade
+      readyKeys.sort((a, b) => {
+        const idxA = currentSchema.findIndex(s => s.key === a || normalizeArabicText(s.label) === normalizeArabicText(a));
+        const idxB = currentSchema.findIndex(s => s.key === b || normalizeArabicText(s.label) === normalizeArabicText(b));
+        return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
+      });
+
       if (readyKeys.length === 0) {
         // Check if there are newly revealed fields we don't have values for yet
         if (copilotService && userMessage && Object.keys(filledFields).length > 0) {
@@ -393,34 +402,44 @@ export class ErpFormDriverService {
       // Process ready fields in this pass
       for (const rawKey of readyKeys) {
         const rawVal = pendingFields[rawKey];
-        delete pendingFields[rawKey];
-
-        if (rawVal == null) continue;
+        if (rawVal == null) {
+          delete pendingFields[rawKey];
+          continue;
+        }
 
         const cleanKey = rawKey.split('(')[0].trim().replace(/^['"]|['"]$/g, '');
         const targetElement = this.findTargetElement(cleanKey, excludeContainer);
 
         if (!targetElement) {
-          this.telemetry?.logFill(cleanKey, 'not_found', 'لم يتم العثور على الحقل في الشاشة', rawVal);
-          results.push({
-            field: cleanKey,
-            value: rawVal,
-            status: 'not_found',
-            message: 'لم يتم العثور على الحقل في الشاشة',
-          });
+          if (pass >= maxPasses) {
+            delete pendingFields[rawKey];
+            this.telemetry?.logFill(cleanKey, 'not_found', 'لم يتم العثور على الحقل في الشاشة', rawVal);
+            results.push({
+              field: cleanKey,
+              value: rawVal,
+              status: 'not_found',
+              message: 'لم يتم العثور على الحقل في الشاشة',
+            });
+          }
           continue;
         }
 
         if (this.isElementDisabled(targetElement)) {
-          this.telemetry?.logFill(cleanKey, 'skipped_disabled', 'حقل للقراءة فقط/معطل — يتم ملؤه تلقائياً بواسطة النظام', rawVal);
-          results.push({
-            field: cleanKey,
-            value: rawVal,
-            status: 'skipped_disabled',
-            message: 'حقل للقراءة فقط/معطل — يتم ملؤه تلقائياً بواسطة النظام',
-          });
+          // Defer disabled fields: only drop if we exhausted all passes
+          if (pass >= maxPasses) {
+            delete pendingFields[rawKey];
+            this.telemetry?.logFill(cleanKey, 'skipped_disabled', 'حقل للقراءة فقط/معطل — يتم ملؤه تلقائياً بواسطة النظام', rawVal);
+            results.push({
+              field: cleanKey,
+              value: rawVal,
+              status: 'skipped_disabled',
+              message: 'حقل للقراءة فقط/معطل — يتم ملؤه تلقائياً بواسطة النظام',
+            });
+          }
           continue;
         }
+
+        delete pendingFields[rawKey];
 
         const tagName = targetElement.tagName.toLowerCase();
         let status: 'filled' | 'ambiguous' | 'not_found' = 'filled';
@@ -457,8 +476,11 @@ export class ErpFormDriverService {
           // Quiesce/settle DOM after each successful input to trigger dependent reactive fields
           await this.settle(
             (targetElement.closest('form, app-base, .erp-card, [data-screen-content]') as HTMLElement) || undefined,
-            { quietMs: 50, maxMs: 400 }
+            { quietMs: 60, maxMs: 500 }
           );
+          if (this.bridge?.isAvailable) {
+            await this.waitFor(() => !this.bridge?.isPageBusy(), 2500);
+          }
         } else {
           this.telemetry?.logFill(cleanKey, status, status === 'ambiguous' ? 'الخيار غامض' : 'لم يتم العثور على العنصر', rawVal);
           results.push({
@@ -524,6 +546,7 @@ export class ErpFormDriverService {
     hostEl: HTMLElement,
     searchTerm: any
   ): Promise<'filled' | 'ambiguous' | 'not_found'> {
+    const startTime = Date.now();
     try {
       const ngSelect = (hostEl.tagName.toLowerCase() === 'ng-select'
         ? hostEl
@@ -541,76 +564,142 @@ export class ErpFormDriverService {
       container.click();
       input.focus();
 
-      // 2. Write search term via native prototype setter to trigger typeahead
       const termStr = String(searchTerm).trim();
-      const nativeSetter = Object.getOwnPropertyDescriptor(
-        window.HTMLInputElement.prototype,
-        'value'
-      )?.set;
 
-      if (nativeSetter) {
-        nativeSetter.call(input, termStr);
-      } else {
-        input.value = termStr;
-      }
-      input.dispatchEvent(new Event('input', { bubbles: true }));
+      const performSearch = async (term: string): Promise<'filled' | 'ambiguous' | 'not_found'> => {
+        // Prototype setter
+        const nativeSetter = Object.getOwnPropertyDescriptor(
+          window.HTMLInputElement.prototype,
+          'value'
+        )?.set;
 
-      // 3. Wait for ng-dropdown-panel to appear in body (appendto="body")
-      const panel = await this.waitFor<HTMLElement>(() => {
-        return (
-          document.querySelector('body > ng-dropdown-panel, ng-dropdown-panel, .ng-dropdown-panel') as HTMLElement
-        );
-      }, 1500);
-
-      if (!panel) {
-        // If dropdown panel didn't appear in body, check inside ng-select
-        console.warn('[ErpFormDriver] ng-dropdown-panel not found for ng-select');
-        return 'not_found';
-      }
-
-      // 4. Wait for .ng-option items to render
-      const options = await this.waitFor<HTMLElement[]>(() => {
-        const items = Array.from(panel.querySelectorAll('.ng-option')) as HTMLElement[];
-        return items.length > 0 ? items : null;
-      }, 1200);
-
-      if (!options || options.length === 0) {
-        return 'not_found';
-      }
-
-      // 5. Match option text using normalized Arabic
-      const normalizedTarget = normalizeArabicText(termStr);
-      let exactMatch: HTMLElement | null = null;
-      const partialMatches: HTMLElement[] = [];
-
-      for (const opt of options) {
-        const labelEl = opt.querySelector('.ng-option-label') || opt;
-        const optText = normalizeArabicText(labelEl.textContent || '');
-
-        if (optText === normalizedTarget) {
-          exactMatch = opt;
-          break;
+        if (nativeSetter) {
+          nativeSetter.call(input, term);
+        } else {
+          input.value = term;
         }
-        if (optText.includes(normalizedTarget) || normalizedTarget.includes(optText)) {
-          partialMatches.push(opt);
+
+        // Dispatch keydown, input, keyup so remote typeahead and reactive debouncers trigger reliably
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Process' }));
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: 'Process' }));
+
+        // 3. Find dropdown panel: target the latest open visible panel attached to body or inside select
+        const panel = await this.waitFor<HTMLElement>(() => {
+          const panels = Array.from(document.querySelectorAll('body > ng-dropdown-panel, ng-dropdown-panel, .ng-dropdown-panel')) as HTMLElement[];
+          const visiblePanels = panels.filter(p => !p.hasAttribute('hidden') && p.style.display !== 'none' && (p.offsetWidth > 0 || p.offsetHeight > 0));
+          return visiblePanels.length > 0 ? visiblePanels[visiblePanels.length - 1] : (panels[panels.length - 1] || null);
+        }, 2000);
+
+        if (!panel) {
+          console.warn('[ErpFormDriver] ng-dropdown-panel not found for ng-select');
+          return 'not_found';
+        }
+
+        // Wait for spinner / loading indicator to disappear first if present
+        await this.waitFor<boolean>(() => {
+          const loadingEl = panel.querySelector('.ng-spinner-loader, .ng-load-more, .loading');
+          return !loadingEl;
+        }, 2500);
+
+        // 4. Wait for .ng-option items to render (expanded to 3000ms for slow remote APIs)
+        const options = await this.waitFor<HTMLElement[]>(() => {
+          const items = (Array.from(panel.querySelectorAll('.ng-option')) as HTMLElement[])
+            .filter(o => !o.classList.contains('ng-option-disabled'));
+          return items.length > 0 ? items : null;
+        }, 3000);
+
+        const optionsCount = options?.length || 0;
+
+        if (!options || optionsCount === 0) {
+          return 'not_found';
+        }
+
+        // 5. Match option text using normalized Arabic
+        const normalizedTarget = normalizeArabicText(term);
+        let exactMatch: HTMLElement | null = null;
+        const partialMatches: HTMLElement[] = [];
+
+        for (const opt of options) {
+          const labelEl = opt.querySelector('.ng-option-label') || opt;
+          const optText = normalizeArabicText(labelEl.textContent || '');
+
+          if (optText === normalizedTarget) {
+            exactMatch = opt;
+            break;
+          }
+          if (optText.includes(normalizedTarget) || normalizedTarget.includes(optText)) {
+            partialMatches.push(opt);
+          }
+        }
+
+        const matchToClick = exactMatch || (partialMatches.length === 1 ? partialMatches[0] : null);
+
+        if (matchToClick) {
+          matchToClick.click();
+          this.highlightElement(ngSelect);
+          const elapsedMs = Date.now() - startTime;
+
+          // S6: Verify .ng-value-label rendered
+          setTimeout(() => {
+            const valueLabel = ngSelect.querySelector('.ng-value-label, .ng-value');
+            if (!valueLabel || !valueLabel.textContent?.trim()) {
+              this.telemetry?.log(
+                'FILL',
+                'verify_mismatch on ng-select',
+                {
+                  term,
+                  elementId: ngSelect.id || ngSelect.getAttribute('name'),
+                  reason: 'No .ng-value-label rendered after option selection'
+                },
+                'WARN'
+              );
+            }
+          }, 80);
+
+          this.telemetry?.log('FILL', `ng-select matched option for '${term}'`, {
+            term,
+            optionsCount,
+            elapsedMs,
+            selected: (matchToClick.textContent || '').trim()
+          });
+          return 'filled';
+        }
+
+        if (partialMatches.length > 1) {
+          return 'ambiguous';
+        }
+
+        return 'not_found';
+      };
+
+      let result = await performSearch(termStr);
+
+      // If not found and search term contains multiple words, retry once with the first primary word
+      if (result === 'not_found') {
+        const words = termStr.split(/\s+/).filter(w => w.length > 2);
+        if (words.length > 1) {
+          const firstWord = words[0];
+          console.info(`[ErpFormDriver] Retrying ng-select with first word: "${firstWord}"`);
+          result = await performSearch(firstWord);
         }
       }
 
-      const matchToClick = exactMatch || (partialMatches.length === 1 ? partialMatches[0] : null);
-
-      if (matchToClick) {
-        matchToClick.click();
-        this.highlightElement(ngSelect);
-        return 'filled';
+      // If still not found or ambiguous, hit Escape to close the hanging dropdown panel cleanly
+      if (result !== 'filled') {
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' }));
+        const elapsedMs = Date.now() - startTime;
+        this.telemetry?.log('FILL', `ng-select failed for '${termStr}' (${result})`, {
+          term: termStr,
+          result,
+          elapsedMs
+        }, 'WARN');
       }
 
-      if (partialMatches.length > 1) {
-        return 'ambiguous';
-      }
-
-      return 'not_found';
+      return result;
     } catch (err) {
       console.warn('[ErpFormDriver] Error in setNgSelect:', err);
+      this.telemetry?.logError('FILL', 'setNgSelect error', err);
       return 'not_found';
     }
   }
@@ -649,6 +738,12 @@ export class ErpFormDriverService {
    * Sets text/date/number input using prototype setter to ensure Angular Reactive Forms detect change.
    */
   setTextOrDate(el: HTMLInputElement | HTMLTextAreaElement, val: any): void {
+    try {
+      el.focus();
+    } catch {
+      // ignore focus error
+    }
+
     const prototype =
       el instanceof HTMLTextAreaElement
         ? window.HTMLTextAreaElement.prototype
@@ -664,6 +759,38 @@ export class ErpFormDriverService {
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
     el.dispatchEvent(new Event('blur', { bubbles: true }));
+
+    // S6: Verification check
+    const expectedStr = String(val).trim();
+    const actualStr = (el.value || '').trim();
+    if (actualStr !== expectedStr && !actualStr.includes(expectedStr)) {
+      // Retry once with simulated key events
+      el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Unidentified', bubbles: true }));
+      if (setter) {
+        setter.call(el, String(val));
+      } else {
+        el.value = String(val);
+      }
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+      el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Unidentified', bubbles: true }));
+      el.dispatchEvent(new Event('change', { bubbles: true }));
+      el.dispatchEvent(new Event('blur', { bubbles: true }));
+
+      const finalStr = (el.value || '').trim();
+      if (finalStr !== expectedStr && !finalStr.includes(expectedStr)) {
+        this.telemetry?.log(
+          'FILL',
+          'verify_mismatch on input',
+          {
+            elementId: el.id || el.getAttribute('name') || el.getAttribute('placeholder'),
+            expected: expectedStr,
+            actual: finalStr
+          },
+          'WARN'
+        );
+      }
+    }
+
     this.highlightElement(el);
   }
 
@@ -757,15 +884,74 @@ export class ErpFormDriverService {
   }
 
   private findLabelForElement(el: HTMLElement): string {
-    const parentGroup = el.closest('.form-group, .field-wrapper, label, td, tr, .row');
-    if (parentGroup) {
-      const labelEl =
-        parentGroup.querySelector('label') ||
-        (parentGroup.tagName === 'LABEL' ? parentGroup : null);
-      if (labelEl && labelEl !== el) {
-        return labelEl.textContent?.trim().replace(/[:*]/g, '').trim() || '';
+    // 1. Explicit <label for="element_id">
+    if (el.id) {
+      try {
+        const explicitLabel = document.querySelector(`label[for="${CSS.escape(el.id)}"]`);
+        if (explicitLabel && explicitLabel.textContent) {
+          const text = explicitLabel.textContent.trim().replace(/[:*]/g, '').trim();
+          if (text) return text;
+        }
+      } catch {
+        // ignore selector syntax errors
       }
     }
+
+    // 2. aria-label or aria-labelledby
+    const ariaLabel = el.getAttribute('aria-label');
+    if (ariaLabel && ariaLabel.trim()) {
+      return ariaLabel.trim().replace(/[:*]/g, '').trim();
+    }
+    const labelledBy = el.getAttribute('aria-labelledby');
+    if (labelledBy) {
+      const refEl = document.getElementById(labelledBy);
+      if (refEl && refEl.textContent) {
+        const text = refEl.textContent.trim().replace(/[:*]/g, '').trim();
+        if (text) return text;
+      }
+    }
+
+    // 3. Closest parent form-group or column container (STRICT: exclude .row to avoid pulling sibling field labels)
+    const parentGroup = el.closest(
+      '.form-group, .field-wrapper, .form-field, mat-form-field, [class*="col-"], label'
+    );
+    if (parentGroup) {
+      const labelEl =
+        parentGroup.tagName === 'LABEL'
+          ? (parentGroup as HTMLElement)
+          : (parentGroup.querySelector('label, mat-label') as HTMLElement);
+      if (labelEl && labelEl !== el && labelEl.textContent) {
+        const text = labelEl.textContent.trim().replace(/[:*]/g, '').trim();
+        if (text) return text;
+      }
+    }
+
+    // 4. Table cell -> Match corresponding <th> / columnheader by column index
+    const cell = el.closest('td, mat-cell, [role="gridcell"]');
+    if (cell) {
+      const row = cell.closest('tr, mat-row, [role="row"]');
+      const table = cell.closest('table, mat-table, ag-grid, [role="grid"]');
+      if (row && table) {
+        const cells = Array.from(row.children);
+        const colIndex = cells.indexOf(cell);
+        if (colIndex >= 0) {
+          const headers = Array.from(
+            table.querySelectorAll('thead th, mat-header-cell, [role="columnheader"]')
+          ) as HTMLElement[];
+          if (headers[colIndex] && headers[colIndex].textContent) {
+            const thText = headers[colIndex].textContent.trim().replace(/[:*]/g, '').trim();
+            if (thText) return thText;
+          }
+        }
+      }
+    }
+
+    // 5. Fallback to placeholder or title
+    const placeholder = el.getAttribute('placeholder') || el.getAttribute('title');
+    if (placeholder && placeholder.trim()) {
+      return placeholder.trim().replace(/[:*]/g, '').trim();
+    }
+
     return '';
   }
 
@@ -910,6 +1096,17 @@ export class ErpFormDriverService {
 
         if (cellFilled) {
           filledRowsCount++;
+
+          // S6: Settle and read calculated total after row is filled
+          await this.settle(targetRow, { quietMs: 50, maxMs: 250 });
+          const totalAfterRow = this.readCalculatedTotal();
+          if (totalAfterRow) {
+            this.telemetry?.log('GRID', `Calculated total after filling row ${rIdx + 1}`, {
+              row: rIdx + 1,
+              calculatedTotal: totalAfterRow
+            });
+          }
+
           if (resultsOut) {
             resultsOut.push({
               field: `row_${rIdx + 1}`,
@@ -927,7 +1124,8 @@ export class ErpFormDriverService {
   }
 
   private async findAddRowButton(table: HTMLElement, excludeContainer?: HTMLElement): Promise<HTMLElement | null> {
-    const candidates: HTMLElement[] = [];
+    // 1. Gather candidates scoped strictly near the table first
+    const localCandidates: HTMLElement[] = [];
     let current: HTMLElement | null = table;
 
     while (current && current !== document.body) {
@@ -935,45 +1133,137 @@ export class ErpFormDriverService {
         current.querySelectorAll('button, a.btn, span.btn, [role="button"]')
       ) as HTMLElement[];
       for (const btn of btns) {
-        if (!candidates.includes(btn)) candidates.push(btn);
+        if (!localCandidates.includes(btn)) localCandidates.push(btn);
       }
       if (
         current.classList.contains('erp-table-box') ||
         current.classList.contains('card') ||
-        current.tagName.toLowerCase() === 'section'
+        current.tagName.toLowerCase() === 'section' ||
+        current.classList.contains('items-grid') ||
+        current.classList.contains('table-responsive')
       ) {
         break;
       }
       current = current.parentElement;
     }
 
+    const isValidBtn = (btn: HTMLElement): boolean => {
+      if (excludeContainer && excludeContainer.contains(btn)) return false;
+      if (!btn.offsetWidth && !btn.offsetHeight && !btn.getClientRects().length) return false;
+      return true;
+    };
+
+    const matchesAddRowPattern = (btn: HTMLElement): boolean => {
+      // Check mat-icon or inner icon elements
+      const icons = Array.from(btn.querySelectorAll('mat-icon, i, span, svg')) as HTMLElement[];
+      for (const ic of icons) {
+        const icText = (ic.textContent || '').trim().toLowerCase();
+        const icClass = (ic.className || '').toLowerCase();
+        if (
+          icText === 'add' ||
+          icText === 'add_circle' ||
+          icText === 'add_box' ||
+          icText === 'plus' ||
+          icClass.includes('fa-plus') ||
+          icClass.includes('bi-plus') ||
+          icClass.includes('icon-plus') ||
+          icClass.includes('btn--add')
+        ) {
+          return true;
+        }
+      }
+
+      // Check button text
+      const btnText = (btn.textContent || '').trim().toLowerCase();
+      if (
+        btnText === '+' ||
+        btnText === 'add' ||
+        btnText === 'add row' ||
+        btnText === 'إضافة' ||
+        btnText === 'اضافة' ||
+        btnText === 'إضافة سطر' ||
+        btnText === 'اضافة سطر' ||
+        btnText === 'سطر جديد' ||
+        btnText === '+ إضافة' ||
+        btnText === '+ اضافة'
+      ) {
+        return true;
+      }
+
+      // Check data-action
+      const dataAction = (btn.getAttribute('data-action') || '').toLowerCase();
+      if (dataAction.includes('add') || dataAction.includes('create-row')) {
+        return true;
+      }
+
+      // Check title / aria-label
+      const titleOrAria = (
+        (btn.getAttribute('title') || '') + ' ' + (btn.getAttribute('aria-label') || '')
+      ).toLowerCase();
+      if (
+        titleOrAria.includes('add') ||
+        titleOrAria.includes('إضافة') ||
+        titleOrAria.includes('اضافة') ||
+        titleOrAria.includes('سطر') ||
+        titleOrAria.includes('+')
+      ) {
+        return true;
+      }
+
+      // Check CSS classes
+      const cls = (btn.className || '').toLowerCase();
+      if (cls.includes('btn--add') || cls.includes('add-row') || cls.includes('add_row')) {
+        return true;
+      }
+
+      return false;
+    };
+
+    // 2. Structural Resolution FIRST (Zero network roundtrips, sub-millisecond, 0 tokens)
+    for (const btn of localCandidates) {
+      if (!isValidBtn(btn)) continue;
+      if (matchesAddRowPattern(btn)) {
+        this.telemetry?.log('GRID', 'Resolved add-row button structurally near grid', {
+          action: btn.getAttribute('data-action') || btn.id || btn.className,
+          label: (btn.textContent || btn.getAttribute('title') || '').trim()
+        });
+        return btn;
+      }
+    }
+
+    // 3. If not found in immediate table container, search broader form container
     const formRoot = (table.closest('.erp-mock-main, .erp-screen, form, main') || document.body) as HTMLElement;
-    const formBtns = Array.from(
-      formRoot.querySelectorAll('button, a.btn, span.btn, [role="button"]')
-    ) as HTMLElement[];
+    const formBtns = (
+      Array.from(formRoot.querySelectorAll('button, a.btn, span.btn, [role="button"]')) as HTMLElement[]
+    ).filter((b) => !localCandidates.includes(b));
+
     for (const btn of formBtns) {
-      if (!candidates.includes(btn)) candidates.push(btn);
+      if (!isValidBtn(btn)) continue;
+      if (matchesAddRowPattern(btn)) {
+        this.telemetry?.log('GRID', 'Resolved add-row button structurally in form', {
+          action: btn.getAttribute('data-action') || btn.id || btn.className,
+          label: (btn.textContent || btn.getAttribute('title') || '').trim()
+        });
+        return btn;
+      }
     }
 
-    const controlList: ControlIn[] = [];
-    const elementMap = new Map<string, HTMLElement>();
-    let cIdx = 1;
-
-    for (const btn of candidates) {
-      if (excludeContainer && excludeContainer.contains(btn)) continue;
-      if (!btn.offsetWidth && !btn.offsetHeight && !btn.getClientRects().length) continue;
-      const rawText = (btn.textContent || btn.getAttribute('title') || btn.getAttribute('aria-label') || '').trim();
-      const id = btn.getAttribute('data-action') || btn.id || `grid_btn_${cIdx++}`;
-      controlList.push({
-        id,
-        label: rawText.slice(0, 80) || id
-      });
-      elementMap.set(id, btn);
-    }
-
-    // 1. AI-driven role classification for add_row
-    if (this.copilotService && controlList.length > 0) {
+    // 4. Fallback to AI (resolveErpControls) only if structural pattern found nothing
+    const allCandidates = [...localCandidates, ...formBtns].filter(isValidBtn);
+    if (this.copilotService && allCandidates.length > 0) {
       try {
+        const controlList: ControlIn[] = [];
+        const elementMap = new Map<string, HTMLElement>();
+        let cIdx = 1;
+
+        // Scoped to top 15 closest candidate buttons to avoid blowing token limit
+        for (const btn of allCandidates.slice(0, 15)) {
+          const rawText = (btn.textContent || btn.getAttribute('title') || btn.getAttribute('aria-label') || '').trim();
+          const id = btn.getAttribute('data-action') || btn.id || `grid_btn_${cIdx++}`;
+          controlList.push({ id, label: rawText.slice(0, 80) || id });
+          elementMap.set(id, btn);
+        }
+
         const screenId = document.querySelector('.screen-tag code')?.textContent?.trim() || 'CURRENT_SCREEN';
         const res = await this.copilotService.resolveErpControls({
           screen_id: screenId,
@@ -983,22 +1273,13 @@ export class ErpFormDriverService {
         const addRowId = res.roles ? res.roles['add_row'] : undefined;
         if (addRowId) {
           const btn = elementMap.get(addRowId);
-          if (btn) return btn;
+          if (btn) {
+            this.telemetry?.log('GRID', 'Resolved add-row button via AI fallback', { addRowId });
+            return btn;
+          }
         }
       } catch (err) {
-        console.warn('[ErpFormDriver] AI add_row resolution failed, checking attributes:', err);
-      }
-    }
-
-    // 2. Structural fallback: data-action, standard CSS classes, or '+' icon (zero static keyword dictionaries)
-    for (const ctrl of controlList) {
-      const el = elementMap.get(ctrl.id);
-      if (!el) continue;
-      const dataAction = (el.getAttribute('data-action') || '').toLowerCase();
-      const cls = el.className || '';
-      const text = (el.textContent || '').trim();
-      if (dataAction.includes('add') || cls.includes('btn--add') || cls.includes('add-row') || text === '+') {
-        return el;
+        console.warn('[ErpFormDriver] AI add_row resolution failed:', err);
       }
     }
 

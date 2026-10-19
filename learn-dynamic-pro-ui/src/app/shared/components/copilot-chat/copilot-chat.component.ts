@@ -886,6 +886,20 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       }
     }
 
+    // S1 Lifecycle Order: If user intent is an action/entry, ensure fresh entry form is prepared/opened first
+    // so collectFormSchema captures entry fields (modal/add-view) rather than search/filter grid!
+    const isEntryIntent = resolvedIntent === 'action' || (!resolvedIntent && /سجل|اضف|أضف|انشئ|أنشئ|فاتورة|سداد|قيد/i.test(query));
+    if (isEntryIntent && typeof document !== 'undefined') {
+      try {
+        const formOpened = await this.navigator.prepareFreshForm(2000);
+        if (formOpened) {
+          await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
+        }
+      } catch (formErr) {
+        console.warn('[Copilot Navigation] prepareFreshForm during schema preparation error:', formErr);
+      }
+    }
+
     // Detect ERP/Host context and gather schema from active page
     const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
     const detectedFields = this.formDriver.buildVisibleFieldsSummary(schemas);
