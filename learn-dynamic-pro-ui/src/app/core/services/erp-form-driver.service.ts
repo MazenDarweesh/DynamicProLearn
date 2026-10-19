@@ -11,6 +11,7 @@ import {
   ControlIn,
 } from '../models/erp-form.models';
 import { CopilotService } from './copilot.service';
+import { ErpTelemetryService } from './erp-telemetry.service';
 
 /**
  * Normalizes Arabic text for flexible matching:
@@ -38,6 +39,7 @@ export function normalizeArabicText(text: string): string {
 })
 export class ErpFormDriverService {
   private copilotService = inject(CopilotService, { optional: true });
+  private telemetry = inject(ErpTelemetryService, { optional: true });
 
   /**
    * Resolves the live form container so hidden background tabs are never inspected.
@@ -270,9 +272,11 @@ export class ErpFormDriverService {
         }
       }
 
+      this.telemetry?.logScan(schemas, 'collectFormSchema');
       return schemas;
     } catch (err) {
       console.warn('[ErpFormDriver] Failed to collect form schema:', err);
+      this.telemetry?.logError('SCAN', 'Failed to collect form schema', err);
       return [];
     }
   }
@@ -397,6 +401,7 @@ export class ErpFormDriverService {
         const targetElement = this.findTargetElement(cleanKey, excludeContainer);
 
         if (!targetElement) {
+          this.telemetry?.logFill(cleanKey, 'not_found', 'لم يتم العثور على الحقل في الشاشة', rawVal);
           results.push({
             field: cleanKey,
             value: rawVal,
@@ -407,6 +412,7 @@ export class ErpFormDriverService {
         }
 
         if (this.isElementDisabled(targetElement)) {
+          this.telemetry?.logFill(cleanKey, 'skipped_disabled', 'حقل للقراءة فقط/معطل — يتم ملؤه تلقائياً بواسطة النظام', rawVal);
           results.push({
             field: cleanKey,
             value: rawVal,
@@ -441,6 +447,7 @@ export class ErpFormDriverService {
         if (status === 'filled') {
           filledCount++;
           filledFields[cleanKey] = rawVal;
+          this.telemetry?.logFill(cleanKey, 'filled', 'تم إدخال القيمة بنجاح', rawVal);
           results.push({
             field: cleanKey,
             value: rawVal,
@@ -453,6 +460,7 @@ export class ErpFormDriverService {
             { quietMs: 50, maxMs: 400 }
           );
         } else {
+          this.telemetry?.logFill(cleanKey, status, status === 'ambiguous' ? 'الخيار غامض' : 'لم يتم العثور على العنصر', rawVal);
           results.push({
             field: cleanKey,
             value: rawVal,
@@ -469,6 +477,7 @@ export class ErpFormDriverService {
     if (rows && rows.length > 0) {
       const rowFilledCount = await this.fillGridRows(rows, excludeContainer, results);
       filledCount += rowFilledCount;
+      this.telemetry?.log('GRID', `Completed filling grid rows: ${rowFilledCount}/${rows.length} rows filled`, { total: rows.length, filled: rowFilledCount });
       await this.settle(undefined, { quietMs: 60, maxMs: 400 });
     }
 

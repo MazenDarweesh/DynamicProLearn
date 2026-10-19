@@ -10,6 +10,7 @@ import { ErpFormDriverService } from '../../../core/services/erp-form-driver.ser
 import { ErpBatchStepperService } from '../../../core/services/erp-batch-stepper.service';
 import { ErpNavigatorService } from '../../../core/services/erp-navigator.service';
 import { ErpBridgeService } from '../../../core/services/erp-bridge.service';
+import { ErpTelemetryService } from '../../../core/services/erp-telemetry.service';
 import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } from '../../../core/models/erp-form.models';
 import { AuthService } from '../../../core/services/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
@@ -68,6 +69,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   private formDriver = inject(ErpFormDriverService);
   private navigator = inject(ErpNavigatorService);
   private bridge = inject(ErpBridgeService);
+  private telemetry = inject(ErpTelemetryService, { optional: true });
   batchStepper = inject(ErpBatchStepperService);
   /** Optional: when on, saves right after a clean (fully filled) form fill. Off by default. */
   autoSaveAfterFill = false;
@@ -624,6 +626,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     const query = this.inputQuery.trim();
     if (!query || this.isStreaming || !this.isAiReady) return;
 
+    this.telemetry?.log('USER_QUERY', `User: "${query}"`, { query, skipCache, screenKey: this.erpKey });
+
     // Add user message
     this.messages.push({
       sender: 'user',
@@ -658,9 +662,15 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     msg.isApplyingFormFill = true;
     this.cdr.detectChanges();
 
+    const targetScreen = msg.formFillData.screenKey;
+    this.telemetry?.log('FILL', `User clicked Apply Form Fill for '${targetScreen || this.erpKey}'`, {
+      screenKey: targetScreen || this.erpKey,
+      fields: msg.formFillData.fields,
+      rows: msg.formFillData.rows
+    });
+
     try {
       // 🚀 Safety Guard: Ensure ERP has navigated to the target screen before filling!
-      const targetScreen = msg.formFillData.screenKey;
       if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
         console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
         await this.navigator.navigateToScreen(targetScreen);
@@ -684,6 +694,13 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       this.cdr.markForCheck();
       console.info('%c[Copilot FormFill] Execution report:', 'color:#10b981;font-weight:bold', report);
 
+      this.telemetry?.log('FILL', `applyFormFill finished with success=${report.success} (${report.filledCount} fields filled)`, {
+        success: report.success,
+        filledCount: report.filledCount,
+        fieldsProcessed: report.fieldsProcessed,
+        results: report.results
+      });
+
       // 🧠 Train Decision Memory: If navigation decision was attached and fill succeeded, confirm to backend
       if (report.success && msg.decisionId && this.copilotService) {
         this.copilotService.feedbackErpNavigation(msg.decisionId, 'applied');
@@ -696,6 +713,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       }
     } catch (err) {
       console.error('[Copilot FormFill] Execution error:', err);
+      this.telemetry?.logError('FILL', 'applyFormFill threw exception', err);
     } finally {
       msg.isApplyingFormFill = false;
       this.cdr.detectChanges();
@@ -917,6 +935,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
         this.messages[assistantMsgIndex].isStreaming = false;
         this.messages[assistantMsgIndex].isRetrying = false;
         this.isStreaming = false;
+        this.telemetry?.logError('USER_QUERY', 'streamSearch error', err);
       },
       skipCache,
       this.activeFilter,
@@ -926,6 +945,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       (fillData: CopilotFormFillData) => {
         if (fillData && this.isValidFormFill(fillData)) {
           this.messages[assistantMsgIndex].formFillData = fillData;
+          this.telemetry?.log('AI_EXTRACT', `AI extracted form fill proposal for '${fillData.screenKey || this.erpKey}'`, {
+            screenKey: fillData.screenKey || this.erpKey,
+            fields: fillData.fields,
+            rows: fillData.rows
+          });
           this.cdr.markForCheck();
         }
       },

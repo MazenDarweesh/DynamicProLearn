@@ -174,6 +174,21 @@ export class CopilotService {
     }
   }
 
+  getAiBaseUrl(): string {
+    return this.aiBaseUrl;
+  }
+
+  sendErpTelemetry(batch: any): Promise<any> {
+    return firstValueFrom(
+      this.http.post(`${this.aiBaseUrl}/v1/erp/telemetry`, batch).pipe(
+        catchError((err) => {
+          console.warn('[Copilot Telemetry] Failed to send telemetry batch:', err);
+          return of({ status: 'failed' });
+        })
+      )
+    );
+  }
+
   private activeLessonIdSubject = new BehaviorSubject<string | undefined>(undefined);
   activeLessonId$ = this.activeLessonIdSubject.asObservable();
 

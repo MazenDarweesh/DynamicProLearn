@@ -1,5 +1,6 @@
-import { Injectable } from '@angular/core';
+import { Injectable, inject } from '@angular/core';
 import { ErpActiveScreen, ErpScreenInfo, ErpSaveResult } from '../models/erp-bridge.models';
+import { ErpTelemetryService } from './erp-telemetry.service';
 
 /**
  * Single safe access point to the host ERP's `window.DynamicERP` bridge.
@@ -10,6 +11,8 @@ import { ErpActiveScreen, ErpScreenInfo, ErpSaveResult } from '../models/erp-bri
   providedIn: 'root'
 })
 export class ErpBridgeService {
+  private telemetry = inject(ErpTelemetryService, { optional: true });
+
   get isAvailable(): boolean {
     return typeof window !== 'undefined' && !!window.DynamicERP;
   }
@@ -17,9 +20,15 @@ export class ErpBridgeService {
   getActiveScreen(): ErpActiveScreen | null {
     if (!this.isAvailable) return null;
     try {
-      return window.DynamicERP!.getActiveScreen?.() ?? null;
+      const screen = window.DynamicERP!.getActiveScreen?.() ?? null;
+      this.telemetry?.logBridge('getActiveScreen', undefined, screen);
+      if (screen?.pageName) {
+        this.telemetry?.setScreenKey(screen.pageName);
+      }
+      return screen;
     } catch (err) {
       console.warn('[ErpBridge] getActiveScreen failed:', err);
+      this.telemetry?.logBridge('getActiveScreen', undefined, null, err);
       return null;
     }
   }
@@ -28,14 +37,18 @@ export class ErpBridgeService {
     if (!this.isAvailable) return null;
     try {
       const bridge = window.DynamicERP as any;
-      if (typeof bridge.listScreens === 'function') return bridge.listScreens() ?? null;
-      if (typeof bridge.getScreens === 'function') return bridge.getScreens() ?? null;
-      if (typeof bridge.getAuthorizedPages === 'function') return bridge.getAuthorizedPages() ?? null;
-      if (Array.isArray(bridge.screens)) return bridge.screens;
-      if (Array.isArray(bridge.pages)) return bridge.pages;
-      return null;
+      let screens: ErpScreenInfo[] | null = null;
+      if (typeof bridge.listScreens === 'function') screens = bridge.listScreens() ?? null;
+      else if (typeof bridge.getScreens === 'function') screens = bridge.getScreens() ?? null;
+      else if (typeof bridge.getAuthorizedPages === 'function') screens = bridge.getAuthorizedPages() ?? null;
+      else if (Array.isArray(bridge.screens)) screens = bridge.screens;
+      else if (Array.isArray(bridge.pages)) screens = bridge.pages;
+
+      this.telemetry?.logBridge('listScreens', undefined, { count: screens?.length ?? 0 });
+      return screens;
     } catch (err) {
       console.warn('[ErpBridge] listScreens failed:', err);
+      this.telemetry?.logBridge('listScreens', undefined, null, err);
       return null;
     }
   }
@@ -46,7 +59,11 @@ export class ErpBridgeService {
   isPageBusy(): boolean {
     if (!this.isAvailable || typeof window.DynamicERP!.isPageBusy !== 'function') return false;
     try {
-      return !!window.DynamicERP!.isPageBusy();
+      const busy = !!window.DynamicERP!.isPageBusy();
+      if (busy) {
+        this.telemetry?.log('BRIDGE', 'DynamicERP.isPageBusy() -> true', undefined, 'DEBUG');
+      }
+      return busy;
     } catch {
       return false;
     }
@@ -54,7 +71,7 @@ export class ErpBridgeService {
 
   /** Returns true if the bridge call completed without error and was not rejected by host. */
   async navigateToScreen(screenNameOrId: string | number): Promise<boolean> {
-    return this.invoke('navigateToScreen', () => window.DynamicERP!.navigateToScreen(screenNameOrId));
+    return this.invoke('navigateToScreen', () => window.DynamicERP!.navigateToScreen(screenNameOrId), { screen: screenNameOrId });
   }
 
   /**
@@ -71,25 +88,31 @@ export class ErpBridgeService {
    */
   async submitActiveForm(): Promise<ErpSaveResult> {
     if (!this.isAvailable) {
+      this.telemetry?.logBridge('submitActiveForm', undefined, false, 'Bridge not available');
       return { success: false, errors: ['جسر الـ ERP غير متاح في هذه البيئة.'] };
     }
     try {
       const raw = await window.DynamicERP!.submitActiveForm();
       if (raw && typeof raw === 'object') {
         const obj = raw as any;
-        return {
+        const result: ErpSaveResult = {
           success: obj.success !== false,
           docId: obj.docId || obj.id,
           errors: Array.isArray(obj.errors) ? obj.errors : undefined,
           message: obj.message
         };
+        this.telemetry?.logBridge('submitActiveForm', undefined, result);
+        return result;
       }
       if (raw === false) {
+        this.telemetry?.logBridge('submitActiveForm', undefined, false, 'ERP returned false');
         return { success: false, errors: ['فشل الحفظ في نظام الـ ERP.'] };
       }
+      this.telemetry?.logBridge('submitActiveForm', undefined, true);
       return { success: true };
     } catch (err: any) {
       console.warn('[ErpBridge] submitActiveForm failed:', err);
+      this.telemetry?.logBridge('submitActiveForm', undefined, null, err);
       return {
         success: false,
         errors: [err?.message || 'حدث خطأ أثناء تنفيذ الحفظ في نظام الـ ERP.']
@@ -97,18 +120,23 @@ export class ErpBridgeService {
     }
   }
 
-  private async invoke(name: string, call: () => unknown): Promise<boolean> {
-    if (!this.isAvailable) return false;
+  private async invoke(name: string, call: () => unknown, args?: any): Promise<boolean> {
+    if (!this.isAvailable) {
+      this.telemetry?.logBridge(name, args, false, 'Bridge not available');
+      return false;
+    }
     try {
       const res = await call();
-      // Crucial: If the host method explicitly returned `false`, respect that as failure
       if (res === false) {
         console.warn(`[ErpBridge] ${name} returned false from host.`);
+        this.telemetry?.logBridge(name, args, false);
         return false;
       }
+      this.telemetry?.logBridge(name, args, true);
       return true;
     } catch (err) {
       console.warn(`[ErpBridge] ${name} failed:`, err);
+      this.telemetry?.logBridge(name, args, false, err);
       return false;
     }
   }
