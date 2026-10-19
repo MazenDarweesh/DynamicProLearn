@@ -433,7 +433,14 @@ export class ErpNavigatorService {
       if (seenLabels.has(normalized)) continue;
       seenLabels.add(normalized);
 
-      const candidateId = el.getAttribute('data-screen') || el.id || `candidate_${index++}`;
+      const candidateId =
+        el.getAttribute('data-screen') ||
+        el.getAttribute('data-page-name') ||
+        el.getAttribute('data-page') ||
+        el.getAttribute('data-page-id') ||
+        el.getAttribute('pageName') ||
+        (el.id && !el.id.startsWith('candidate_') ? el.id : undefined) ||
+        `candidate_${index++}`;
       this.candidateElementsMap.set(candidateId, el);
 
       // Determine contextual hierarchical path for AI reasoning
@@ -501,22 +508,36 @@ export class ErpNavigatorService {
         const targetEl = this.candidateElementsMap.get(top.id);
         const targetLabel = (targetEl?.textContent || top.id).trim();
 
-        window.dispatchEvent(new CustomEvent('lms:navigate', {
-          bubbles: true,
-          composed: true,
-          detail: { screenKey: top.id, label: targetLabel }
-        }));
-        window.dispatchEvent(new CustomEvent('window:lms:navigate', {
-          bubbles: true,
-          composed: true,
-          detail: { screenName: top.id }
-        }));
+        // Extract real ERP screen identifier if present on element or passed from catalog
+        const realScreenName =
+          targetEl?.getAttribute('data-screen') ||
+          targetEl?.getAttribute('data-page-name') ||
+          targetEl?.getAttribute('data-page') ||
+          targetEl?.getAttribute('pageName') ||
+          (!top.id.startsWith('candidate_') ? top.id : undefined);
 
+        // Only dispatch screenName navigation events when we have a real screen name (never synthetic candidate_N)
+        if (realScreenName) {
+          window.dispatchEvent(new CustomEvent('lms:navigate', {
+            bubbles: true,
+            composed: true,
+            detail: { screenKey: realScreenName, label: targetLabel }
+          }));
+          window.dispatchEvent(new CustomEvent('window:lms:navigate', {
+            bubbles: true,
+            composed: true,
+            detail: { screenName: realScreenName, label: targetLabel }
+          }));
+          if (this.bridge.isAvailable) {
+            await this.bridge.navigateToScreen(realScreenName);
+          }
+        }
 
+        // If target element is an existing DOM tile/button, click it directly to trigger its native Angular handler
         if (targetEl) {
           this.simulateClick(targetEl);
-        } else {
-          await this.navigateToScreen(top.id);
+        } else if (realScreenName && this.bridge.isAvailable) {
+          await this.bridge.navigateToScreen(realScreenName);
         }
 
         await this.delay(400);

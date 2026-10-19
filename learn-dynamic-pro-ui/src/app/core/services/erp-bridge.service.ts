@@ -25,9 +25,15 @@ export class ErpBridgeService {
   }
 
   listScreens(): ErpScreenInfo[] | null {
-    if (!this.isAvailable || typeof window.DynamicERP!.listScreens !== 'function') return null;
+    if (!this.isAvailable) return null;
     try {
-      return window.DynamicERP!.listScreens() ?? null;
+      const bridge = window.DynamicERP as any;
+      if (typeof bridge.listScreens === 'function') return bridge.listScreens() ?? null;
+      if (typeof bridge.getScreens === 'function') return bridge.getScreens() ?? null;
+      if (typeof bridge.getAuthorizedPages === 'function') return bridge.getAuthorizedPages() ?? null;
+      if (Array.isArray(bridge.screens)) return bridge.screens;
+      if (Array.isArray(bridge.pages)) return bridge.pages;
+      return null;
     } catch (err) {
       console.warn('[ErpBridge] listScreens failed:', err);
       return null;
