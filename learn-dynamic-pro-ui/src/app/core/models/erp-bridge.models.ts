@@ -34,7 +34,11 @@ export interface ErpFormFillPayload {
 export interface ErpActiveFormContext {
   isOpen: boolean;
   screenKey?: string;
+  screenName?: string;
   isInvoice?: boolean;
+  formType?: string;
+  dataObject?: Record<string, any> | null;
+  rows?: Array<Record<string, any>> | null;
 }
 
 export interface DynamicErpBridge {

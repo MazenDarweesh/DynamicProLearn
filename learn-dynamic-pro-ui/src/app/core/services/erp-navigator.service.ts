@@ -320,13 +320,19 @@ export class ErpNavigatorService {
   isFormAlreadyOpen(): boolean {
     // 0. Official ERP bridge context check (instant in-memory authority)
     const ctx = this.bridge.getActiveFormContext();
-    if (ctx && typeof ctx.isOpen === 'boolean') {
-      return ctx.isOpen;
+    if (ctx) {
+      // Genuinely active in-memory form check:
+      // Must have dataObject, or populated transactional rows/excelObject, or explicit isInvoice flag.
+      // A fallback { isOpen: true, formType: 'dom', dataObject: null, rows: null }
+      // merely means the page container is in the DOM, NOT that a document creation form is open!
+      if (ctx.dataObject || (ctx.rows && ctx.rows.length >= 0 && ctx.formType !== 'dom') || ctx.isInvoice) {
+        return true;
+      }
     }
 
     if (typeof document === 'undefined') return false;
 
-    // Check modal overlays first (always top priority)
+    // Check modal overlays first (always top priority for creation forms)
     const modalForm = document.querySelector(
       '.cdk-overlay-container .dp-modal app-add-or-edit, ' +
       '.cdk-overlay-container .dp-modal, ' +
@@ -336,14 +342,12 @@ export class ErpNavigatorService {
       return true;
     }
 
-    // Check strictly within the active, non-hidden page tab
+    // Check strictly within the active, non-hidden page tab for an actual AddOrEdit form
     const activePage = document.querySelector('.dp-shell__pages > div:not([hidden])');
     if (!activePage) return false;
 
-    // Ensure the active page actually contains an editor/form with inputs (not an empty dashboard or summary card)
-    const pageForm = activePage.querySelector(
-      'app-add-or-edit, .dp-form, [data-screen-content] form, .erp-form-grid'
-    );
+    // For in-page forms (when showInPopUp === false), app-add-or-edit is rendered directly in the page
+    const pageForm = activePage.querySelector('app-add-or-edit');
     return !!(pageForm && this.isElementVisible(pageForm));
   }
 
@@ -413,10 +417,12 @@ export class ErpNavigatorService {
     const catalog = this.bridge.listScreens();
     if (catalog && catalog.length > 0) {
       return catalog.map(s => {
-        const mod = s.moduleName || s.module;
+        const mod = (s.moduleName || s.module || '').trim();
+        const rawName = (s.pageName || '').trim();
+        const rawTitle = (s.title || s.pageName || '').trim();
         return {
-          id: s.pageName || (s.pageId ? String(s.pageId) : 'screen'),
-          label: s.title || s.pageName,
+          id: rawName || (s.pageId ? String(s.pageId) : 'screen'),
+          label: rawTitle || rawName,
           path: mod ? [mod] : []
         };
       });

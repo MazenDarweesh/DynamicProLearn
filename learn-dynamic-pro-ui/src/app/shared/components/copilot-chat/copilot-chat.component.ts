@@ -919,18 +919,19 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       resolvedIntent = 'action';
     }
 
+    let navRes: any = null;
     if (!skipNavCheck && typeof document !== 'undefined') {
       try {
-        const navRes = await this.navigator.resolveAndNavigate(query);
-        resolvedIntent = navRes.rawResolution?.intent;
-        resolvedDecisionId = navRes.rawResolution?.decision_id;
+        navRes = await this.navigator.resolveAndNavigate(query);
+        resolvedIntent = navRes?.rawResolution?.intent;
+        resolvedDecisionId = navRes?.rawResolution?.decision_id;
 
-        if (navRes.success && navRes.chosen) {
+        if (navRes?.success && navRes.chosen) {
           console.info('%c[Copilot Navigation] Auto-navigated to target screen:', 'color:#10b981;font-weight:bold', navRes.chosen.id);
           this.syncErpKey(navRes.chosen.id);
           // Wait for DOM & Angular components to settle on the new screen
           await this.formDriver.settle(undefined, { quietMs: 300, maxMs: 1500 });
-        } else if (navRes.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
+        } else if (navRes?.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
           console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options without blocking stream:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
           pendingAskOptions = navRes.askOptions;
         }
@@ -940,9 +941,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     }
 
     // S1 Lifecycle Order: If user intent is an action/entry, ensure fresh entry form is prepared/opened first
-    // so collectFormSchema captures entry fields (modal/add-view) rather than search/filter grid!
+    // CRITICAL: Only prepare fresh form if we are genuinely on the target screen (already matching or navigated successfully)
+    const isOnTargetScreen = skipNavCheck || !!(navRes && navRes.success);
     const isEntryIntent = resolvedIntent === 'action' || (!resolvedIntent && /سجل|اضف|أضف|انشئ|أنشئ|فاتورة|سداد|قيد/i.test(query));
-    if (isEntryIntent && typeof document !== 'undefined') {
+    if (isEntryIntent && isOnTargetScreen && typeof document !== 'undefined') {
       try {
         const formOpened = await this.navigator.prepareFreshForm(2000);
         if (formOpened) {
