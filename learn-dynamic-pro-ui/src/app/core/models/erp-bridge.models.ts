@@ -24,6 +24,17 @@ export interface ErpSaveResult {
   message?: string;
 }
 
+export interface ErpFormFillPayload {
+  fields: Record<string, any>;
+  rows?: Array<Record<string, any>>;
+}
+
+export interface ErpActiveFormContext {
+  isOpen: boolean;
+  screenKey?: string;
+  isInvoice?: boolean;
+}
+
 export interface DynamicErpBridge {
   getActiveScreen(): ErpActiveScreen | null | undefined;
   navigateToScreen(screenNameOrId: string | number): Promise<unknown> | unknown;
@@ -33,6 +44,10 @@ export interface DynamicErpBridge {
   listScreens?(): ErpScreenInfo[];
   /** Optional check if the active screen is still fetching data or busy */
   isPageBusy?(): boolean;
+  /** Direct in-memory state injection across all 700+ screens (excelObject / dataObject) */
+  fillFormData?(payload: ErpFormFillPayload): Promise<boolean | void> | boolean | void;
+  /** Direct inspection of active component form status */
+  getActiveFormContext?(): ErpActiveFormContext | null;
 }
 
 declare global {
@@ -40,3 +55,4 @@ declare global {
     DynamicERP?: DynamicErpBridge;
   }
 }
+

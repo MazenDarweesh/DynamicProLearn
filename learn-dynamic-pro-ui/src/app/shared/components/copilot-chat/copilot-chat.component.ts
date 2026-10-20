@@ -675,23 +675,26 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const currentActiveNorm = currentActive.trim().toLowerCase();
       const targetNorm = (targetScreen || '').trim().toLowerCase();
 
-      // If active screen is already in the same domain (e.g. both are purchases or current is the main form)
+      // If active screen is already in the same domain (e.g. both are purchases, sales, or entries)
       const isBothPurchases = currentActiveNorm.includes('purchas') && targetNorm.includes('purchas');
       const isBothSales = currentActiveNorm.includes('sale') && targetNorm.includes('sale');
+      const isBothEntries = currentActiveNorm.includes('entry') && targetNorm.includes('entry');
 
+      let effectiveTarget = targetScreen;
       if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
-        if (isBothPurchases || isBothSales) {
+        if (isBothPurchases || isBothSales || isBothEntries) {
           console.info(
             `%c[Copilot FormFill] User is already on '${currentActive}'. Retaining active screen instead of switching to '${targetScreen}'`,
             'color:#10b981;font-weight:bold'
           );
+          effectiveTarget = currentActive;
         } else {
           console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
           await this.navigator.navigateToScreen(targetScreen);
           await this.formDriver.settle(undefined, { quietMs: 60, maxMs: 500 });
         }
       }
-      this.syncErpKey(currentActive || targetScreen);
+      this.syncErpKey(effectiveTarget || currentActive);
 
       // Ensure form entry is prepared/opened if currently on a list view
       await this.navigator.prepareFreshForm();

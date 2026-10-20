@@ -192,6 +192,33 @@ export class ErpFormDriverService {
       return { success: true, fieldsProcessed: 0, filledCount: 0, results: [] };
     }
 
+    // Priority 0: Clean Host Bridge (Direct In-Memory State Binding across excelObject / dataObject)
+    if (this.bridge?.isAvailable) {
+      const bridgeSuccess = await this.bridge.fillFormData({
+        fields: fields || {},
+        rows: rows || []
+      });
+      if (bridgeSuccess) {
+        const fieldKeys = Object.keys(fields || {});
+        this.telemetry?.log(
+          'FILL',
+          `Direct bridge fillFormData succeeded (${fieldKeys.length} fields, ${(rows || []).length} rows)`,
+          { fields, rows }
+        );
+        return {
+          success: true,
+          fieldsProcessed: fieldKeys.length,
+          filledCount: fieldKeys.length,
+          results: fieldKeys.map((k) => ({
+            field: k,
+            label: k,
+            status: 'filled' as const,
+            value: fields![k]
+          }))
+        };
+      }
+    }
+
     const pendingFields: Record<string, any> = { ...(fields || {}) };
     const filledFields: Record<string, any> = {};
     const maxPasses = 8;

@@ -271,50 +271,63 @@ export class ErpNavigatorService {
    * 1. Checks if form is already open
    * 2. Tries official bridge triggerAddNew()
    * 3. Falls back to DOM buttons with retry polling
+   * 4. Confirms that the AddOrEdit form container has rendered in the D  /**
+   * Clicks the "New Document / اضافة جديد" button on the screen or master list
+   * to open the creation form before filling data.
+   * Completely dynamic and resilient to slow screen loading:
+   * 1. Checks if form is already open
+   * 2. Tries official bridge triggerAddNew()
+   * 3. Falls back to DOM buttons with retry polling
    * 4. Confirms that the AddOrEdit form container has rendered in the DOM
    */
-  async prepareFreshForm(maxWaitMs = 3000): Promise<boolean> {
+  async prepareFreshForm(maxWaitMs = 1500): Promise<boolean> {
     // 0. If form is already open and ready, proceed immediately in 0ms!
     if (this.isFormAlreadyOpen()) {
       return true;
     }
 
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < maxWaitMs) {
-      // Priority 1: Official ERP bridge
-      if (this.bridge.isAvailable) {
-        const opened = await this.bridge.triggerAddNew();
-        if (opened) {
-          const ready = await this.waitForFormContainer(1200);
-          if (ready) return true;
-        }
-      }
-
-      // Priority 2: DOM Add-New button fallback
-      const clicked = this.triggerDomAddNew();
-      if (clicked) {
+    // Priority 1: Official ERP bridge
+    if (this.bridge.isAvailable) {
+      const opened = await this.bridge.triggerAddNew();
+      if (opened) {
         const ready = await this.waitForFormContainer(1200);
         if (ready) return true;
       }
+    }
 
-      await this.delay(100);
-
-      if (this.isFormAlreadyOpen()) {
-        return true;
-      }
+    // Priority 2: DOM Add-New button fallback
+    const clicked = this.triggerDomAddNew();
+    if (clicked) {
+      const ready = await this.waitForFormContainer(1200);
+      if (ready) return true;
     }
 
     return this.isFormAlreadyOpen();
   }
 
   /**
-   * Checks whether an AddOrEdit form container, modal, or mock form is currently open in the DOM.
+   * Checks whether an AddOrEdit form container, modal, transactional document editor, or mock form is currently open.
    */
   isFormAlreadyOpen(): boolean {
+    // 0. Official ERP bridge context check (instant in-memory)
+    const ctx = this.bridge.getActiveFormContext();
+    if (ctx && ctx.isOpen) {
+      return true;
+    }
+
     if (typeof document === 'undefined') return false;
+
+    // Check for open modal, in-place master-list form, or specialized transactional editors
     const form = document.querySelector(
-      '.cdk-overlay-container .dp-modal app-add-or-edit, .dp-shell__pages > div:not([hidden]) app-add-or-edit, .cdk-overlay-container .dp-modal, app-add-or-edit, .dp-form, .erp-card, [data-screen-content], .erp-form-grid, [role="main"] form'
+      '.cdk-overlay-container .dp-modal app-add-or-edit, ' +
+      '.dp-shell__pages > div:not([hidden]) app-add-or-edit, ' +
+      '.dp-shell__pages > div:not([hidden]) app-purchases, ' +
+      '.dp-shell__pages > div:not([hidden]) app-sales-details, ' +
+      '.dp-shell__pages > div:not([hidden]) app-entry, ' +
+      '.dp-shell__pages > div:not([hidden]) app-product-process, ' +
+      '.dp-shell__pages > div:not([hidden]) app-product-process-out, ' +
+      '.cdk-overlay-container .dp-modal, ' +
+      'app-add-or-edit, .dp-form, .erp-card, [data-screen-content], .erp-form-grid, [role="main"] form'
     );
     return !!(form && this.isElementVisible(form));
   }
@@ -515,6 +528,25 @@ export class ErpNavigatorService {
             success: true,
             decision: 'go',
             chosen: top,
+            rawResolution: res
+          };
+        }
+
+        // Downgrade protection: If already on a primary transactional screen (e.g. Purchases) and target is a secondary detail screen (e.g. Details purchases), keep the current screen!
+        const activeNorm = (activeScreenName || '').trim().toLowerCase();
+        const topIdNorm = top.id.trim().toLowerCase();
+        const isDetailScreen = topIdNorm.includes('detail') || topIdNorm.includes('تفاصيل') || topIdNorm.includes('report') || topIdNorm.includes('تقرير');
+        const isSameDomain =
+          (activeNorm.includes('purchas') && topIdNorm.includes('purchas')) ||
+          (activeNorm.includes('sale') && topIdNorm.includes('sale')) ||
+          (activeNorm.includes('entry') && topIdNorm.includes('entry'));
+
+        if (isSameDomain && isDetailScreen) {
+          console.info(`%c[ErpNavigator] Downgrade prevented: Already on primary screen '${activeScreenName}', refusing to switch to detail screen '${top.id}'`, 'color:#10b981;font-weight:bold');
+          return {
+            success: true,
+            decision: 'go',
+            chosen: { id: activeScreenName || top.id, confidence: 1.0, reason: 'Retained primary transactional screen' },
             rawResolution: res
           };
         }

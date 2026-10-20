@@ -1,5 +1,11 @@
 import { Injectable, inject } from '@angular/core';
-import { ErpActiveScreen, ErpScreenInfo, ErpSaveResult } from '../models/erp-bridge.models';
+import {
+  ErpActiveScreen,
+  ErpScreenInfo,
+  ErpSaveResult,
+  ErpFormFillPayload,
+  ErpActiveFormContext
+} from '../models/erp-bridge.models';
 import { ErpTelemetryService } from './erp-telemetry.service';
 
 /**
@@ -117,6 +123,36 @@ export class ErpBridgeService {
         success: false,
         errors: [err?.message || 'حدث خطأ أثناء تنفيذ الحفظ في نظام الـ ERP.']
       };
+    }
+  }
+
+  /**
+   * Directly populates form state and grid rows via the official host ERP bridge.
+   * Leverages in-memory binding (excelObject / dataObject) without fragile DOM scraping.
+   */
+  async fillFormData(payload: ErpFormFillPayload): Promise<boolean> {
+    if (!this.isAvailable || typeof window.DynamicERP!.fillFormData !== 'function') {
+      return false;
+    }
+    return this.invoke('fillFormData', () => window.DynamicERP!.fillFormData!(payload), {
+      fieldsCount: Object.keys(payload.fields || {}).length,
+      rowsCount: payload.rows?.length || 0
+    });
+  }
+
+  /**
+   * Directly checks if the host ERP indicates an active transaction or document form is currently open.
+   */
+  getActiveFormContext(): ErpActiveFormContext | null {
+    if (!this.isAvailable || typeof window.DynamicERP!.getActiveFormContext !== 'function') {
+      return null;
+    }
+    try {
+      const ctx = window.DynamicERP!.getActiveFormContext() || null;
+      this.telemetry?.logBridge('getActiveFormContext', undefined, ctx);
+      return ctx;
+    } catch {
+      return null;
     }
   }
 
