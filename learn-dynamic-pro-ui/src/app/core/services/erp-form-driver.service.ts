@@ -196,7 +196,12 @@ export class ErpFormDriverService {
         const isNgSelect = tagName === 'eg-select' || tagName === 'ng-select';
         const isMatSelect = tagName === 'mat-select';
 
-        const rawName = host.getAttribute('name') || host.id || '';
+        const rawName =
+          host.getAttribute('name') ||
+          host.getAttribute('formcontrolname') ||
+          host.id ||
+          host.getAttribute('data-field') ||
+          '';
         const cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
 
         const labelText = this.findLabelForElement(host);
@@ -235,15 +240,24 @@ export class ErpFormDriverService {
         // Skip table pagination, master-list internal search bar, and numeric row checkboxes
         if (el.closest('.dp-table__pagination, app-master-list-switch, .dataTables_paginate')) continue;
 
-        const rawName = el.getAttribute('name') || el.id || el.getAttribute('placeholder') || '';
+        const rawName =
+          el.getAttribute('name') ||
+          el.getAttribute('formcontrolname') ||
+          el.id ||
+          el.getAttribute('placeholder') ||
+          '';
         const cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
 
-        // Filter out non-business grid controls
-        if (/^(dpCheckAll|pageSeachValue|dpLimit|\d+)$/i.test(cleanName)) continue;
+        // Filter out non-business pagination/limits controls
+        if (/^(dpCheckAll|pageSeachValue|dpLimit)$/i.test(cleanName)) continue;
 
         const labelText = this.findLabelForElement(el);
 
-        const key = cleanName || (labelText ? `field_${labelText}` : '');
+        // If cleanName is purely digits (e.g. table row index), prefer labelText as key if available
+        let key = cleanName;
+        if (/^\d+$/.test(cleanName) || !cleanName) {
+          key = labelText ? `field_${labelText}` : cleanName;
+        }
         if (!key) continue;
 
         const tagName = el.tagName.toLowerCase();
@@ -510,21 +524,87 @@ export class ErpFormDriverService {
       for (const [rawKey, rawVal] of Object.entries(fields)) {
         if (String(rawVal).toUpperCase() === '$TOTAL' || String(rawVal).toUpperCase() === 'TOTAL') {
           const cleanKey = rawKey.split('(')[0].trim().replace(/^['"]|['"]$/g, '');
-          const targetElement = this.findTargetElement(cleanKey, excludeContainer);
+          let targetElement = this.findTargetElement(cleanKey, excludeContainer);
+
+          // If targetElement is not a text/number input (e.g. an ng-select like SafeAccounId), discard it so fallbacks find the real payment input
+          if (
+            targetElement &&
+            !(targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
+          ) {
+            targetElement = null;
+          }
+
+          // Fallback 1: Search for paid / cash / settlement inputs in the form
+          if (!targetElement) {
+            const paidSelectors = [
+              'input[name*="paid" i]',
+              'input[id*="paid" i]',
+              'input[formcontrolname*="paid" i]',
+              'input[name*="cash" i]',
+              'input[id*="cash" i]',
+              'input[formcontrolname*="cash" i]',
+              'input[name*="pay" i]',
+              'input[id*="pay" i]',
+              'input[formcontrolname*="pay" i]',
+              'input[name*="madfou" i]',
+              'input[id*="madfou" i]'
+            ];
+            for (const sel of paidSelectors) {
+              const el = this.getActiveFormRoot().querySelector(sel) as HTMLInputElement;
+              if (el && (!excludeContainer || !excludeContainer.contains(el)) && !el.disabled && !el.readOnly) {
+                targetElement = el;
+                break;
+              }
+            }
+          }
+
+          // Fallback 2: Search by label containing "مدفوع" or "مسدد" or "نقدا"
+          if (!targetElement) {
+            const labels = Array.from(this.getActiveFormRoot().querySelectorAll('label'));
+            for (const lbl of labels) {
+              const text = normalizeArabicText(lbl.textContent || '');
+              if (text.includes('مدفوع') || text.includes('مسدد') || text.includes('نقدا') || text.includes('سداد')) {
+                const group = lbl.closest('.form-group, .row, div');
+                const inp = group?.querySelector('input') as HTMLInputElement;
+                if (inp && (!excludeContainer || !excludeContainer.contains(inp)) && !inp.disabled && !inp.readOnly) {
+                  targetElement = inp;
+                  break;
+                }
+              }
+            }
+          }
 
           if (
             targetElement &&
             (targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
           ) {
-            const calculatedTotal = this.readCalculatedTotal();
-            const finalVal = calculatedTotal || '0';
+            let finalVal = this.readCalculatedTotal();
+            if (!finalVal || finalVal === '0') {
+              // Calculate fallback sum from rows: sum(qty * price/cost)
+              let sum = 0;
+              for (const r of rows || []) {
+                const q = parseFloat(String(r['الكمية'] || r['كمية'] || r['qty'] || 0)) || 0;
+                const p = parseFloat(String(r['السعر'] || r['سعر'] || r['التكلفة'] || r['تكلفة'] || r['price'] || r['cost'] || 0)) || 0;
+                sum += (q * p);
+              }
+              if (sum > 0) {
+                finalVal = String(sum);
+              } else {
+                finalVal = finalVal || '0';
+              }
+            }
             this.setTextOrDate(targetElement, finalVal);
             filledCount++;
             results.push({
-              field: cleanKey,
+              field: cleanKey || 'المدفوع نقداً',
               value: finalVal,
               status: 'filled',
-              message: `تم نسخ القيمة الإجمالية المحسوبة (${finalVal}) إلى خانة السداد`,
+              message: `تم نسخ القيمة الإجمالية المحسوبة (${finalVal}) إلى خانة السداد والمدفوع نقداً`,
+            });
+            this.telemetry?.log('FILL', `Populated calculated total (${finalVal}) into cash paid field`, {
+              field: cleanKey,
+              total: finalVal,
+              targetId: targetElement.id || targetElement.getAttribute('name')
             });
           }
         }
@@ -615,25 +695,43 @@ export class ErpFormDriverService {
           return 'not_found';
         }
 
-        // 5. Match option text using normalized Arabic
+        // 5. Match option text using normalized Arabic with candidate scoring
         const normalizedTarget = normalizeArabicText(term);
         let exactMatch: HTMLElement | null = null;
-        const partialMatches: HTMLElement[] = [];
+        const candidateMatches: { el: HTMLElement; score: number; optText: string }[] = [];
 
         for (const opt of options) {
           const labelEl = opt.querySelector('.ng-option-label') || opt;
-          const optText = normalizeArabicText(labelEl.textContent || '');
+          const rawOptText = (labelEl.textContent || '').trim();
+          const optText = normalizeArabicText(rawOptText);
+          const cleanedOptText = optText.replace(/^[0-9\-_[\]#\s.:]+/, '').replace(/[0-9\-_[\]#\s.:]+$/, '').trim();
 
-          if (optText === normalizedTarget) {
+          if (optText === normalizedTarget || cleanedOptText === normalizedTarget) {
             exactMatch = opt;
             break;
           }
-          if (optText.includes(normalizedTarget) || normalizedTarget.includes(optText)) {
-            partialMatches.push(opt);
+
+          if (cleanedOptText.includes(normalizedTarget) || optText.includes(normalizedTarget)) {
+            const lengthDiff = Math.abs(cleanedOptText.length - normalizedTarget.length);
+            candidateMatches.push({ el: opt, score: 100 - lengthDiff, optText });
+          } else {
+            const targetWords = normalizedTarget.split(/\s+/).filter(w => w.length > 1);
+            let matchedWords = 0;
+            for (const tw of targetWords) {
+              if (cleanedOptText.includes(tw)) matchedWords++;
+            }
+            if (matchedWords >= 2 || (targetWords.length === 1 && matchedWords === 1)) {
+              candidateMatches.push({
+                el: opt,
+                score: (matchedWords / targetWords.length) * 50 - Math.abs(cleanedOptText.length - normalizedTarget.length),
+                optText
+              });
+            }
           }
         }
 
-        const matchToClick = exactMatch || (partialMatches.length === 1 ? partialMatches[0] : null);
+        candidateMatches.sort((a, b) => b.score - a.score);
+        const matchToClick = exactMatch || (candidateMatches.length > 0 ? candidateMatches[0].el : null);
 
         if (matchToClick) {
           matchToClick.click();
@@ -664,10 +762,6 @@ export class ErpFormDriverService {
             selected: (matchToClick.textContent || '').trim()
           });
           return 'filled';
-        }
-
-        if (partialMatches.length > 1) {
-          return 'ambiguous';
         }
 
         return 'not_found';
@@ -806,14 +900,17 @@ export class ErpFormDriverService {
       'input[name*="net" i]',
       'input[id*="total" i]',
       'input[id*="net" i]',
+      'input[formcontrolname*="total" i]',
+      'input[formcontrolname*="net" i]',
       '[data-testid*="total" i]',
+      '[data-field*="total" i]',
     ];
 
     for (const sel of selectors) {
       const el = this.getActiveFormRoot().querySelector(sel) as HTMLInputElement;
       if (el && el.value && el.value.trim()) {
         const num = el.value.trim().replace(/,/g, '');
-        if (!isNaN(Number(num))) return num;
+        if (!isNaN(Number(num)) && Number(num) > 0) return num;
       }
     }
 
@@ -826,8 +923,24 @@ export class ErpFormDriverService {
         const input = group?.querySelector('input') as HTMLInputElement;
         if (input && input.value && input.value.trim()) {
           const num = input.value.trim().replace(/,/g, '');
-          if (!isNaN(Number(num))) return num;
+          if (!isNaN(Number(num)) && Number(num) > 0) return num;
         }
+        const textEl = group?.querySelector('.form-control-static, span, div, strong') as HTMLElement;
+        if (textEl && textEl.textContent && textEl.textContent.trim()) {
+          const num = textEl.textContent.trim().replace(/,/g, '').replace(/[^\d.]/g, '');
+          if (!isNaN(Number(num)) && Number(num) > 0) return num;
+        }
+      }
+    }
+
+    // Try finding footer or summary table cells
+    const footerCells = Array.from(
+      this.getActiveFormRoot().querySelectorAll('tfoot td, .total-value, .net-value, [class*="total"]')
+    ) as HTMLElement[];
+    for (const cell of footerCells) {
+      const text = cell.textContent?.trim().replace(/,/g, '').replace(/[^\d.]/g, '') || '';
+      if (text && !isNaN(Number(text)) && Number(text) > 0) {
+        return text;
       }
     }
 
@@ -845,22 +958,69 @@ export class ErpFormDriverService {
     const clean = key.trim().replace(/^['"]|['"]$/g, '');
     const formRoot = this.getActiveFormRoot();
 
-    // 1. Check custom dropdown hosts first
-    const customCandidates = Array.from(
-      formRoot.querySelectorAll(`eg-select[name="${clean}" i], ng-select[name="${clean}" i], [name="${clean}" i]`)
-    ) as HTMLElement[];
+    // Map known aliases (e.g. POSetting <-> طريقة الشراء, StoreID <-> المخزن, ProjectID <-> المشروع)
+    const aliasMap: Record<string, string[]> = {
+      'supplierid': ['supplier', 'vendor', 'المورد', 'مورد'],
+      'storeid': ['store', 'warehouse', 'المخزن', 'مخزن'],
+      'safeaccounid': ['safe', 'cashbox', 'treasury', 'الخزينة', 'خزينة', 'الصندوق', 'صندوق', 'طريقة الدفع', 'طريقة السداد'],
+      'projectid': ['project', 'المشروع', 'مشروع', 'المشروعات', 'مشروعات'],
+      'posetting': ['posetting', 'purchasesetting', 'طريقة الشراء', 'طريقةالشراء', 'نوع الشراء', 'اعدادات الشراء'],
+      'costitemid': ['costitem', 'costcenter', 'مركز التكلفة', 'مركزالتكلفة'],
+      'cashpaid': ['paid', 'cash', 'paidamount', 'netpaid', 'المدفوع', 'مدفوع', 'المسدد', 'مسدد', 'المدفوع نقدا', 'مدفوع نقدا', 'نقدا']
+    };
 
-    for (const cand of customCandidates) {
-      if (excludeContainer && excludeContainer.contains(cand)) continue;
-      return cand;
+    const keysToTry = [clean];
+    const cleanLower = clean.toLowerCase();
+    for (const [canonical, aliases] of Object.entries(aliasMap)) {
+      if (cleanLower === canonical || aliases.includes(clean) || aliases.includes(cleanLower)) {
+        if (!keysToTry.includes(canonical)) keysToTry.push(canonical);
+        for (const al of aliases) {
+          if (!keysToTry.includes(al)) keysToTry.push(al);
+        }
+      }
     }
 
-    // 2. Check standard inputs / selects / textareas
-    const safeSelector = `input[name="${clean}" i], select[name="${clean}" i], textarea[name="${clean}" i], [data-testid="${clean}" i]`;
-    const elements = Array.from(formRoot.querySelectorAll(safeSelector)) as HTMLElement[];
-    for (const el of elements) {
-      if (excludeContainer && excludeContainer.contains(el)) continue;
-      return el;
+    for (const searchKey of keysToTry) {
+      // 1. Check custom dropdown hosts first (by name, id, formcontrolname, data-field)
+      const customSelector = [
+        `eg-select[name="${searchKey}" i]`,
+        `ng-select[name="${searchKey}" i]`,
+        `[name="${searchKey}" i]`,
+        `eg-select[id="${searchKey}" i]`,
+        `ng-select[id="${searchKey}" i]`,
+        `[id="${searchKey}" i]`,
+        `eg-select[formcontrolname="${searchKey}" i]`,
+        `ng-select[formcontrolname="${searchKey}" i]`,
+        `[formcontrolname="${searchKey}" i]`,
+        `[data-field="${searchKey}" i]`
+      ].join(', ');
+
+      const customCandidates = Array.from(formRoot.querySelectorAll(customSelector)) as HTMLElement[];
+      for (const cand of customCandidates) {
+        if (excludeContainer && excludeContainer.contains(cand)) continue;
+        return cand;
+      }
+
+      // 2. Check standard inputs / selects / textareas (by name, id, formcontrolname, data-testid, data-field)
+      const safeSelector = [
+        `input[name="${searchKey}" i]`,
+        `select[name="${searchKey}" i]`,
+        `textarea[name="${searchKey}" i]`,
+        `input[id="${searchKey}" i]`,
+        `select[id="${searchKey}" i]`,
+        `textarea[id="${searchKey}" i]`,
+        `input[formcontrolname="${searchKey}" i]`,
+        `select[formcontrolname="${searchKey}" i]`,
+        `textarea[formcontrolname="${searchKey}" i]`,
+        `[data-testid="${searchKey}" i]`,
+        `[data-field="${searchKey}" i]`
+      ].join(', ');
+
+      const elements = Array.from(formRoot.querySelectorAll(safeSelector)) as HTMLElement[];
+      for (const el of elements) {
+        if (excludeContainer && excludeContainer.contains(el)) continue;
+        return el;
+      }
     }
 
     // 3. Fallback: match by label text
@@ -994,27 +1154,113 @@ export class ErpFormDriverService {
         this.getActiveFormRoot().querySelectorAll('table, mat-table, ag-grid, [role="grid"]')
       ) as HTMLElement[];
 
-      const table = tables.find((t) => !excludeContainer || !excludeContainer.contains(t));
+      // Pick the table that specifically contains items/products or fallback to the first table
+      const table =
+        tables.find((t) => {
+          if (excludeContainer && excludeContainer.contains(t)) return false;
+          const text = (t.textContent || '').toLowerCase();
+          return (
+            text.includes('صنف') ||
+            text.includes('منتج') ||
+            text.includes('كمية') ||
+            text.includes('item') ||
+            text.includes('qty')
+          );
+        }) || tables.find((t) => !excludeContainer || !excludeContainer.contains(t));
+
       if (!table) {
         console.warn('[ErpFormDriver] No grid table found for rows filling');
         return 0;
       }
 
-      const headers = Array.from(
-        table.querySelectorAll('thead th, mat-header-cell, tr:first-child th, [role="columnheader"]')
-      ) as HTMLElement[];
+      // Read clean column headers strictly from the primary header row (thead tr)
+      const thead = table.querySelector('thead');
+      const headerRow = thead ? thead.querySelector('tr') : table.querySelector('tr');
+      const headers = headerRow
+        ? (Array.from(headerRow.querySelectorAll('th, td, [role="columnheader"]')) as HTMLElement[])
+        : (Array.from(table.querySelectorAll('thead th, mat-header-cell, [role="columnheader"]')) as HTMLElement[]);
 
       const colHeaderMap: { index: number; text: string }[] = headers.map((th, index) => ({
         index,
         text: normalizeArabicText(th.textContent || ''),
       }));
 
+      const isGenuineItemRow = (r: HTMLElement): boolean => {
+        if (r.closest('thead, tfoot')) return false;
+        if (r.querySelector('th, [role="columnheader"]')) return false;
+
+        const className = (r.className || '').toLowerCase();
+        if (
+          className.includes('filter') ||
+          className.includes('p-filter-row') ||
+          className.includes('no-data') ||
+          className.includes('empty') ||
+          className.includes('template') ||
+          className.includes('dub') ||
+          r.querySelector('.no-data-msg, .dataTables_empty')
+        ) {
+          return false;
+        }
+
+        // Exclude template or duplicate rows where all dropdowns are 'Dub'
+        const selects = Array.from(r.querySelectorAll('eg-select, ng-select, mat-select')) as HTMLElement[];
+        if (selects.length > 0) {
+          const onlyDub = selects.every((s) => {
+            const name = (s.getAttribute('name') || s.getAttribute('formcontrolname') || s.id || '').toLowerCase();
+            const label = (s.getAttribute('aria-label') || s.getAttribute('title') || '').toLowerCase();
+            return name.includes('dub') || label.includes('dub');
+          });
+          if (onlyDub) return false;
+          return true;
+        }
+
+        const inputs = Array.from(
+          r.querySelectorAll('input:not([type="hidden"]), select')
+        ) as (HTMLInputElement | HTMLSelectElement)[];
+        const editableInputs = inputs.filter((inp) => !inp.disabled && !(inp instanceof HTMLInputElement && inp.readOnly));
+        return editableInputs.length >= 2;
+      };
+
+      const getGenuineRows = (): HTMLElement[] => {
+        const rowsInTbody = Array.from(table.querySelectorAll('tbody > tr, mat-row')) as HTMLElement[];
+        const candidates =
+          rowsInTbody.length > 0
+            ? rowsInTbody
+            : (Array.from(table.querySelectorAll('tr, mat-row, [role="row"]')) as HTMLElement[]).filter(
+                (r) => !r.closest('thead, tfoot')
+              );
+        return candidates.filter(isGenuineItemRow);
+      };
+
+      const matchesColKey = (headerText: string, key: string): boolean => {
+        const normHeader = normalizeArabicText(headerText).replace(/\s+/g, '');
+        const normKey = normalizeArabicText(key).replace(/\s+/g, '');
+
+        if (normHeader.includes(normKey) || normKey.includes(normHeader)) return true;
+
+        const synonymGroups: string[][] = [
+          ['اسمالمنتج', 'الصنف', 'المنتج', 'البيان', 'البند', 'item', 'product', 'itemname', 'productname'],
+          ['الكمية', 'العدد', 'كمية', 'qty', 'quantity', 'count'],
+          ['السعر', 'التكلفة', 'سعرالشراء', 'سعرالوحدة', 'سعر', 'تكلفة', 'price', 'cost', 'unitprice', 'purchasingprice'],
+          ['الوحدة', 'وحدةالقياس', 'وحدة', 'unit'],
+          ['الملاحظات', 'ملاحظات', 'بيان', 'notes', 'remarks'],
+          ['الاجمالي', 'اجمالي', 'القيمة', 'total', 'amount']
+        ];
+
+        for (const group of synonymGroups) {
+          const keyInGroup = group.some((g) => normKey.includes(g) || g.includes(normKey));
+          if (keyInGroup) {
+            const headerInGroup = group.some((g) => normHeader.includes(g) || g.includes(normHeader));
+            if (headerInGroup) return true;
+          }
+        }
+        return false;
+      };
+
       for (let rIdx = 0; rIdx < rows.length; rIdx++) {
         const rowData = rows[rIdx];
 
-        let rowEls = Array.from(table.querySelectorAll('tbody tr, mat-row, [role="row"]')) as HTMLElement[];
-        rowEls = rowEls.filter((r) => !r.querySelector('th, [role="columnheader"]'));
-
+        let rowEls = getGenuineRows();
         let targetRow: HTMLElement | null | undefined = rowEls[rIdx];
 
         if (!targetRow) {
@@ -1022,38 +1268,60 @@ export class ErpFormDriverService {
           if (addBtn) {
             addBtn.click();
             targetRow = (await this.waitFor<HTMLElement>(() => {
-              const currentRows = (Array.from(
-                table.querySelectorAll('tbody tr, mat-row, [role="row"]')
-              ) as HTMLElement[]).filter((r) => !r.querySelector('th, [role="columnheader"]'));
-
+              const currentRows = getGenuineRows();
               if (currentRows.length > rowEls.length) {
-                const candidate = currentRows[rIdx] || currentRows[currentRows.length - 1];
-                const inputs = candidate.querySelectorAll('input, select, textarea, eg-select, ng-select');
-                return inputs.length > 0 ? candidate : null;
+                return currentRows[rIdx] || currentRows[currentRows.length - 1] || null;
               }
               return null;
             }, 3000)) || undefined;
 
-            await new Promise((resolve) => setTimeout(resolve, 80));
+            await new Promise((resolve) => setTimeout(resolve, 100));
+          }
+        }
+
+        // If targetRow exists but lacks an item selector dropdown, trigger addBtn to get a proper item row
+        if (targetRow && !targetRow.querySelector('eg-select, ng-select')) {
+          const addBtn = await this.findAddRowButton(table, excludeContainer);
+          if (addBtn) {
+            addBtn.click();
+            targetRow = (await this.waitFor<HTMLElement>(() => {
+              const currentRows = getGenuineRows();
+              const candidate = currentRows[rIdx] || currentRows[currentRows.length - 1];
+              return candidate && candidate.querySelector('eg-select, ng-select') ? candidate : null;
+            }, 3000)) || targetRow;
+
+            await new Promise((resolve) => setTimeout(resolve, 100));
           }
         }
 
         if (!targetRow) {
           console.warn(`[ErpFormDriver] Could not find or create grid row index ${rIdx}`);
+          this.telemetry?.log('GRID', `Could not find or create grid row index ${rIdx}`, {
+            row: rIdx + 1,
+            data: rowData
+          });
           continue;
         }
 
         const cells = Array.from(targetRow.querySelectorAll('td, mat-cell, [role="gridcell"]')) as HTMLElement[];
         let cellFilled = false;
 
-        for (const [colKey, rawVal] of Object.entries(rowData)) {
+        // Sort entries so product/item dropdown is filled FIRST, allowing ERP async cascade to settle before setting qty/cost
+        const sortedEntries = Object.entries(rowData).sort(([keyA], [keyB]) => {
+          const isItemA = matchesColKey('الصنف', keyA) || matchesColKey('اسم المنتج', keyA);
+          const isItemB = matchesColKey('الصنف', keyB) || matchesColKey('اسم المنتج', keyB);
+          if (isItemA && !isItemB) return -1;
+          if (!isItemA && isItemB) return 1;
+          return 0;
+        });
+
+        for (const [colKey, rawVal] of sortedEntries) {
           if (rawVal == null) continue;
-          const normalizedKey = normalizeArabicText(colKey);
 
           let targetCell: HTMLElement | null = null;
           for (let cIdx = 0; cIdx < cells.length; cIdx++) {
             const h = colHeaderMap.find((header) => header.index === cIdx);
-            if (h && (h.text.includes(normalizedKey) || normalizedKey.includes(h.text))) {
+            if (h && matchesColKey(h.text, colKey)) {
               targetCell = cells[cIdx];
               break;
             }
@@ -1071,11 +1339,48 @@ export class ErpFormDriverService {
             }
           }
 
+          // Direct Fallback 1: match product/item column directly to cell with eg-select / ng-select (excluding Dub)
+          if (!targetCell && (matchesColKey('الصنف', colKey) || matchesColKey('اسم المنتج', colKey))) {
+            targetCell =
+              cells.find((c) => {
+                const sel = c.querySelector('eg-select, ng-select');
+                if (!sel) return false;
+                const name = (sel.getAttribute('name') || sel.getAttribute('formcontrolname') || sel.id || '').toLowerCase();
+                return !name.includes('dub');
+              }) || null;
+          }
+
+          // Direct Fallback 2: match quantity directly to number input cell
+          if (!targetCell && (matchesColKey('الكمية', colKey) || matchesColKey('العدد', colKey))) {
+            targetCell =
+              cells.find((c) => {
+                const inp = c.querySelector(
+                  'input[type="number"], input[name*="qty" i], input[name*="count" i], input[formcontrolname*="qty" i]'
+                );
+                return !!inp;
+              }) || null;
+          }
+
+          // Direct Fallback 3: match price/cost directly to price/cost input cell
+          if (!targetCell && (matchesColKey('السعر', colKey) || matchesColKey('التكلفة', colKey))) {
+            targetCell =
+              cells.find((c) => {
+                const inp = c.querySelector(
+                  'input[name*="price" i], input[name*="cost" i], input[formcontrolname*="price" i], input[formcontrolname*="cost" i]'
+                );
+                return !!inp;
+              }) || null;
+          }
+
           if (targetCell) {
             const ngSelect = targetCell.querySelector('eg-select, ng-select') as HTMLElement;
             if (ngSelect) {
               const status = await this.setNgSelect(ngSelect, rawVal);
-              if (status === 'filled') cellFilled = true;
+              if (status === 'filled') {
+                cellFilled = true;
+                // Wait briefly for ERP cascade / auto-calculated fields to populate
+                await this.settle(targetRow, { quietMs: 60, maxMs: 400 });
+              }
             } else {
               const input = targetCell.querySelector('input, select, textarea') as
                 | HTMLInputElement
@@ -1083,12 +1388,54 @@ export class ErpFormDriverService {
                 | HTMLTextAreaElement;
 
               if (input && !input.disabled && !(input as HTMLInputElement).readOnly) {
+                // P3: Check if this is a Price/Cost column that already received an auto-populated default value from the ERP system
+                const isCostOrPrice = matchesColKey('التكلفة', colKey) || matchesColKey('السعر', colKey);
+                if (isCostOrPrice) {
+                  await this.settle(targetRow, { quietMs: 40, maxMs: 200 });
+                  const existingNum = parseFloat(String(input.value || '').replace(/,/g, '').trim());
+                  if (!isNaN(existingNum) && existingNum > 0) {
+                    this.telemetry?.log('GRID', `Preserving system auto-populated default cost for row ${rIdx + 1}`, {
+                      field: colKey,
+                      systemCost: existingNum,
+                      skippedProposed: rawVal
+                    });
+                    cellFilled = true;
+                    continue; // Leave the system default value intact!
+                  }
+                }
+
                 if (input.tagName.toLowerCase() === 'select') {
                   this.setNativeSelect(input as HTMLSelectElement, rawVal);
                 } else {
                   this.setTextOrDate(input as HTMLInputElement, rawVal);
                 }
                 cellFilled = true;
+              }
+            }
+          }
+        }
+
+        // Post-fill verification & enforcement for quantity:
+        // DynamicERP's async product selection cascade often resets quantity to default 1.
+        // If the user specified an expected quantity, ensure it is preserved!
+        const expectedQtyKey = Object.keys(rowData).find(k => matchesColKey('الكمية', k) || matchesColKey('العدد', k) || k.toLowerCase().includes('qty'));
+        if (expectedQtyKey && rowData[expectedQtyKey] != null) {
+          const expectedQty = parseFloat(String(rowData[expectedQtyKey]));
+          if (!isNaN(expectedQty)) {
+            const qtyInput = targetRow.querySelector(
+              'input[name*="qty" i], input[name*="count" i], input[name*="quantity" i], input[formcontrolname*="qty" i], input[formcontrolname*="quantity" i], input[type="number"]'
+            ) as HTMLInputElement;
+
+            if (qtyInput && !qtyInput.disabled && !qtyInput.readOnly) {
+              const currentQty = parseFloat(String(qtyInput.value || '').replace(/,/g, '').trim());
+              if (isNaN(currentQty) || currentQty !== expectedQty) {
+                this.telemetry?.log('GRID', `Enforcing requested quantity for row ${rIdx + 1} after cascade (was ${currentQty}, expected ${expectedQty})`, {
+                  row: rIdx + 1,
+                  currentQty,
+                  expectedQty
+                });
+                this.setTextOrDate(qtyInput, expectedQty);
+                await this.settle(targetRow, { quietMs: 40, maxMs: 200 });
               }
             }
           }

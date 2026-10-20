@@ -496,15 +496,29 @@ export class ErpNavigatorService {
     }
 
     try {
+      const activeScreenName = this.bridge.getActiveScreen()?.pageName;
+      const currentPath = activeScreenName ? [activeScreenName.trim()] : [];
       const res = await this.copilotService.resolveErpNavigation({
         user_message: userMessage,
         candidates,
-        current_path: []
+        current_path: currentPath
       });
       console.info('%c[ErpNavigator] resolve response from backend:', 'color:#8b5cf6;font-weight:bold', res);
 
       if (res.decision === 'go' && res.candidates.length > 0) {
         const top = res.candidates[0];
+
+        // If user is already on the target screen, avoid redundant navigation cycles
+        if (activeScreenName && this.isScreenActive(top.id)) {
+          console.info('%c[ErpNavigator] Already on target screen:', 'color:#10b981;font-weight:bold', top.id);
+          return {
+            success: true,
+            decision: 'go',
+            chosen: top,
+            rawResolution: res
+          };
+        }
+
         const targetEl = this.candidateElementsMap.get(top.id);
         const targetLabel = (targetEl?.textContent || top.id).trim();
 

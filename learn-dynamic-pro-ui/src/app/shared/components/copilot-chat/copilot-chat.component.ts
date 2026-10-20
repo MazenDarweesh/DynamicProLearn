@@ -6,7 +6,7 @@ import { MarkdownComponent } from 'ngx-markdown';
 import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
 import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData } from '../../../core/services/copilot.service';
-import { ErpFormDriverService } from '../../../core/services/erp-form-driver.service';
+import { ErpFormDriverService, normalizeArabicText } from '../../../core/services/erp-form-driver.service';
 import { ErpBatchStepperService } from '../../../core/services/erp-batch-stepper.service';
 import { ErpNavigatorService } from '../../../core/services/erp-navigator.service';
 import { ErpBridgeService } from '../../../core/services/erp-bridge.service';
@@ -670,13 +670,28 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     });
 
     try {
-      // 🚀 Safety Guard: Ensure ERP has navigated to the target screen before filling!
+      // 🚀 Safety Guard: Ensure ERP does not navigate away if already on matching domain screen!
+      const currentActive = this.bridge.getActiveScreen()?.pageName || this.erpKey || '';
+      const currentActiveNorm = currentActive.trim().toLowerCase();
+      const targetNorm = (targetScreen || '').trim().toLowerCase();
+
+      // If active screen is already in the same domain (e.g. both are purchases or current is the main form)
+      const isBothPurchases = currentActiveNorm.includes('purchas') && targetNorm.includes('purchas');
+      const isBothSales = currentActiveNorm.includes('sale') && targetNorm.includes('sale');
+
       if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
-        console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
-        await this.navigator.navigateToScreen(targetScreen);
-        await this.formDriver.settle(undefined, { quietMs: 60, maxMs: 500 });
+        if (isBothPurchases || isBothSales) {
+          console.info(
+            `%c[Copilot FormFill] User is already on '${currentActive}'. Retaining active screen instead of switching to '${targetScreen}'`,
+            'color:#10b981;font-weight:bold'
+          );
+        } else {
+          console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
+          await this.navigator.navigateToScreen(targetScreen);
+          await this.formDriver.settle(undefined, { quietMs: 60, maxMs: 500 });
+        }
       }
-      this.syncErpKey(targetScreen);
+      this.syncErpKey(currentActive || targetScreen);
 
       // Ensure form entry is prepared/opened if currently on a list view
       await this.navigator.prepareFreshForm();
@@ -866,6 +881,37 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     let resolvedDecisionId: string | null | undefined = undefined;
 
     // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
+    const activeScreen = this.bridge.getActiveScreen();
+    const activeName = (activeScreen?.pageName || this.erpKey || '').trim().toLowerCase();
+    const queryNorm = normalizeArabicText(query).toLowerCase();
+
+    // Check domain relevance between query and current active screen
+    const isPurchaseQuery =
+      queryNorm.includes('مشتريات') ||
+      queryNorm.includes('شراء') ||
+      queryNorm.includes('فاتورة') ||
+      queryNorm.includes('مورد');
+    const isCurrentPurchase = activeName.includes('purchas') || activeName.includes('مشتريات');
+
+    const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
+    const isCurrentSales = activeName.includes('sale') || activeName.includes('مبيعات');
+
+    const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
+
+    const isAlreadyOnMatchingScreen =
+      (isPurchaseQuery && isCurrentPurchase) ||
+      (isSalesQuery && isCurrentSales);
+
+    // If user is already on a matching screen and did NOT explicitly ask to navigate to a different screen:
+    if (isAlreadyOnMatchingScreen && !isExplicitNavRequest) {
+      console.info(
+        `%c[Copilot Navigation] Active screen '${activeName}' already matches query domain. Staying on current screen!`,
+        'color:#10b981;font-weight:bold'
+      );
+      skipNavCheck = true;
+      resolvedIntent = 'action';
+    }
+
     if (!skipNavCheck && typeof document !== 'undefined') {
       try {
         const navRes = await this.navigator.resolveAndNavigate(query);
