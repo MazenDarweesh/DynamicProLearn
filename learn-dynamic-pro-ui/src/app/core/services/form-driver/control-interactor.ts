@@ -1,4 +1,8 @@
-import { normalizeArabicText, resolveKeysToTry } from './arabic-normalizer';
+import {
+  normalizeArabicText,
+  resolveKeysToTry,
+  convertEasternToWesternNumerals,
+} from './arabic-normalizer';
 import { getActiveFormRoot, waitFor, highlightElement } from './dom-synchronizer';
 
 /**
@@ -106,6 +110,14 @@ export function setTextOrDate(
     // ignore focus error
   }
 
+  let strVal = String(val ?? '');
+  if (
+    el instanceof HTMLInputElement &&
+    (el.type === 'number' || el.type === 'date' || el.type === 'datetime-local')
+  ) {
+    strVal = convertEasternToWesternNumerals(strVal);
+  }
+
   const prototype =
     el instanceof HTMLTextAreaElement
       ? window.HTMLTextAreaElement.prototype
@@ -113,9 +125,9 @@ export function setTextOrDate(
 
   const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
   if (setter) {
-    setter.call(el, String(val));
+    setter.call(el, strVal);
   } else {
-    el.value = String(val);
+    el.value = strVal;
   }
 
   el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -123,15 +135,15 @@ export function setTextOrDate(
   el.dispatchEvent(new Event('blur', { bubbles: true }));
 
   // Verification check
-  const expectedStr = String(val).trim();
+  const expectedStr = strVal.trim();
   const actualStr = (el.value || '').trim();
   if (actualStr !== expectedStr && !actualStr.includes(expectedStr)) {
     // Retry once with simulated key events
     el.dispatchEvent(new KeyboardEvent('keydown', { key: 'Unidentified', bubbles: true }));
     if (setter) {
-      setter.call(el, String(val));
+      setter.call(el, strVal);
     } else {
-      el.value = String(val);
+      el.value = strVal;
     }
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new KeyboardEvent('keyup', { key: 'Unidentified', bubbles: true }));

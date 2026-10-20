@@ -11,7 +11,10 @@ import { ErpTelemetryService } from './erp-telemetry.service';
 import { ErpBridgeService } from './erp-bridge.service';
 
 // Modular Driver Delegates
-import { normalizeArabicText } from './form-driver/arabic-normalizer';
+import {
+  normalizeArabicText,
+  convertEasternToWesternNumerals,
+} from './form-driver/arabic-normalizer';
 import {
   getActiveFormRoot,
   waitFor,
@@ -34,7 +37,7 @@ import {
 import { fillGridRows } from './form-driver/grid-driver';
 
 // Re-export for backward compatibility with components & callers
-export { normalizeArabicText };
+export { normalizeArabicText, convertEasternToWesternNumerals };
 
 /**
  * ErpFormDriverService - Lean Façade & Form Fill Orchestrator.

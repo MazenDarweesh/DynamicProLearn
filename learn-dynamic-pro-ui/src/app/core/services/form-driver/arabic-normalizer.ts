@@ -3,18 +3,38 @@
  */
 
 /**
+ * Map Eastern Arabic numerals (٠-٩) and Persian numerals (۰-۹) to Western numerals (0-9).
+ */
+export const EASTERN_TO_WESTERN_NUMERALS: Record<string, string> = {
+  '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4',
+  '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+  '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4',
+  '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9',
+};
+
+/**
+ * Converts Eastern Arabic and Persian numerals to Western ASCII digits (0-9).
+ */
+export function convertEasternToWesternNumerals(text: string): string {
+  if (!text) return '';
+  return text.replace(/[٠-٩۰-۹]/g, (char) => EASTERN_TO_WESTERN_NUMERALS[char] || char);
+}
+
+/**
  * Normalizes Arabic text for flexible matching:
- * - Removes diacritics / tashkeel
- * - Unifies Alef shapes (أ, إ, آ -> ا)
+ * - Removes diacritics / tashkeel and tatweel (ـ)
+ * - Converts Eastern Arabic and Persian numerals (٠-٩, ۰-۹) to Western digits (0-9)
+ * - Unifies Alef shapes (أ, إ, آ, ٱ -> ا)
  * - Unifies Taa Marbuta / Haa (ة -> ه)
  * - Unifies Yaa / Alef Maksura (ى -> ي)
  * - Trims and collapses multiple spaces
  */
 export function normalizeArabicText(text: string): string {
   if (!text) return '';
-  return text
-    .replace(/[\u064B-\u065F\u0670]/g, '') // remove tashkeel
-    .replace(/[أإآ]/g, 'ا')
+  const convertedNumerals = convertEasternToWesternNumerals(text);
+  return convertedNumerals
+    .replace(/[\u064B-\u065F\u0670\u0640]/g, '') // remove tashkeel & tatweel (ـ)
+    .replace(/[أإآٱ]/g, 'ا') // unify Alif variants
     .replace(/ة/g, 'ه')
     .replace(/ى/g, 'ي')
     .replace(/[\r\n\t]+/g, ' ')
