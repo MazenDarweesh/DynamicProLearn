@@ -64,6 +64,7 @@ export const ERP_FIELD_ALIAS_MAP: Record<string, string[]> = {
   posetting: [
     'posetting',
     'purchasesetting',
+    'custom_select',
     'طريقة الشراء',
     'طريقةالشراء',
     'نوع الشراء',

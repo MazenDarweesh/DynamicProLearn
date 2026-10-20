@@ -6,6 +6,7 @@ export interface ErpActiveScreen {
   pageId: number;
   pageName: string;
   title?: string;
+  screenKey?: string;
 }
 
 export interface ErpScreenInfo {
@@ -15,6 +16,7 @@ export interface ErpScreenInfo {
   moduleId?: number;
   moduleName?: string;
   module?: string;
+  screenKey?: string;
 }
 
 export interface ErpSaveResult {

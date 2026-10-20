@@ -41,15 +41,24 @@ export class ErpNavigatorService {
         return true;
       }
       // If bridge has listScreens(), check if active page corresponds to the requested screenKey
+      // CRITICAL: Only match if active has a genuine non-empty pageName or screenKey (never match when on Dashboard/Main screen)
       const screens = this.bridge.listScreens();
-      if (screens) {
+      if (screens && (active.pageName || active.screenKey)) {
         const matchedTarget = screens.find(s =>
           (s.pageName && s.pageName.toUpperCase().trim() === upperKey) ||
           (s.title && normalizeArabicText(s.title) === normalizedKey) ||
           String(s.pageId) === screenKey
         );
-        if (matchedTarget && (matchedTarget.pageId === active.pageId || matchedTarget.pageName === active.pageName)) {
-          return true;
+        if (matchedTarget) {
+          if (active.pageName && matchedTarget.pageName?.toUpperCase().trim() === active.pageName.toUpperCase().trim()) {
+            return true;
+          }
+          if (active.screenKey && (matchedTarget.screenKey === active.screenKey || matchedTarget.pageName === active.screenKey)) {
+            return true;
+          }
+          if (matchedTarget.pageId === active.pageId && active.pageName) {
+            return true;
+          }
         }
       }
     }
@@ -309,27 +318,33 @@ export class ErpNavigatorService {
    * Checks whether an AddOrEdit form container, modal, transactional document editor, or mock form is currently open.
    */
   isFormAlreadyOpen(): boolean {
-    // 0. Official ERP bridge context check (instant in-memory)
+    // 0. Official ERP bridge context check (instant in-memory authority)
     const ctx = this.bridge.getActiveFormContext();
-    if (ctx && ctx.isOpen) {
-      return true;
+    if (ctx && typeof ctx.isOpen === 'boolean') {
+      return ctx.isOpen;
     }
 
     if (typeof document === 'undefined') return false;
 
-    // Check for open modal, in-place master-list form, or specialized transactional editors
-    const form = document.querySelector(
+    // Check modal overlays first (always top priority)
+    const modalForm = document.querySelector(
       '.cdk-overlay-container .dp-modal app-add-or-edit, ' +
-      '.dp-shell__pages > div:not([hidden]) app-add-or-edit, ' +
-      '.dp-shell__pages > div:not([hidden]) app-purchases, ' +
-      '.dp-shell__pages > div:not([hidden]) app-sales-details, ' +
-      '.dp-shell__pages > div:not([hidden]) app-entry, ' +
-      '.dp-shell__pages > div:not([hidden]) app-product-process, ' +
-      '.dp-shell__pages > div:not([hidden]) app-product-process-out, ' +
       '.cdk-overlay-container .dp-modal, ' +
-      'app-add-or-edit, .dp-form, .erp-card, [data-screen-content], .erp-form-grid, [role="main"] form'
+      '#addOrEditPopUp'
     );
-    return !!(form && this.isElementVisible(form));
+    if (modalForm && this.isElementVisible(modalForm)) {
+      return true;
+    }
+
+    // Check strictly within the active, non-hidden page tab
+    const activePage = document.querySelector('.dp-shell__pages > div:not([hidden])');
+    if (!activePage) return false;
+
+    // Ensure the active page actually contains an editor/form with inputs (not an empty dashboard or summary card)
+    const pageForm = activePage.querySelector(
+      'app-add-or-edit, .dp-form, [data-screen-content] form, .erp-form-grid'
+    );
+    return !!(pageForm && this.isElementVisible(pageForm));
   }
 
   /**
@@ -535,7 +550,16 @@ export class ErpNavigatorService {
         // Downgrade protection: If already on a primary transactional screen (e.g. Purchases) and target is a secondary detail screen (e.g. Details purchases), keep the current screen!
         const activeNorm = (activeScreenName || '').trim().toLowerCase();
         const topIdNorm = top.id.trim().toLowerCase();
-        const isDetailScreen = topIdNorm.includes('detail') || topIdNorm.includes('تفاصيل') || topIdNorm.includes('report') || topIdNorm.includes('تقرير');
+        const isDetailScreen =
+          topIdNorm.includes('detail') ||
+          topIdNorm.includes('تفاصيل') ||
+          topIdNorm.includes('report') ||
+          topIdNorm.includes('تقرير') ||
+          topIdNorm.includes('total') ||
+          topIdNorm.includes('اجمالي') ||
+          topIdNorm.includes('إجمالي') ||
+          topIdNorm.includes('ارصدة') ||
+          topIdNorm.includes('أرصدة');
         const isSameDomain =
           (activeNorm.includes('purchas') && topIdNorm.includes('purchas')) ||
           (activeNorm.includes('sale') && topIdNorm.includes('sale')) ||

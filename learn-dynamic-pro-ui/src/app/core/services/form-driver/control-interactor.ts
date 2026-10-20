@@ -35,6 +35,10 @@ export function findTargetElement(
       `ng-select[formcontrolname="${searchKey}" i]`,
       `[formcontrolname="${searchKey}" i]`,
       `[data-field="${searchKey}" i]`,
+      `[data-copilot-field="${searchKey}" i]`,
+      `[data-copilot-alias="${searchKey}" i]`,
+      `[placeholder="${searchKey}" i]`,
+      `[aria-label="${searchKey}" i]`,
     ].join(', ');
 
     const customCandidates = Array.from(

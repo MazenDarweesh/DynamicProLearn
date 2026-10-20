@@ -179,11 +179,24 @@ export function collectFormSchema(
         host.getAttribute('formcontrolname') ||
         host.id ||
         host.getAttribute('data-field') ||
+        host.getAttribute('placeholder') ||
+        host.getAttribute('aria-label') ||
+        host.getAttribute('title') ||
         '';
       const cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
 
-      const labelText = findLabelForElement(host);
+      const labelText = findLabelForElement(host) || host.getAttribute('placeholder') || host.getAttribute('aria-label') || '';
       const key = cleanName || (labelText ? `select_${labelText}` : 'custom_select');
+
+      // Stamp data-copilot-field so findTargetElement can reliably locate this custom host even if it lacks name/id
+      try {
+        host.setAttribute('data-copilot-field', key);
+        if (cleanName && cleanName !== key) {
+          host.setAttribute('data-copilot-alias', cleanName);
+        }
+      } catch {
+        // ignore attribute set errors in restricted DOM
+      }
 
       const kind: FieldKind = isNgSelect ? 'ng-select' : isMatSelect ? 'mat-select' : 'select';
       const group: FieldGroup = determineFieldGroup(host);

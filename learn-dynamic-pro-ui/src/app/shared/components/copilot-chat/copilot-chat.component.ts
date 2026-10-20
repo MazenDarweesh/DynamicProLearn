@@ -885,7 +885,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
     // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
     const activeScreen = this.bridge.getActiveScreen();
-    const activeName = (activeScreen?.pageName || this.erpKey || '').trim().toLowerCase();
+    // CRITICAL: Do NOT fall back to stale this.erpKey if activeScreen has empty pageName/screenKey (e.g. on Dashboard/Main screen)
+    const activeRaw = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
+    const activeName = activeRaw.toLowerCase();
     const queryNorm = normalizeArabicText(query).toLowerCase();
 
     // Check domain relevance between query and current active screen
@@ -894,21 +896,23 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       queryNorm.includes('شراء') ||
       queryNorm.includes('فاتورة') ||
       queryNorm.includes('مورد');
-    const isCurrentPurchase = activeName.includes('purchas') || activeName.includes('مشتريات');
+    const isCurrentPurchase = !!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات'));
 
     const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
-    const isCurrentSales = activeName.includes('sale') || activeName.includes('مبيعات');
+    const isCurrentSales = !!activeName && (activeName.includes('sale') || activeName.includes('مبيعات'));
 
     const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
 
+    // Only skip navigation if activeName is genuinely present AND confirmed active in the DOM
+    const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activeRaw) || this.navigator.isScreenActive(activeName));
     const isAlreadyOnMatchingScreen =
-      (isPurchaseQuery && isCurrentPurchase) ||
-      (isSalesQuery && isCurrentSales);
+      isDomActive &&
+      ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
 
     // If user is already on a matching screen and did NOT explicitly ask to navigate to a different screen:
     if (isAlreadyOnMatchingScreen && !isExplicitNavRequest) {
       console.info(
-        `%c[Copilot Navigation] Active screen '${activeName}' already matches query domain. Staying on current screen!`,
+        `%c[Copilot Navigation] Active screen '${activeName}' already matches query domain and is active in DOM. Staying on current screen!`,
         'color:#10b981;font-weight:bold'
       );
       skipNavCheck = true;
