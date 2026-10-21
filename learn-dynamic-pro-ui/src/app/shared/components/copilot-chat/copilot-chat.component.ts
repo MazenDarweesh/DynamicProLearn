@@ -5,7 +5,7 @@ import { Router } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
-import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData } from '../../../core/services/copilot.service';
+import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData, AgentStepItem } from '../../../core/services/copilot.service';
 import { ErpFormDriverService, normalizeArabicText } from '../../../core/services/erp-form-driver.service';
 import { ErpBatchStepperService } from '../../../core/services/erp-batch-stepper.service';
 import { ErpNavigatorService } from '../../../core/services/erp-navigator.service';
@@ -15,6 +15,15 @@ import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } fro
 import { AuthService } from '../../../core/services/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
+
+export interface AgentExecutionState {
+  isActive: boolean;
+  goal: string;
+  steps: AgentStepItem[];
+  currentStatus: string;
+  error?: string;
+  isComplete?: boolean;
+}
 
 export interface ChatMessage {
   sender: 'user' | 'assistant';
@@ -55,6 +64,8 @@ export interface ChatMessage {
   saveMessage?: string;
   /** Immediate debouncing and loading state when user clicks apply button */
   isApplyingFormFill?: boolean;
+  /** Vision / CDP Agent live execution stream state */
+  agentExecution?: AgentExecutionState;
 }
 
 @Component({
@@ -104,6 +115,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   isStreaming = false;
   isClearingCache = false;
   clearCacheStatus: 'idle' | 'success' | 'error' = 'idle';
+
+  // ── Vision Agent (CDP / Path 2) State ─────────────────────────────────────
+  isVisionAgentMode = false;
+  cdpPort = 9222;
+  cdpHost = typeof localStorage !== 'undefined' ? (localStorage.getItem('copilot_cdp_host') || '127.0.0.1') : '127.0.0.1';
 
   // ── Smart Top Filter Bar State ───────────────────────────────────────────
   activeFilter: CopilotFilterState = { scope: 'all' };
@@ -622,9 +638,20 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     }
   }
 
+  toggleVisionAgentMode() {
+    this.isVisionAgentMode = !this.isVisionAgentMode;
+  }
+
   async sendMessage(skipCache: boolean = false) {
     const query = this.inputQuery.trim();
     if (!query || this.isStreaming || !this.isAiReady) return;
+
+    const isAgentSlash = /^\/(agent|vision|cdp)\s*/i.test(query);
+    if (isAgentSlash || this.isVisionAgentMode) {
+      this.inputQuery = '';
+      await this.runVisionAgent(query, this.cdpPort, this.cdpHost);
+      return;
+    }
 
     this.telemetry?.log('USER_QUERY', `User: "${query}"`, { query, skipCache, screenKey: this.erpKey });
 
@@ -636,6 +663,135 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
     this.inputQuery = '';
     await this.streamQuery(query, skipCache);
+  }
+
+  /**
+   * Executes autonomous Vision Agent loop via CDP over SSE.
+   * Directly interfaces with Google Gemini 2.0 Multimodal Grounding Engine.
+   */
+  async runVisionAgent(goal: string, cdpPort: number = 9222, cdpHost?: string) {
+    const cleanGoal = goal.replace(/^\/(agent|vision|cdp)\s*/i, '').trim();
+    if (!cleanGoal || this.isStreaming) return;
+
+    const host = (cdpHost || this.cdpHost || '127.0.0.1').trim();
+    this.cdpHost = host;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('copilot_cdp_host', host);
+    }
+
+    this.isStreaming = true;
+    this.telemetry?.log('GENERAL', `Vision Agent goal: "${cleanGoal}"`, { goal: cleanGoal, cdpPort, cdpHost: host });
+
+    this.messages.push({
+      sender: 'user',
+      text: `👁️ [أتمتة بصرية]: ${cleanGoal}`
+    });
+
+    const assistantMsg: ChatMessage = {
+      sender: 'assistant',
+      text: `🚀 جاري تشغيل الأتمتة البصرية (Vision Agent) عبر CDP للهدف: "${cleanGoal}"...`,
+      agentExecution: {
+        isActive: true,
+        goal: cleanGoal,
+        steps: [],
+        currentStatus: `جاري الاتصال بالمتصفح عبر ${host}:${cdpPort}...`
+      }
+    };
+    this.messages.push(assistantMsg);
+    this.cdr.detectChanges();
+    this.scrollToBottom();
+
+    const sessId = this.telemetry?.getSessionId();
+
+    await this.copilotService.streamAgentExecution(
+      cleanGoal,
+      cdpPort,
+      host,
+      15,
+      sessId,
+      (stepItem) => {
+        if (!assistantMsg.agentExecution) return;
+        assistantMsg.agentExecution.steps.push(stepItem);
+        assistantMsg.agentExecution.currentStatus = stepItem.message || stepItem.thought || stepItem.status;
+
+        // 📡 تسجيل الخطوة لحظياً في الصندوق الأسود (ErpTelemetryService)
+        this.telemetry?.log(
+          'GENERAL',
+          `[Vision Step ${stepItem.step}] ${stepItem.status}: ${stepItem.message || ''}`,
+          {
+            step: stepItem.step,
+            status: stepItem.status,
+            action: stepItem.action,
+            coordinate: stepItem.coordinate,
+            thought: stepItem.thought,
+            cdpHost: host,
+            cdpPort
+          },
+          stepItem.status === 'error' ? 'ERROR' : 'INFO'
+        );
+
+        if (stepItem.status === 'error') {
+          assistantMsg.agentExecution.error = stepItem.message;
+          assistantMsg.agentExecution.isActive = false;
+        } else if (stepItem.status === 'completed') {
+          assistantMsg.agentExecution.isComplete = true;
+          assistantMsg.agentExecution.isActive = false;
+        }
+        this.cdr.detectChanges();
+        this.scrollToBottom();
+      },
+      (lastStep) => {
+        if (assistantMsg.agentExecution) {
+          assistantMsg.agentExecution.isActive = false;
+          if (!assistantMsg.agentExecution.isComplete && !assistantMsg.agentExecution.error) {
+            assistantMsg.agentExecution.isComplete = true;
+          }
+        }
+        this.isStreaming = false;
+        this.telemetry?.flush();
+        this.cdr.detectChanges();
+        this.scrollToBottom();
+      },
+      (err) => {
+        if (assistantMsg.agentExecution) {
+          assistantMsg.agentExecution.isActive = false;
+          assistantMsg.agentExecution.error = err?.message || 'حدث خطأ أثناء الاتصال بالوكيل البصري.';
+        }
+        this.isStreaming = false;
+        this.telemetry?.log('ERROR', `Vision Agent stream failed: ${err?.message || err}`, { error: String(err) });
+        this.telemetry?.flush();
+        this.cdr.detectChanges();
+        this.scrollToBottom();
+      }
+    );
+  }
+
+  /**
+   * Stops the ongoing Vision Agent execution immediately.
+   */
+  stopVisionAgent(msg?: ChatMessage) {
+    console.info('[Copilot] Stop Vision Agent requested by user.');
+    this.copilotService.stopAgentExecution();
+    if (msg && msg.agentExecution) {
+      msg.agentExecution.isActive = false;
+      msg.agentExecution.error = '🛑 تم إيقاف التنفيذ يدوياً بواسطة المستخدم.';
+      msg.agentExecution.currentStatus = 'توقف العميل.';
+    }
+    this.isStreaming = false;
+    this.telemetry?.log('GENERAL', 'Vision Agent stopped by user', {}, 'WARN');
+    this.telemetry?.flush();
+    this.cdr.detectChanges();
+  }
+
+  formatAgentAction(action?: string): string {
+    switch (action) {
+      case 'click': return '🖱️ نقر بالماوس';
+      case 'type': return '✍️ كتابة نص';
+      case 'press_key': return '⌨️ ضغط مفتاح';
+      case 'wait': return '⏳ انتظار المزامنة';
+      case 'done': return '✅ اكتمال المهمة';
+      default: return action ? `⚙️ ${action}` : '👁️ تحليل بصري';
+    }
   }
 
   /**

@@ -297,6 +297,12 @@
                     <span class="btn-icon" [class.animate-spin]="msg.isApplyingFormFill">{{ msg.isApplyingFormFill ? '⏳' : '✨' }}</span>
                     <span>{{ msg.isApplyingFormFill ? 'جارٍ ملء الشاشة...' : 'تعبئة شاشة الـ ERP الآن' }}</span>
                   </button>
+                  <button *ngIf="!msg.formFillApplied" type="button" class="btn-vision-fallback"
+                          (click)="runVisionAgent(msg.relatedUserQuery || 'تعبئة هذه الفاتورة')"
+                          title="تشغيل محرك الرؤية البصرية المستقل عبر CDP">
+                    <span class="btn-icon">👁️</span>
+                    <span>تنفيذ بصري (Vision Agent)</span>
+                  </button>
                 </div>
 
                 <!-- Save confirmation card (shown after the fields were filled) -->
@@ -325,6 +331,72 @@
 
               </ng-container>
 
+            </div>
+
+            <!-- ── Vision Agent Execution Card (Path 2: CDP Grounding Stream) ── -->
+            <div *ngIf="msg.agentExecution" class="vision-agent-card">
+              <div class="agent-card-header">
+                <div class="agent-header-title">
+                  <span class="agent-pulse-dot" [class.active]="msg.agentExecution.isActive" [class.complete]="msg.agentExecution.isComplete" [class.error]="!!msg.agentExecution.error"></span>
+                  <span class="agent-title-text">🤖 الوكيل البصري المستقل (Vision Agent)</span>
+                </div>
+                <div class="agent-badges">
+                  <span class="agent-badge port-badge">CDP :{{ cdpPort }}</span>
+                  <span *ngIf="msg.agentExecution.isActive" class="agent-badge running-badge">⚡ قيد التنفيذ</span>
+                  <span *ngIf="msg.agentExecution.isComplete" class="agent-badge success-badge">✅ اكتملت المهمة</span>
+                  <span *ngIf="msg.agentExecution.error" class="agent-badge error-badge">❌ {{ msg.agentExecution.error.includes('إيقاف') ? 'تم الإيقاف' : 'تعذر الاتصال' }}</span>
+                  <!-- 🛑 Emergency Kill Switch Button -->
+                  <button *ngIf="msg.agentExecution.isActive" type="button" class="btn-agent-stop" (click)="stopVisionAgent(msg)" title="إيقاف تشغيل الوكيل البصري فوراً">
+                    <span>🛑 إيقاف فوري</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="agent-goal-banner">
+                <span class="goal-label">الهدف المطلوب:</span>
+                <span class="goal-text">"{{ msg.agentExecution.goal }}"</span>
+              </div>
+
+              <!-- Live Status Banner -->
+              <div class="agent-status-strip" [class.acting]="msg.agentExecution.isActive" [class.error-strip]="!!msg.agentExecution.error">
+                <span class="status-icon">{{ msg.agentExecution.error ? '⚠️' : (msg.agentExecution.isComplete ? '🎉' : '🔄') }}</span>
+                <span class="status-text">{{ msg.agentExecution.currentStatus }}</span>
+              </div>
+
+              <!-- Stream Steps Log -->
+              <div *ngIf="msg.agentExecution.steps.length > 0" class="agent-steps-timeline">
+                <div *ngFor="let s of msg.agentExecution.steps; let sIdx = index" class="agent-step-item" [class.step-error]="s.status === 'error'" [class.step-acting]="s.status === 'acting'">
+                  <div class="step-meta">
+                    <span class="step-num">خطوة {{ s.step || (sIdx + 1) }}</span>
+                    <span class="step-action-badge">{{ formatAgentAction(s.action) }}</span>
+                    <span *ngIf="s.coordinate" class="step-coord-badge">📍 [{{ s.coordinate[0] }}, {{ s.coordinate[1] }}]</span>
+                  </div>
+                  <div *ngIf="s.thought" class="step-thought">
+                    <span class="thought-icon">💡</span>
+                    <span class="thought-text">{{ s.thought }}</span>
+                  </div>
+                  <div class="step-message">{{ s.message }}</div>
+                </div>
+              </div>
+
+              <!-- Error Guidance & Re-test Button -->
+              <div *ngIf="msg.agentExecution.error" class="agent-troubleshoot-box">
+                <div class="troubleshoot-title">🛠️ أمر تشغيل المتصفح على الجهاز الثاني (عبر الشبكة):</div>
+                <div class="troubleshoot-code">
+                  <code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --user-data-dir="C:\chrome-dev"</code>
+                </div>
+                <p class="troubleshoot-desc">تأكد من فتح المتصفح بالأمر أعلاه على الجهاز الثاني وفتح شاشة الـ ERP، ثم اكتب IP الجهاز الثاني أدناه واضغط إعادة المحاولة:</p>
+                
+                <div class="agent-host-input-wrap">
+                  <label class="host-label">🌐 عنوان IP الجهاز الثاني (أو 127.0.0.1 إذا كان محلياً):</label>
+                  <div class="host-input-row">
+                    <input type="text" [(ngModel)]="cdpHost" class="host-input" placeholder="مثال: 192.168.1.50">
+                    <button type="button" class="btn-agent-retry" (click)="runVisionAgent(msg.agentExecution.goal, cdpPort, cdpHost)">
+                      <span>إعادة المحاولة عبر المتصفح</span> 🔄
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- Rating Bar & Feedback Popover (For completed assistant responses) -->
@@ -420,12 +492,23 @@
 
       <!-- Input Footer -->
       <div class="copilot-footer">
+        <button type="button" class="copilot-mode-toggle-btn"
+                [class.active]="isVisionAgentMode"
+                (click)="toggleVisionAgentMode()"
+                [title]="isVisionAgentMode ? 'نمط الوكيل البصري (Vision Agent) مفعّل - انقر للعودة للنمط العادي' : 'تفعيل نمط الوكيل البصري المستقل (Vision Agent / CDP)'">
+          <span class="mode-icon">👁️</span>
+          <span *ngIf="isVisionAgentMode" class="mode-tag">Vision ON</span>
+        </button>
         <input type="text" class="copilot-input"
-          [placeholder]="(hasConnectionError && !isAiReady) ? 'تعذر الاتصال بالمحرك، انقر إعادة الاتصال أعلاه...' : (isWarmingUp ? 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...' : 'اسأل عن أي موديول، شاشة، أو درس...')"
-          [(ngModel)]="inputQuery" (keyup.enter)="sendMessage()" [disabled]="isStreaming || !isAiReady">
-        <button class="copilot-send-btn" [disabled]="!inputQuery.trim() || isStreaming || !isAiReady"
+          [placeholder]="isVisionAgentMode ? 'اكتب هدفك للوكيل البصري (مثال: اشتر 10 سن من المورد حسين)...' : ((hasConnectionError && !isAiReady) ? 'تعذر الاتصال بالمحرك، انقر إعادة الاتصال أعلاه...' : (isWarmingUp ? 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...' : 'اسأل عن أي موديول، أو اكتب /agent لتنفيذ بصري...'))"
+          [(ngModel)]="inputQuery" (keyup.enter)="sendMessage()" [disabled]="isStreaming || (!isAiReady && !isVisionAgentMode)">
+        <button *ngIf="!isStreaming" class="copilot-send-btn" [disabled]="!inputQuery.trim() || (!isAiReady && !isVisionAgentMode)"
           (click)="sendMessage()" title="إرسال">
           ➔
+        </button>
+        <button *ngIf="isStreaming" type="button" class="copilot-stop-btn"
+          (click)="stopVisionAgent()" title="إيقاف التنفيذ فوراً">
+          🛑
         </button>
       </div>
     </ng-container>
