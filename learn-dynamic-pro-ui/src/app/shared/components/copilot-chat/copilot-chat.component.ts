@@ -66,6 +66,9 @@ export interface ChatMessage {
   isApplyingFormFill?: boolean;
   /** Vision / CDP Agent live execution stream state */
   agentExecution?: AgentExecutionState;
+  /** Dual-path escalation: suggest launching Vision Agent when form is not currently open in DOM */
+  canEscalateToVisionAgent?: boolean;
+  escalationGoal?: string;
 }
 
 @Component({
@@ -783,6 +786,16 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     this.cdr.detectChanges();
   }
 
+  /**
+   * Executes the transaction goal directly in the current page via In-DOM automation,
+   * completely bypassing CDP and external browser debugging requirements.
+   */
+  async executeGoalInCurrentDom(goal?: string) {
+    if (!goal || this.isStreaming) return;
+    this.isVisionAgentMode = false;
+    await this.streamQuery(goal, false);
+  }
+
   formatAgentAction(action?: string): string {
     switch (action) {
       case 'click': return '🖱️ نقر بالماوس';
@@ -1119,6 +1132,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     console.info('%c[Copilot FormFill] Active Form Fields Detected:', 'color:#10b981;font-weight:bold', visibleFields);
 
     // Create assistant message placeholder
+    const shouldOfferVisionEscalation = isEntryIntent && (!visibleFields || visibleFields.length === 0);
     const assistantMsgIndex = this.messages.length;
     this.messages.push({
       sender: 'assistant',
@@ -1126,6 +1140,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       sources: [],
       isStreaming: true,
       askOptions: pendingAskOptions,
+      canEscalateToVisionAgent: shouldOfferVisionEscalation,
+      escalationGoal: shouldOfferVisionEscalation ? query : undefined,
       relatedUserQuery: query,
       decisionId: resolvedDecisionId,
       filters: { ...this.activeFilter },

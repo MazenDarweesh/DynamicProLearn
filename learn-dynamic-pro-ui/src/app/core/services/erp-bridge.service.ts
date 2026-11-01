@@ -44,7 +44,8 @@ export class ErpBridgeService {
     try {
       const bridge = window.DynamicERP as any;
       let screens: ErpScreenInfo[] | null = null;
-      if (typeof bridge.listScreens === 'function') screens = bridge.listScreens() ?? null;
+      if (typeof bridge.listUserPages === 'function') screens = bridge.listUserPages() ?? null;
+      else if (typeof bridge.listScreens === 'function') screens = bridge.listScreens() ?? null;
       else if (typeof bridge.getScreens === 'function') screens = bridge.getScreens() ?? null;
       else if (typeof bridge.getAuthorizedPages === 'function') screens = bridge.getAuthorizedPages() ?? null;
       else if (Array.isArray(bridge.screens)) screens = bridge.screens;

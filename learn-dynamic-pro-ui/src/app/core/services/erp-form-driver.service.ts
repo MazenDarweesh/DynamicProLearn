@@ -194,28 +194,19 @@ export class ErpFormDriverService {
 
     // Priority 0: Clean Host Bridge (Direct In-Memory State Binding across excelObject / dataObject)
     if (this.bridge?.isAvailable) {
-      const bridgeSuccess = await this.bridge.fillFormData({
-        fields: fields || {},
-        rows: rows || []
-      });
-      if (bridgeSuccess) {
+      try {
+        await this.bridge.fillFormData({
+          fields: fields || {},
+          rows: rows || []
+        });
         const fieldKeys = Object.keys(fields || {});
         this.telemetry?.log(
           'FILL',
-          `Direct bridge fillFormData succeeded (${fieldKeys.length} fields, ${(rows || []).length} rows)`,
+          `Direct bridge fillFormData synchronized in memory (${fieldKeys.length} fields, ${(rows || []).length} rows)`,
           { fields, rows }
         );
-        return {
-          success: true,
-          fieldsProcessed: fieldKeys.length,
-          filledCount: fieldKeys.length,
-          results: fieldKeys.map((k) => ({
-            field: k,
-            label: k,
-            status: 'filled' as const,
-            value: fields![k]
-          }))
-        };
+      } catch (err) {
+        console.warn('[ErpFormDriver] Host bridge fillFormData error, continuing with DOM driver:', err);
       }
     }
 

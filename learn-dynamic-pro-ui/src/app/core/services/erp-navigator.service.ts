@@ -416,13 +416,14 @@ export class ErpNavigatorService {
     // Official catalog from the ERP bridge (ids are real page names, never candidate_N)
     const catalog = this.bridge.listScreens();
     if (catalog && catalog.length > 0) {
-      return catalog.map(s => {
-        const mod = (s.moduleName || s.module || '').trim();
-        const rawName = (s.pageName || '').trim();
-        const rawTitle = (s.title || s.pageName || '').trim();
+      return catalog.map((s: any) => {
+        const pid = s.page_id ?? s.pageId;
+        const key = String(s.screen_key ?? s.pageName ?? (pid ? String(pid) : 'screen')).trim();
+        const titleAr = String(s.name_ar ?? s.title ?? s.pageName ?? key).trim();
+        const mod = String(s.moduleName ?? s.module ?? '').trim();
         return {
-          id: rawName || (s.pageId ? String(s.pageId) : 'screen'),
-          label: rawTitle || rawName,
+          id: String(pid || key),
+          label: titleAr || key,
           path: mod ? [mod] : []
         };
       });

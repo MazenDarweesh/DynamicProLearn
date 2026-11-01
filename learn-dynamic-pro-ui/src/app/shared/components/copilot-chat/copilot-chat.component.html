@@ -111,6 +111,23 @@
               </div>
             </div>
 
+            <!-- Vision Agent Escalation Card (Task A.7: Dual-Path Mode Transition) -->
+            <div *ngIf="msg.canEscalateToVisionAgent && !msg.isStreaming" class="vision-escalate-box animate-fade-in my-2 p-3 rounded-lg border border-indigo-200 bg-indigo-50/80 dark:bg-indigo-950/40 dark:border-indigo-800">
+              <div class="flex items-center gap-2 mb-1.5 text-indigo-900 dark:text-indigo-200 font-semibold text-xs">
+                <span>🤖</span>
+                <span>المساعد الذكي يقترح الأتمتة البصرية المباشرة:</span>
+              </div>
+              <p class="text-xs text-slate-600 dark:text-slate-300 mb-2.5 leading-relaxed">
+                طلبك يتطلب فتح شاشة المعاملة وتعبئتها. هل ترغب في قيام وكيل الـ Vision Agent المستقل بفتح الشاشة وحقن البيانات تلقائياً عبر المتصفح؟
+              </p>
+              <button type="button"
+                      class="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-md shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                      (click)="runVisionAgent(msg.escalationGoal || msg.relatedUserQuery || '')">
+                <span>🚀</span>
+                <span>تشغيل الأتمتة البصرية المستقلة (Vision Agent)</span>
+              </button>
+            </div>
+
             <!-- Sources Panel (shown after bot response has sources) -->
             <div *ngIf="msg.sources && msg.sources.length > 0" class="msg-sources-box">
               <div class="sources-header">
@@ -395,6 +412,13 @@
                       <span>إعادة المحاولة عبر المتصفح</span> 🔄
                     </button>
                   </div>
+                </div>
+
+                <div class="agent-fallback-action" style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                  <span style="font-size: 13px; color: #cbd5e1;">💡 أو نفّذ المعاملة فوراً داخل هذه الصفحة بدون الحاجة لـ CDP:</span>
+                  <button type="button" class="btn-direct-in-dom" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; border-radius: 6px; padding: 7px 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;" (click)="executeGoalInCurrentDom(msg.agentExecution.goal)">
+                    <span>⚡ تنفيذ فوري في الصفحة الحالية</span>
+                  </button>
                 </div>
               </div>
             </div>
