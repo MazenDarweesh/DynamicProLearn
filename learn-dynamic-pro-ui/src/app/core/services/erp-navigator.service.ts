@@ -289,26 +289,36 @@ export class ErpNavigatorService {
    * 3. Falls back to DOM buttons with retry polling
    * 4. Confirms that the AddOrEdit form container has rendered in the DOM
    */
-  async prepareFreshForm(maxWaitMs = 1500): Promise<boolean> {
+  async prepareFreshForm(maxWaitMs = 2500): Promise<boolean> {
     // 0. If form is already open and ready, proceed immediately in 0ms!
     if (this.isFormAlreadyOpen()) {
       return true;
     }
 
+    const start = Date.now();
+
     // Priority 1: Official ERP bridge
     if (this.bridge.isAvailable) {
-      const opened = await this.bridge.triggerAddNew();
-      if (opened) {
-        const ready = await this.waitForFormContainer(1200);
-        if (ready) return true;
+      try {
+        const opened = await this.bridge.triggerAddNew();
+        if (opened) {
+          const ready = await this.waitForFormContainer(1200);
+          if (ready) return true;
+        }
+      } catch (err) {
+        console.warn('[ErpNavigator] bridge.triggerAddNew error:', err);
       }
     }
 
-    // Priority 2: DOM Add-New button fallback
-    const clicked = this.triggerDomAddNew();
-    if (clicked) {
-      const ready = await this.waitForFormContainer(1200);
-      if (ready) return true;
+    // Priority 2: Wait for DOM Add-New button to render, then click it
+    while (Date.now() - start < maxWaitMs) {
+      if (this.isFormAlreadyOpen()) return true;
+      const clicked = this.triggerDomAddNew();
+      if (clicked) {
+        const ready = await this.waitForFormContainer(1500);
+        if (ready) return true;
+      }
+      await this.delay(100);
     }
 
     return this.isFormAlreadyOpen();
@@ -373,7 +383,7 @@ export class ErpNavigatorService {
 
     // 1. Direct DynamicPro ERP Master-List action button (.dp-btn--primary.dp-list__act, or .fa-plus)
     const masterAddBtn = document.querySelector<HTMLElement>(
-      'button.dp-btn--primary.dp-list__act, .dp-list__act.dp-btn--primary, button.dp-list__act i.fa-plus, button.dp-btn--new, [data-action="new"]'
+      'button.dp-btn--primary.dp-list__act, .dp-list__act.dp-btn--primary, button.dp-btn--new, [data-action="new"], button.dp-list__act'
     );
     const targetAddBtn = masterAddBtn?.closest('button') || masterAddBtn;
     if (targetAddBtn && this.isElementVisible(targetAddBtn)) {
@@ -382,16 +392,25 @@ export class ErpNavigatorService {
       return true;
     }
 
-    // 2. Text-based matching for action toolbar buttons ("اضافة جديد" / "جديد")
+    // 2. Text-based or icon-based matching for action toolbar buttons
     const allButtons = Array.from(document.querySelectorAll<HTMLElement>(
-      'app-master-list button, .dp-list__actions button, .header-actions button, button'
+      'app-master-list button, .dp-list__actions button, .header-actions button, .dp-shell__pages button, button'
     ));
     for (const btn of allButtons) {
       if (btn.closest('lms-ai-copilot, app-copilot-chat, nav, .dp-hdr')) continue;
       if (!this.isElementVisible(btn)) continue;
-      const text = normalizeArabicText(btn.textContent || '');
-      if (text === 'اضافة جديد' || text === 'اضافه جديد' || text === 'جديد' || text === 'اضافة' || text === 'اضافه') {
-        console.info('%c[ErpNavigator] Triggered Add New by text match:', 'color:#10b981;font-weight:bold', text);
+      const text = normalizeArabicText(btn.textContent || '').trim();
+      const hasPlusIcon = !!btn.querySelector('.fa-plus, .bi-plus, i[class*="plus"]');
+      if (
+        text === 'اضافة جديد' ||
+        text === 'اضافه جديد' ||
+        text === 'جديد' ||
+        text === 'اضافة' ||
+        text === 'اضافه' ||
+        text === 'add new' ||
+        (hasPlusIcon && (text.includes('اضاف') || text.includes('جديد') || text === ''))
+      ) {
+        console.info('%c[ErpNavigator] Triggered Add New by text/icon match:', 'color:#10b981;font-weight:bold', text || 'plus-icon');
         this.simulateClick(btn);
         return true;
       }

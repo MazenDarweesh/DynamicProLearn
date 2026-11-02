@@ -505,6 +505,18 @@ export async function setNgSelect(
 export function readCalculatedTotal(excludeContainer?: HTMLElement): string | null {
   if (typeof document === 'undefined') return null;
 
+  // Try bridge dataObject total if available (instant in-memory authority)
+  try {
+    const bridgeCtx = (window as any).DynamicERP?.getActiveFormContext?.();
+    const dobj = bridgeCtx?.dataObject;
+    if (dobj) {
+      const bTotal = dobj.TotalCurrancy ?? dobj.TotalOrderBeforCurrancy ?? dobj.NetTotal;
+      if (bTotal !== undefined && bTotal !== null && !isNaN(Number(bTotal)) && Number(bTotal) > 0) {
+        return String(bTotal);
+      }
+    }
+  } catch {}
+
   const formRoot = getActiveFormRoot();
 
   // Search for inputs matching total / net / sum

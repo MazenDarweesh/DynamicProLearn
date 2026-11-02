@@ -74,7 +74,7 @@ export class ErpFormDriverService {
    */
   async settle(
     container?: HTMLElement,
-    options: { quietMs?: number; maxMs?: number } = {}
+    options: { quietMs?: number; maxMs?: number; minMs?: number } = {}
   ): Promise<void> {
     return settle(container, options);
   }

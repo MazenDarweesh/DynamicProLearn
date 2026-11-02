@@ -58,12 +58,14 @@ export async function waitFor<T>(
  */
 export async function settle(
   container?: HTMLElement,
-  options: { quietMs?: number; maxMs?: number } = {}
+  options: { quietMs?: number; maxMs?: number; minMs?: number } = {}
 ): Promise<void> {
   if (typeof document === 'undefined') return;
 
   const quietMs = options.quietMs ?? 60;
   const maxMs = options.maxMs ?? 800;
+  const minMs = options.minMs ?? 0;
+  const startTime = Date.now();
   const target = container || document.body;
 
   return new Promise<void>((resolve) => {
@@ -72,11 +74,19 @@ export async function settle(
     let observer: MutationObserver | null = null;
 
     const cleanup = () => {
+      const elapsed = Date.now() - startTime;
+      if (elapsed < minMs) {
+        setTimeout(cleanup, minMs - elapsed);
+        return;
+      }
       if (timeoutId) clearTimeout(timeoutId);
       if (maxTimeoutId) clearTimeout(maxTimeoutId);
       if (observer) {
         observer.disconnect();
         observer = null;
+      }
+      if (typeof window !== 'undefined') {
+        (window as any).__erpPageReady = true;
       }
       resolve();
     };

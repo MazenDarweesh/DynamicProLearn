@@ -1064,11 +1064,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
   async selectAskOption(option: NavScored, originalQuery?: string) {
     console.info('%c[Copilot Navigation] User clicked ambiguity chip:', 'color:#3b82f6;font-weight:bold', option);
-    // 1. Navigate to chosen screen
+    this.isActionMode = true;
     await this.navigator.navigateToScreen(option.id);
     this.syncErpKey(option.id);
     // 2. Wait for DOM to settle
-    await this.formDriver.settle(undefined, { quietMs: 350, maxMs: 1500 });
+    await this.formDriver.settle(undefined, { quietMs: 250, maxMs: 2500, minMs: 120 });
     // 3. Re-run streamQuery on the newly selected screen
     if (originalQuery) {
       await this.streamQuery(originalQuery, true, true);
@@ -1145,7 +1145,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
             console.info('%c[Copilot Navigation] Auto-navigated to target screen:', 'color:#10b981;font-weight:bold', navRes.chosen.id);
             this.syncErpKey(navRes.chosen.id);
             // Wait for DOM & Angular components to settle on the new screen
-            await this.formDriver.settle(undefined, { quietMs: 300, maxMs: 1500 });
+            await this.formDriver.settle(undefined, { quietMs: 250, maxMs: 2500, minMs: 120 });
           } else if (navRes?.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
             console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options without blocking stream:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
             pendingAskOptions = navRes.askOptions;
