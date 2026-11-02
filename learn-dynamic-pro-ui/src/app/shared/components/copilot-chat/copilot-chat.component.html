@@ -516,24 +516,38 @@
 
       <!-- Input Footer -->
       <div class="copilot-footer">
-        <button type="button" class="copilot-mode-toggle-btn"
-                [class.active]="isVisionAgentMode"
-                (click)="toggleVisionAgentMode()"
-                [title]="isVisionAgentMode ? 'نمط الوكيل البصري (Vision Agent) مفعّل - انقر للعودة للنمط العادي' : 'تفعيل نمط الوكيل البصري المستقل (Vision Agent / CDP)'">
-          <span class="mode-icon">👁️</span>
-          <span *ngIf="isVisionAgentMode" class="mode-tag">Vision ON</span>
-        </button>
-        <input type="text" class="copilot-input"
-          [placeholder]="isVisionAgentMode ? 'اكتب هدفك للوكيل البصري (مثال: اشتر 10 سن من المورد حسين)...' : ((hasConnectionError && !isAiReady) ? 'تعذر الاتصال بالمحرك، انقر إعادة الاتصال أعلاه...' : (isWarmingUp ? 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...' : 'اسأل عن أي موديول، أو اكتب /agent لتنفيذ بصري...'))"
-          [(ngModel)]="inputQuery" (keyup.enter)="sendMessage()" [disabled]="isStreaming || (!isAiReady && !isVisionAgentMode)">
-        <button *ngIf="!isStreaming" class="copilot-send-btn" [disabled]="!inputQuery.trim() || (!isAiReady && !isVisionAgentMode)"
-          (click)="sendMessage()" title="إرسال">
-          ➔
-        </button>
-        <button *ngIf="isStreaming" type="button" class="copilot-stop-btn"
-          (click)="stopVisionAgent()" title="إيقاف التنفيذ فوراً">
-          🛑
-        </button>
+        <div class="copilot-mode-badge" [ngClass]="currentModeKey">
+          <span *ngIf="!isActionMode && !isVisionAgentMode">💬 نمط الشرح والتعليم (Q&A) <small>— فعّل ⚡ للتنفيذ المباشر</small></span>
+          <span *ngIf="isActionMode">⚡ نمط التنفيذ التلقائي (Action Mode)</span>
+          <span *ngIf="isVisionAgentMode">👁️ نمط الوكيل البصري (Vision Agent)</span>
+        </div>
+        <div class="copilot-footer-controls">
+          <button type="button" class="copilot-mode-toggle-btn action-mode-btn"
+                  [class.active]="isActionMode"
+                  (click)="toggleActionMode()"
+                  [title]="isActionMode ? 'نمط التنفيذ التلقائي (Action Mode) مفعّل - انقر للعودة لنمط الشرح (Q&A)' : 'تفعيل نمط التنفيذ التلقائي في شاشات النظام (Action Mode)'">
+            <span class="mode-icon">⚡</span>
+            <span *ngIf="isActionMode" class="mode-tag">Action ON</span>
+          </button>
+          <button type="button" class="copilot-mode-toggle-btn"
+                  [class.active]="isVisionAgentMode"
+                  (click)="toggleVisionAgentMode()"
+                  [title]="isVisionAgentMode ? 'نمط الوكيل البصري (Vision Agent) مفعّل - انقر للعودة للنمط العادي' : 'تفعيل نمط الوكيل البصري المستقل (Vision Agent / CDP)'">
+            <span class="mode-icon">👁️</span>
+            <span *ngIf="isVisionAgentMode" class="mode-tag">Vision ON</span>
+          </button>
+          <input type="text" class="copilot-input"
+            [placeholder]="inputPlaceholder"
+            [(ngModel)]="inputQuery" (keyup.enter)="sendMessage()" [disabled]="isStreaming || (!isAiReady && !isVisionAgentMode)">
+          <button *ngIf="!isStreaming" class="copilot-send-btn" [disabled]="!inputQuery.trim() || (!isAiReady && !isVisionAgentMode)"
+            (click)="sendMessage()" title="إرسال">
+            ➔
+          </button>
+          <button *ngIf="isStreaming" type="button" class="copilot-stop-btn"
+            (click)="stopVisionAgent()" title="إيقاف التنفيذ فوراً">
+            🛑
+          </button>
+        </div>
       </div>
     </ng-container>
   </div>

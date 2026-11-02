@@ -195,15 +195,29 @@ export class ErpFormDriverService {
     // Priority 0: Clean Host Bridge (Direct In-Memory State Binding across excelObject / dataObject)
     if (this.bridge?.isAvailable) {
       try {
+        const activeCtx = this.bridge.getActiveFormContext();
+        const hasExistingRows =
+          Array.isArray(activeCtx?.rows) &&
+          activeCtx.rows.some(
+            (r: any) =>
+              r &&
+              (r.ProductID ||
+                r.ItemId ||
+                r.Total > 0 ||
+                r.Qty > 0 ||
+                r.UnitePrice > 0 ||
+                r.PriceCurrancy > 0)
+          );
+
         await this.bridge.fillFormData({
           fields: fields || {},
-          rows: rows || []
+          rows: hasExistingRows ? [] : (rows || [])
         });
         const fieldKeys = Object.keys(fields || {});
         this.telemetry?.log(
           'FILL',
-          `Direct bridge fillFormData synchronized in memory (${fieldKeys.length} fields, ${(rows || []).length} rows)`,
-          { fields, rows }
+          `Direct bridge fillFormData synchronized in memory (${fieldKeys.length} fields, ${hasExistingRows ? 0 : (rows || []).length} rows)`,
+          { fields, rows: hasExistingRows ? [] : rows, hasExistingRows }
         );
       } catch (err) {
         console.warn('[ErpFormDriver] Host bridge fillFormData error, continuing with DOM driver:', err);
@@ -419,6 +433,8 @@ export class ErpFormDriverService {
           // Fallback 1: Search for paid / cash / settlement inputs in the form
           if (!targetElement) {
             const paidSelectors = [
+              'input[name="POPaid" i]',
+              'input[name*="popaid" i]',
               'input[name*="paid" i]',
               'input[id*="paid" i]',
               'input[formcontrolname*="paid" i]',

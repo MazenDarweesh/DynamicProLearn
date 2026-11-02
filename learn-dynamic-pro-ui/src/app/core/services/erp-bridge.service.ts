@@ -98,6 +98,14 @@ export class ErpBridgeService {
       this.telemetry?.logBridge('submitActiveForm', undefined, false, 'Bridge not available');
       return { success: false, errors: ['جسر الـ ERP غير متاح في هذه البيئة.'] };
     }
+    if (typeof (window.DynamicERP as any)?.submitActiveForm !== 'function') {
+      this.telemetry?.logBridge('submitActiveForm', undefined, false, 'submitActiveForm not supported by host bridge');
+      return {
+        success: false,
+        message: 'الحفظ التلقائي غير مدعوم في هذه النسخة من النظام. يرجى مراجعة البيانات والضغط على زر الحفظ يدوياً.',
+        errors: ['الحفظ التلقائي غير مدعوم في هذه النسخة من النظام. يرجى مراجعة البيانات والضغط على زر الحفظ يدوياً.']
+      };
+    }
     try {
       const raw = await window.DynamicERP!.submitActiveForm();
       if (raw && typeof raw === 'object') {

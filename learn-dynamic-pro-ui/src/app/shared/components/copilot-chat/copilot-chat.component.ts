@@ -119,10 +119,33 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   isClearingCache = false;
   clearCacheStatus: 'idle' | 'success' | 'error' = 'idle';
 
-  // ── Vision Agent (CDP / Path 2) State ─────────────────────────────────────
+  // ── Mode State (Mutually Exclusive: Q&A default | Action ⚡ | Vision 👁️) ──
+  isActionMode = false;
   isVisionAgentMode = false;
   cdpPort = 9222;
   cdpHost = typeof localStorage !== 'undefined' ? (localStorage.getItem('copilot_cdp_host') || '127.0.0.1') : '127.0.0.1';
+
+  get currentModeKey(): string {
+    if (this.isVisionAgentMode) return 'mode-vision';
+    if (this.isActionMode) return 'mode-action';
+    return 'mode-qa';
+  }
+
+  get inputPlaceholder(): string {
+    if (this.isVisionAgentMode) {
+      return 'اكتب هدفك للوكيل البصري (مثال: اشتر 10 سن من المورد حسين)...';
+    }
+    if (this.isActionMode) {
+      return 'اكتب أمراً لتنفيذه مباشرة في شاشات النظام (مثال: سجل فاتورة مبيعات...)...';
+    }
+    if (this.hasConnectionError && !this.isAiReady) {
+      return 'تعذر الاتصال بالمحرك، انقر إعادة الاتصال أعلاه...';
+    }
+    if (this.isWarmingUp) {
+      return 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...';
+    }
+    return 'اسأل أي سؤال عن النظام أو شروحات المحاضرات (أو فعّل ⚡ للتنفيذ)...';
+  }
 
   // ── Smart Top Filter Bar State ───────────────────────────────────────────
   activeFilter: CopilotFilterState = { scope: 'all' };
@@ -641,8 +664,20 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     }
   }
 
-  toggleVisionAgentMode() {
+  toggleActionMode(): void {
+    this.isActionMode = !this.isActionMode;
+    if (this.isActionMode) {
+      this.isVisionAgentMode = false;
+    }
+    this.cdr.markForCheck();
+  }
+
+  toggleVisionAgentMode(): void {
     this.isVisionAgentMode = !this.isVisionAgentMode;
+    if (this.isVisionAgentMode) {
+      this.isActionMode = false;
+    }
+    this.cdr.markForCheck();
   }
 
   async sendMessage(skipCache: boolean = false) {
@@ -656,7 +691,13 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       return;
     }
 
-    this.telemetry?.log('USER_QUERY', `User: "${query}"`, { query, skipCache, screenKey: this.erpKey });
+    const currentMode = this.isVisionAgentMode ? 'vision' : (this.isActionMode ? 'action' : 'qa');
+    this.telemetry?.log('USER_QUERY', `User: "${query}"`, {
+      query,
+      skipCache,
+      screenKey: this.erpKey,
+      mode: currentMode
+    });
 
     // Add user message
     this.messages.push({
@@ -793,6 +834,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   async executeGoalInCurrentDom(goal?: string) {
     if (!goal || this.isStreaming) return;
     this.isVisionAgentMode = false;
+    this.isActionMode = true;
     await this.streamQuery(goal, false);
   }
 
@@ -1051,88 +1093,96 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     let pendingAskOptions: NavScored[] | undefined = undefined;
     let resolvedIntent: string | undefined = undefined;
     let resolvedDecisionId: string | null | undefined = undefined;
+    let visibleFields: string[] | undefined = undefined;
+    let formSchema: any[] | undefined = undefined;
+    let shouldOfferVisionEscalation = false;
 
-    // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
-    const activeScreen = this.bridge.getActiveScreen();
-    // CRITICAL: Do NOT fall back to stale this.erpKey if activeScreen has empty pageName/screenKey (e.g. on Dashboard/Main screen)
-    const activeRaw = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
-    const activeName = activeRaw.toLowerCase();
-    const queryNorm = normalizeArabicText(query).toLowerCase();
+    if (this.isActionMode) {
+      // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
+      const activeScreen = this.bridge.getActiveScreen();
+      // CRITICAL: Do NOT fall back to stale this.erpKey if activeScreen has empty pageName/screenKey (e.g. on Dashboard/Main screen)
+      const activeRaw = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
+      const activeName = activeRaw.toLowerCase();
+      const queryNorm = normalizeArabicText(query).toLowerCase();
 
-    // Check domain relevance between query and current active screen
-    const isPurchaseQuery =
-      queryNorm.includes('مشتريات') ||
-      queryNorm.includes('شراء') ||
-      queryNorm.includes('فاتورة') ||
-      queryNorm.includes('مورد');
-    const isCurrentPurchase = !!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات'));
+      // Check domain relevance between query and current active screen
+      const isPurchaseQuery =
+        queryNorm.includes('مشتريات') ||
+        queryNorm.includes('شراء') ||
+        queryNorm.includes('فاتورة') ||
+        queryNorm.includes('مورد');
+      const isCurrentPurchase = !!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات'));
 
-    const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
-    const isCurrentSales = !!activeName && (activeName.includes('sale') || activeName.includes('مبيعات'));
+      const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
+      const isCurrentSales = !!activeName && (activeName.includes('sale') || activeName.includes('مبيعات'));
 
-    const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
+      const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
 
-    // Only skip navigation if activeName is genuinely present AND confirmed active in the DOM
-    const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activeRaw) || this.navigator.isScreenActive(activeName));
-    const isAlreadyOnMatchingScreen =
-      isDomActive &&
-      ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
+      // Only skip navigation if activeName is genuinely present AND confirmed active in the DOM
+      const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activeRaw) || this.navigator.isScreenActive(activeName));
+      const isAlreadyOnMatchingScreen =
+        isDomActive &&
+        ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
 
-    // If user is already on a matching screen and did NOT explicitly ask to navigate to a different screen:
-    if (isAlreadyOnMatchingScreen && !isExplicitNavRequest) {
-      console.info(
-        `%c[Copilot Navigation] Active screen '${activeName}' already matches query domain and is active in DOM. Staying on current screen!`,
-        'color:#10b981;font-weight:bold'
-      );
-      skipNavCheck = true;
-      resolvedIntent = 'action';
-    }
-
-    let navRes: any = null;
-    if (!skipNavCheck && typeof document !== 'undefined') {
-      try {
-        navRes = await this.navigator.resolveAndNavigate(query);
-        resolvedIntent = navRes?.rawResolution?.intent;
-        resolvedDecisionId = navRes?.rawResolution?.decision_id;
-
-        if (navRes?.success && navRes.chosen) {
-          console.info('%c[Copilot Navigation] Auto-navigated to target screen:', 'color:#10b981;font-weight:bold', navRes.chosen.id);
-          this.syncErpKey(navRes.chosen.id);
-          // Wait for DOM & Angular components to settle on the new screen
-          await this.formDriver.settle(undefined, { quietMs: 300, maxMs: 1500 });
-        } else if (navRes?.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
-          console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options without blocking stream:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
-          pendingAskOptions = navRes.askOptions;
-        }
-      } catch (navErr) {
-        console.warn('[Copilot Navigation] resolveAndNavigate error:', navErr);
+      // If user is already on a matching screen and did NOT explicitly ask to navigate to a different screen:
+      if (isAlreadyOnMatchingScreen && !isExplicitNavRequest) {
+        console.info(
+          `%c[Copilot Navigation] Active screen '${activeName}' already matches query domain and is active in DOM. Staying on current screen!`,
+          'color:#10b981;font-weight:bold'
+        );
+        skipNavCheck = true;
+        resolvedIntent = 'action';
       }
-    }
 
-    // S1 Lifecycle Order: If user intent is an action/entry, ensure fresh entry form is prepared/opened first
-    // CRITICAL: Only prepare fresh form if we are genuinely on the target screen (already matching or navigated successfully)
-    const isOnTargetScreen = skipNavCheck || !!(navRes && navRes.success);
-    const isEntryIntent = resolvedIntent === 'action' || (!resolvedIntent && /سجل|اضف|أضف|انشئ|أنشئ|فاتورة|سداد|قيد/i.test(query));
-    if (isEntryIntent && isOnTargetScreen && typeof document !== 'undefined') {
-      try {
-        const formOpened = await this.navigator.prepareFreshForm(2000);
-        if (formOpened) {
-          await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
+      let navRes: any = null;
+      if (!skipNavCheck && typeof document !== 'undefined') {
+        try {
+          navRes = await this.navigator.resolveAndNavigate(query);
+          resolvedIntent = navRes?.rawResolution?.intent;
+          resolvedDecisionId = navRes?.rawResolution?.decision_id;
+
+          if (navRes?.success && navRes.chosen) {
+            console.info('%c[Copilot Navigation] Auto-navigated to target screen:', 'color:#10b981;font-weight:bold', navRes.chosen.id);
+            this.syncErpKey(navRes.chosen.id);
+            // Wait for DOM & Angular components to settle on the new screen
+            await this.formDriver.settle(undefined, { quietMs: 300, maxMs: 1500 });
+          } else if (navRes?.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
+            console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options without blocking stream:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
+            pendingAskOptions = navRes.askOptions;
+          }
+        } catch (navErr) {
+          console.warn('[Copilot Navigation] resolveAndNavigate error:', navErr);
         }
-      } catch (formErr) {
-        console.warn('[Copilot Navigation] prepareFreshForm during schema preparation error:', formErr);
       }
+
+      // S1 Lifecycle Order: If user intent is an action/entry, ensure fresh entry form is prepared/opened first
+      // CRITICAL: Only prepare fresh form if we are genuinely on the target screen (already matching or navigated successfully)
+      const isOnTargetScreen = skipNavCheck || !!(navRes && navRes.success);
+      const isEntryIntent = resolvedIntent === 'action' || (!resolvedIntent && /سجل|اضف|أضف|انشئ|أنشئ|فاتورة|سداد|قيد/i.test(query));
+      if (isEntryIntent && isOnTargetScreen && typeof document !== 'undefined') {
+        try {
+          const formOpened = await this.navigator.prepareFreshForm(2000);
+          if (formOpened) {
+            await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
+          }
+        } catch (formErr) {
+          console.warn('[Copilot Navigation] prepareFreshForm during schema preparation error:', formErr);
+        }
+      }
+
+      // Detect ERP/Host context and gather schema from active page
+      const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
+      const detectedFields = this.formDriver.buildVisibleFieldsSummary(schemas);
+      visibleFields = detectedFields.length > 0 ? detectedFields : undefined;
+      formSchema = schemas.length > 0 ? schemas : undefined;
+      shouldOfferVisionEscalation = isEntryIntent && (!visibleFields || visibleFields.length === 0);
+      console.info('%c[Copilot FormFill] Active Form Fields Detected:', 'color:#10b981;font-weight:bold', visibleFields);
+    } else {
+      // 💬 Pure Q&A Mode: Do NOT navigate, do NOT collect schemas, enforce question intent
+      resolvedIntent = 'question';
+      shouldOfferVisionEscalation = false;
+      console.info('%c[Copilot Mode] Pure Educational Q&A Mode active — navigation and form inspection bypassed', 'color:#6366f1;font-weight:bold');
     }
-
-    // Detect ERP/Host context and gather schema from active page
-    const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
-    const detectedFields = this.formDriver.buildVisibleFieldsSummary(schemas);
-    const visibleFields = detectedFields.length > 0 ? detectedFields : undefined;
-    const formSchema = schemas.length > 0 ? schemas : undefined;
-    console.info('%c[Copilot FormFill] Active Form Fields Detected:', 'color:#10b981;font-weight:bold', visibleFields);
-
-    // Create assistant message placeholder
-    const shouldOfferVisionEscalation = isEntryIntent && (!visibleFields || visibleFields.length === 0);
     const assistantMsgIndex = this.messages.length;
     this.messages.push({
       sender: 'assistant',

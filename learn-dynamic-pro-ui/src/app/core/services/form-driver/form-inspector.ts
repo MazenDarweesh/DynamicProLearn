@@ -95,6 +95,16 @@ export function findLabelForElement(el: HTMLElement): string {
     }
   }
 
+  // 3b. Sibling / Parent container with .dp-edit__totlbl (DynamicPro ERP footer calculation labels)
+  const totHolder = el.closest('li, .dp-edit__total, .dp-field, .form-group') || el.parentElement;
+  if (totHolder) {
+    const totLbl = totHolder.querySelector('.dp-edit__totlbl, .totlbl, [class*="totlbl"]') as HTMLElement;
+    if (totLbl && totLbl !== el && totLbl.textContent) {
+      const text = totLbl.textContent.trim().replace(/[:*]/g, '').trim();
+      if (text) return text;
+    }
+  }
+
   // 4. Table cell -> Match corresponding <th> / columnheader by column index
   const cell = el.closest('td, mat-cell, [role="gridcell"]');
   if (cell) {

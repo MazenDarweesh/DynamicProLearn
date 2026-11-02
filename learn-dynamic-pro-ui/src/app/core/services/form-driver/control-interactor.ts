@@ -203,6 +203,79 @@ export function setNativeSelect(selectEl: HTMLSelectElement, val: any): boolean 
 }
 
 /**
+ * Pure function that ranks and picks the single best matching option from candidate elements.
+ * 1. Strict exact equality (after Arabic normalization) takes highest priority.
+ * 2. Strict negation disqualification: If target does not contain "غير", any candidate containing "غير" is disqualified.
+ * 3. Exact word boundary match (+150 score).
+ * 4. Prefix match (+100 score).
+ * 5. Substring match (+50 score) with length proximity penalty.
+ */
+export function pickBestOption<T extends { el: HTMLElement; rawText: string }>(
+  items: T[],
+  term: string
+): T | null {
+  const normalizedTarget = normalizeArabicText(term).trim();
+  if (!normalizedTarget || items.length === 0) return null;
+
+  // 1. Strict exact match first
+  for (const item of items) {
+    const optText = normalizeArabicText(item.rawText).trim();
+    const cleaned = optText.replace(/^[0-9\-_[\]#\s.:]+/, '').replace(/[0-9\-_[\]#\s.:]+$/, '').trim();
+    if (optText === normalizedTarget || cleaned === normalizedTarget) {
+      return item;
+    }
+  }
+
+  // 2. Candidate scoring
+  const targetHasGhair = normalizedTarget.includes('غير');
+  const scored: { item: T; score: number }[] = [];
+
+  for (const item of items) {
+    const optText = normalizeArabicText(item.rawText).trim();
+    const cleaned = optText.replace(/^[0-9\-_[\]#\s.:]+/, '').replace(/[0-9\-_[\]#\s.:]+$/, '').trim();
+
+    // Negation disqualification:
+    // When user says "مباشرة" (no "غير"), disqualify options containing "غير" (e.g. "مبيعات غير مباشرة")
+    if (!targetHasGhair && (optText.includes('غير') || cleaned.includes('غير'))) {
+      continue;
+    }
+
+    // Exact word boundary match
+    const words = optText.split(/\s+/);
+    const hasExactWord = words.some((w) => w === normalizedTarget);
+
+    let score = 0;
+    if (hasExactWord) {
+      score += 150;
+    }
+
+    if (optText.startsWith(normalizedTarget) || cleaned.startsWith(normalizedTarget)) {
+      score += 100;
+    } else if (optText.includes(normalizedTarget) || cleaned.includes(normalizedTarget)) {
+      score += 50;
+    } else {
+      const targetWords = normalizedTarget.split(/\s+/).filter((w) => w.length > 1);
+      let matchedWords = 0;
+      for (const tw of targetWords) {
+        if (cleaned.includes(tw)) matchedWords++;
+      }
+      if (matchedWords >= 2 || (targetWords.length === 1 && matchedWords === 1)) {
+        score += (matchedWords / targetWords.length) * 40;
+      }
+    }
+
+    if (score > 0) {
+      const lengthDiff = Math.abs(cleaned.length - normalizedTarget.length);
+      score -= Math.min(lengthDiff, 30);
+      scored.push({ item, score });
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.length > 0 ? scored[0].item : null;
+}
+
+/**
  * Sets value on @ng-select/ng-select component with typeahead support.
  */
 export async function setNgSelect(
@@ -284,46 +357,15 @@ export async function setNgSelect(
         return 'not_found';
       }
 
-      // 5. Match option text using normalized Arabic with candidate scoring
-      const normalizedTarget = normalizeArabicText(term);
-      let exactMatch: HTMLElement | null = null;
-      const candidateMatches: { el: HTMLElement; score: number; optText: string }[] = [];
-
-      for (const opt of options) {
+      // 5. Match option text using strict exact-match priority & negation disqualification
+      const candidateItems = options.map((opt) => {
         const labelEl = opt.querySelector('.ng-option-label') || opt;
         const rawOptText = (labelEl.textContent || '').trim();
-        const optText = normalizeArabicText(rawOptText);
-        const cleanedOptText = optText
-          .replace(/^[0-9\-_[\]#\s.:]+/, '')
-          .replace(/[0-9\-_[\]#\s.:]+$/, '')
-          .trim();
+        return { el: opt, rawText: rawOptText };
+      });
 
-        if (optText === normalizedTarget || cleanedOptText === normalizedTarget) {
-          exactMatch = opt;
-          break;
-        }
-
-        if (cleanedOptText.includes(normalizedTarget) || optText.includes(normalizedTarget)) {
-          const lengthDiff = Math.abs(cleanedOptText.length - normalizedTarget.length);
-          candidateMatches.push({ el: opt, score: 100 - lengthDiff, optText });
-        } else {
-          const targetWords = normalizedTarget.split(/\s+/).filter((w) => w.length > 1);
-          let matchedWords = 0;
-          for (const tw of targetWords) {
-            if (cleanedOptText.includes(tw)) matchedWords++;
-          }
-          if (matchedWords >= 2 || (targetWords.length === 1 && matchedWords === 1)) {
-            candidateMatches.push({
-              el: opt,
-              score: (matchedWords / targetWords.length) * 50 - Math.abs(cleanedOptText.length - normalizedTarget.length),
-              optText,
-            });
-          }
-        }
-      }
-
-      candidateMatches.sort((a, b) => b.score - a.score);
-      const matchToClick = exactMatch || (candidateMatches.length > 0 ? candidateMatches[0].el : null);
+      const best = pickBestOption(candidateItems, term);
+      const matchToClick = best ? best.el : null;
 
       if (matchToClick) {
         matchToClick.click();
