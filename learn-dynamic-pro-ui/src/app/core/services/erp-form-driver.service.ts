@@ -209,8 +209,18 @@ export class ErpFormDriverService {
                 r.PriceCurrancy > 0)
           );
 
+        const lookupKinds = new Set(['ng-select', 'select', 'mat-select']);
+        const lookupKeys = new Set(
+          this.collectFormSchema(excludeContainer)
+            .filter((s) => lookupKinds.has(s.kind))
+            .map((s) => s.key)
+        );
+        const bridgeFields = Object.fromEntries(
+          Object.entries(fields || {}).filter(([k]) => !lookupKeys.has(k))
+        );
+
         await this.bridge.fillFormData({
-          fields: fields || {},
+          fields: bridgeFields,
           rows: hasExistingRows ? [] : (rows || [])
         });
         const fieldKeys = Object.keys(fields || {});

@@ -227,12 +227,15 @@ export function pickBestOption<T extends { el: HTMLElement; rawText: string }>(
   }
 
   // 2. Candidate scoring
+  const targetStem = normalizedTarget.replace(/[ةه]$/, '');
   const targetHasGhair = normalizedTarget.includes('غير');
   const scored: { item: T; score: number }[] = [];
 
   for (const item of items) {
     const optText = normalizeArabicText(item.rawText).trim();
     const cleaned = optText.replace(/^[0-9\-_[\]#\s.:]+/, '').replace(/[0-9\-_[\]#\s.:]+$/, '').trim();
+    const optStem = optText.replace(/[ةه]$/, '');
+    const cleanedStem = cleaned.replace(/[ةه]$/, '');
 
     // Negation disqualification:
     // When user says "مباشرة" (no "غير"), disqualify options containing "غير" (e.g. "مبيعات غير مباشرة")
@@ -242,16 +245,26 @@ export function pickBestOption<T extends { el: HTMLElement; rawText: string }>(
 
     // Exact word boundary match
     const words = optText.split(/\s+/);
-    const hasExactWord = words.some((w) => w === normalizedTarget);
+    const hasExactWord = words.some(
+      (w) => w === normalizedTarget || (targetStem && w === targetStem)
+    );
 
     let score = 0;
     if (hasExactWord) {
       score += 150;
     }
 
-    if (optText.startsWith(normalizedTarget) || cleaned.startsWith(normalizedTarget)) {
+    if (
+      optText.startsWith(normalizedTarget) ||
+      cleaned.startsWith(normalizedTarget) ||
+      (targetStem && (optStem.startsWith(targetStem) || cleanedStem.startsWith(targetStem)))
+    ) {
       score += 100;
-    } else if (optText.includes(normalizedTarget) || cleaned.includes(normalizedTarget)) {
+    } else if (
+      optText.includes(normalizedTarget) ||
+      cleaned.includes(normalizedTarget) ||
+      (targetStem && (optStem.includes(targetStem) || cleanedStem.includes(targetStem)))
+    ) {
       score += 50;
     } else {
       const targetWords = normalizedTarget.split(/\s+/).filter((w) => w.length > 1);
@@ -403,13 +416,62 @@ export async function setNgSelect(
 
     let result = await performSearch(termStr);
 
-    // If not found and search term contains multiple words, retry once with the first primary word
+    // 1. If not found, try common Arabic morphology fallbacks (feminine/masculine stem, prefix Al-)
+    if (result === 'not_found') {
+      const strippedStem = termStr.replace(/[ةه]$/, '').replace(/^ال/, '').trim();
+      if (strippedStem && strippedStem !== termStr && strippedStem.length >= 3) {
+        console.info(`[ControlInteractor] Retrying ng-select with stem: "${strippedStem}"`);
+        result = await performSearch(strippedStem);
+      }
+    }
+
+    // 2. If still not found and search term contains multiple words, retry once with the first primary word
     if (result === 'not_found') {
       const words = termStr.split(/\s+/).filter((w) => w.length > 2);
       if (words.length > 1) {
         const firstWord = words[0];
         console.info(`[ControlInteractor] Retrying ng-select with first word: "${firstWord}"`);
         result = await performSearch(firstWord);
+      }
+    }
+
+    // 3. Fallback: If typing filtered out all options, clear input to reveal all options and pickBestOption from unfiltered panel
+    if (result === 'not_found') {
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        'value'
+      )?.set;
+      if (nativeSetter) {
+        nativeSetter.call(input, '');
+      } else {
+        input.value = '';
+      }
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await new Promise((r) => setTimeout(r, 150));
+
+      const panel = document.querySelector(
+        'body > ng-dropdown-panel, ng-dropdown-panel, .ng-dropdown-panel'
+      ) as HTMLElement;
+      if (panel) {
+        const allOptions = (Array.from(panel.querySelectorAll('.ng-option')) as HTMLElement[]).filter(
+          (o) => !o.classList.contains('ng-option-disabled')
+        );
+        if (allOptions.length > 0) {
+          const candidates = allOptions.map((opt) => ({
+            el: opt,
+            rawText: (opt.querySelector('.ng-option-label') || opt).textContent?.trim() || '',
+          }));
+          const best = pickBestOption(candidates, termStr);
+          if (best) {
+            best.el.click();
+            highlightElement(ngSelect);
+            telemetry?.log('FILL', `ng-select matched option from unfiltered panel for '${termStr}'`, {
+              term: termStr,
+              selected: best.rawText,
+            });
+            result = 'filled';
+          }
+        }
       }
     }
 
