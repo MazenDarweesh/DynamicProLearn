@@ -114,6 +114,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
   isOpen = true;
   isMinimized = false;
+  isDragging = false;
+  private dragEndTimeout?: any;
   inputQuery = '';
   isStreaming = false;
   isClearingCache = false;
@@ -386,6 +388,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     this.attrObserver?.disconnect();
     this.stopReadinessPolling();
     this.lessonSub?.unsubscribe();
+    if (this.dragEndTimeout) {
+      clearTimeout(this.dragEndTimeout);
+      this.dragEndTimeout = undefined;
+    }
   }
 
   toggleChat() {
@@ -504,7 +510,25 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     }
   }
 
+  onDragStarted(): void {
+    this.isDragging = true;
+    if (this.dragEndTimeout) {
+      clearTimeout(this.dragEndTimeout);
+      this.dragEndTimeout = undefined;
+    }
+  }
+
+  onDragEnded(): void {
+    // Delay clearing isDragging so the trailing click event from mouseup does not trigger toggleMinimize
+    this.dragEndTimeout = setTimeout(() => {
+      this.isDragging = false;
+    }, 150);
+  }
+
   toggleMinimize() {
+    if (this.isDragging) {
+      return;
+    }
     this.isMinimized = !this.isMinimized;
     if (!this.isMinimized) {
       this.detectLessonFromRoute();

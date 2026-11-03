@@ -116,7 +116,12 @@
   width: 320px;
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.25);
-  cursor: pointer;
+  cursor: grab;
+  user-select: none;
+}
+
+.copilot-window.minimized:active {
+  cursor: grabbing;
 }
 
 .copilot-window.minimized .copilot-header {
@@ -125,8 +130,20 @@
 }
 
 .copilot-window.minimized:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 12px 28px rgba(67, 56, 202, 0.3);
+  box-shadow: 0 14px 32px rgba(67, 56, 202, 0.35);
+  border-color: #818cf8;
+}
+
+/* CDK Drag Performance & State Enhancements */
+.copilot-window.cdk-drag-dragging {
+  transition: none !important;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.35) !important;
+  cursor: grabbing !important;
+  user-select: none;
+}
+
+.copilot-window.cdk-drag-animating {
+  transition: transform 0.2s cubic-bezier(0, 0, 0.2, 1) !important;
 }
 
 .copilot-window.no-header {

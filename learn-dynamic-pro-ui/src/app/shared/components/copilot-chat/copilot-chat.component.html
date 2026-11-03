@@ -7,7 +7,9 @@
        dir="rtl" 
        cdkDrag
        [cdkDragDisabled]="hideHeader || inline" 
-       cdkDragBoundary="body">
+       cdkDragBoundary="body"
+       (cdkDragStarted)="onDragStarted()"
+       (cdkDragEnded)="onDragEnded()">
 
     <!-- ── Separated Header Component (Rendered only if !hideHeader) ────────── -->
     <app-copilot-header *ngIf="!hideHeader"
