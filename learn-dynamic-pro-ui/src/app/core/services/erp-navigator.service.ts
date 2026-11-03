@@ -352,13 +352,22 @@ export class ErpNavigatorService {
       return true;
     }
 
-    // Check strictly within the active, non-hidden page tab for an actual AddOrEdit form
-    const activePage = document.querySelector('.dp-shell__pages > div:not([hidden])');
-    if (!activePage) return false;
+    // Check strictly within the active, non-hidden page tab for an actual AddOrEdit form or in-page edit section
+    const activePage = document.querySelector('.dp-shell__pages > div:not([hidden])') || document;
+    const pageForm = activePage.querySelector('app-add-or-edit, .dp-edit, .dp-list__pre, .dp-edit__head, section.dp-pu__sup');
+    if (pageForm && this.isElementVisible(pageForm)) {
+      return true;
+    }
 
-    // For in-page forms (when showInPopUp === false), app-add-or-edit is rendered directly in the page
-    const pageForm = activePage.querySelector('app-add-or-edit');
-    return !!(pageForm && this.isElementVisible(pageForm));
+    // Secondary check: Presence of visible transactional entry inputs
+    const primaryInput = activePage.querySelector<HTMLElement>(
+      'ng-select[formcontrolname], [formcontrolname="SupplierID"], [formcontrolname="CustomerID"], [formcontrolname="StoreID"], [formcontrolname="EmpId"], input#productQty'
+    );
+    if (primaryInput && this.isElementVisible(primaryInput)) {
+      return true;
+    }
+
+    return false;
   }
 
   /**

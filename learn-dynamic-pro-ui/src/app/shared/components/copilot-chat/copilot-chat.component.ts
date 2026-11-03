@@ -714,10 +714,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
    * Directly interfaces with Google Gemini 2.0 Multimodal Grounding Engine.
    */
   async runVisionAgent(goal: string, cdpPort: number = 9222, cdpHost?: string) {
-    const cleanGoal = goal.replace(/^\/(agent|vision|cdp)\s*/i, '').trim();
+    let cleanGoal = goal.replace(/^\/(agent|vision|cdp)\s*/i, '').trim();
     if (!cleanGoal || this.isStreaming) return;
 
-    const host = (cdpHost || this.cdpHost || '127.0.0.1').trim();
+    let host = (cdpHost || this.cdpHost || '127.0.0.1').trim();
+    // Allow user to supply tunnel URL directly: /agent https://xxx.devtunnels.ms <goal>
+    const hostPrefixMatch = cleanGoal.match(/^(https?:\/\/[^\s]+)\s+(.+)$/i);
+    if (hostPrefixMatch) {
+      host = hostPrefixMatch[1].trim();
+      cleanGoal = hostPrefixMatch[2].trim();
+    }
+
     this.cdpHost = host;
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('copilot_cdp_host', host);

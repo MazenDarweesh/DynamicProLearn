@@ -519,6 +519,15 @@ export function readCalculatedTotal(excludeContainer?: HTMLElement): string | nu
 
   const formRoot = getActiveFormRoot();
 
+  // Try finding grand total displayed in summary (.dp-edit__grandval / .dp-edit__grand)
+  const grandEl = formRoot.querySelector('.dp-edit__grandval, .dp-edit__grand strong, [class*="grandval"]') as HTMLElement;
+  if (grandEl && (!excludeContainer || !excludeContainer.contains(grandEl))) {
+    const text = grandEl.textContent?.trim().replace(/,/g, '').replace(/[^\d.]/g, '') || '';
+    if (text && !isNaN(Number(text)) && Number(text) > 0) {
+      return text;
+    }
+  }
+
   // Search for inputs matching total / net / sum
   const selectors = [
     'input[name*="total" i]',
