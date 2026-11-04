@@ -904,7 +904,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     msg.isApplyingFormFill = true;
     this.cdr.detectChanges();
 
-    const targetScreen = msg.formFillData.screenKey;
+    const targetScreen = (msg.formFillData.pageId ? String(msg.formFillData.pageId) : undefined)
+      || msg.formFillData.screenKey;
     this.telemetry?.log('FILL', `User clicked Apply Form Fill for '${targetScreen || this.erpKey}'`, {
       screenKey: targetScreen || this.erpKey,
       fields: msg.formFillData.fields,
@@ -912,29 +913,27 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     });
 
     try {
-      // 🚀 Safety Guard: Ensure ERP does not navigate away if already on matching domain screen!
-      const currentActive = this.bridge.getActiveScreen()?.pageName || this.erpKey || '';
-      const currentActiveNorm = currentActive.trim().toLowerCase();
-      const targetNorm = (targetScreen || '').trim().toLowerCase();
+      const activeScreen = this.bridge.getActiveScreen();
+      const currentActive = activeScreen?.pageName || this.erpKey || '';
+      const targetPageId = msg.formFillData.pageId;
+      const currentPageId = activeScreen?.pageId;
 
-      // If active screen is already in the same domain (e.g. both are purchases, sales, or entries)
-      const isBothPurchases = currentActiveNorm.includes('purchas') && targetNorm.includes('purchas');
-      const isBothSales = currentActiveNorm.includes('sale') && targetNorm.includes('sale');
-      const isBothEntries = currentActiveNorm.includes('entry') && targetNorm.includes('entry');
+      // Deterministic check: If targetPageId is given, compare page IDs directly!
+      const isSameScreen = targetPageId
+        ? (currentPageId === targetPageId)
+        : (targetScreen ? this.navigator.isScreenActive(targetScreen) : true);
 
       let effectiveTarget = targetScreen;
-      if (targetScreen && !this.navigator.isScreenActive(targetScreen)) {
-        if (isBothPurchases || isBothSales || isBothEntries) {
-          console.info(
-            `%c[Copilot FormFill] User is already on '${currentActive}'. Retaining active screen instead of switching to '${targetScreen}'`,
-            'color:#10b981;font-weight:bold'
-          );
-          effectiveTarget = currentActive;
-        } else {
-          console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
-          await this.navigator.navigateToScreen(targetScreen);
-          await this.formDriver.settle(undefined, { quietMs: 60, maxMs: 500 });
-        }
+      if (targetScreen && !isSameScreen) {
+        console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
+        await this.navigator.navigateToScreen(targetScreen);
+        await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
+      } else if (isSameScreen) {
+        console.info(
+          `%c[Copilot FormFill] User is already on '${currentActive}' (pageId: ${currentPageId}). Retaining active screen.`,
+          'color:#10b981;font-weight:bold'
+        );
+        effectiveTarget = currentActive;
       }
       this.syncErpKey(effectiveTarget || currentActive);
 
@@ -1137,10 +1136,19 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const queryNorm = normalizeArabicText(query).toLowerCase();
 
       // Check domain relevance between query and current active screen
+      const isInvoiceQuery = queryNorm.includes('فاتورة') || queryNorm.includes('فواتير') || queryNorm.includes('سند') || queryNorm.includes('قيد');
+      const isSetupOrConfigScreen =
+        activeName.includes('type') ||
+        activeName.includes('setting') ||
+        activeName.includes('config') ||
+        activeName.includes('تعريف') ||
+        activeName.includes('أنواع') ||
+        activeName.includes('انواع') ||
+        activeName.includes('تهيئة');
+
       const isPurchaseQuery =
         queryNorm.includes('مشتريات') ||
         queryNorm.includes('شراء') ||
-        queryNorm.includes('فاتورة') ||
         queryNorm.includes('مورد');
       const isCurrentPurchase = !!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات'));
 
@@ -1150,9 +1158,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
 
       // Only skip navigation if activeName is genuinely present AND confirmed active in the DOM
+      // AND current screen is NOT a setup/types screen while user asks for transactions
       const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activeRaw) || this.navigator.isScreenActive(activeName));
       const isAlreadyOnMatchingScreen =
         isDomActive &&
+        !isSetupOrConfigScreen &&
+        (!isInvoiceQuery || activeName.includes('invoice') || activeName.includes('فاتورة')) &&
         ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
 
       // If user is already on a matching screen and did NOT explicitly ask to navigate to a different screen:
@@ -1206,7 +1217,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const detectedFields = this.formDriver.buildVisibleFieldsSummary(schemas);
       visibleFields = detectedFields.length > 0 ? detectedFields : undefined;
       formSchema = schemas.length > 0 ? schemas : undefined;
-      shouldOfferVisionEscalation = isEntryIntent && (!visibleFields || visibleFields.length === 0);
+      shouldOfferVisionEscalation = isEntryIntent && (!visibleFields || visibleFields.length === 0) && !isOnTargetScreen && navRes?.decision !== 'go';
       console.info('%c[Copilot FormFill] Active Form Fields Detected:', 'color:#10b981;font-weight:bold', visibleFields);
     } else {
       // 💬 Pure Q&A Mode: Do NOT navigate, do NOT collect schemas, enforce question intent
@@ -1250,6 +1261,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
           this.messages[assistantMsgIndex].cacheHit = meta.cache_hit ?? false;
           this.messages[assistantMsgIndex].provenance = meta.provenance;
           this.messages[assistantMsgIndex].latencyMs = meta.metrics?.total_latency_ms ?? meta.latency_ms;
+          if (this.messages[assistantMsgIndex].formFillData) {
+            this.messages[assistantMsgIndex].canEscalateToVisionAgent = false;
+            this.messages[assistantMsgIndex].escalationGoal = undefined;
+          }
         }
       },
       (err: any) => {
@@ -1267,6 +1282,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       (fillData: CopilotFormFillData) => {
         if (fillData && this.isValidFormFill(fillData)) {
           this.messages[assistantMsgIndex].formFillData = fillData;
+          this.messages[assistantMsgIndex].canEscalateToVisionAgent = false;
+          this.messages[assistantMsgIndex].escalationGoal = undefined;
           this.telemetry?.log('AI_EXTRACT', `AI extracted form fill proposal for '${fillData.screenKey || this.erpKey}'`, {
             screenKey: fillData.screenKey || this.erpKey,
             fields: fillData.fields,

@@ -61,6 +61,8 @@ export interface CopilotFormFillData {
   fields?: Record<string, any>;
   rows?: Record<string, any>[];
   screenKey?: string;
+  pageId?: number | string;
+  documentName?: string;
   batch_mode?: boolean;
   batch_items?: ErpBatchItem[];
 }

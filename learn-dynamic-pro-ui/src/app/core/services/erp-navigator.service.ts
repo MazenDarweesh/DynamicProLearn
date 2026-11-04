@@ -621,31 +621,14 @@ export class ErpNavigatorService {
           targetEl?.getAttribute('pageName') ||
           (!top.id.startsWith('candidate_') ? top.id : undefined);
 
-        // Only dispatch screenName navigation events when we have a real screen name (never synthetic candidate_N)
-        if (realScreenName) {
-          window.dispatchEvent(new CustomEvent('lms:navigate', {
-            bubbles: true,
-            composed: true,
-            detail: { screenKey: realScreenName, label: targetLabel }
-          }));
-          window.dispatchEvent(new CustomEvent('window:lms:navigate', {
-            bubbles: true,
-            composed: true,
-            detail: { screenName: realScreenName, label: targetLabel }
-          }));
-          if (this.bridge.isAvailable) {
-            await this.bridge.navigateToScreen(realScreenName);
-          }
-        }
-
-        // If target element is an existing DOM tile/button, click it directly to trigger its native Angular handler
+        // If target element is an existing DOM tile/button, click it directly; otherwise navigate via bridge/events
         if (targetEl) {
           this.simulateClick(targetEl);
-        } else if (realScreenName && this.bridge.isAvailable) {
-          await this.bridge.navigateToScreen(realScreenName);
+          await this.delay(400);
+        } else if (realScreenName) {
+          await this.navigateToScreen(realScreenName);
         }
 
-        await this.delay(400);
         // Prepare fresh form if we reached the form/list
         await this.prepareFreshForm();
 
