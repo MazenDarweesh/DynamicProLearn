@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, firstValueFrom, shareReplay, BehaviorSubject, of, catchError } from 'rxjs';
 import { AuthService } from './auth.service';
+import { ErpBridgeService } from './erp-bridge.service';
 import {
   ErpBatchItem,
   NavRequest,
@@ -116,6 +117,7 @@ export interface CopilotFilterState {
 export class CopilotService {
   private http = inject(HttpClient);
   private authService = inject(AuthService);
+  private bridge = inject(ErpBridgeService, { optional: true });
 
   private normalizeTunnelUrl(url: string): string {
     let clean = url.trim().replace(/[<>]/g, '').replace(/\/+$/, '');
@@ -275,9 +277,16 @@ export class CopilotService {
       payload['formSchema'] = formSchema;
     }
 
-    if (erpKey) {
-      payload['erp_key'] = erpKey;
-      payload['erpKey'] = erpKey;
+    const activeScreen = this.bridge?.getActiveScreen();
+    if (activeScreen?.pageId) {
+      payload['page_id'] = activeScreen.pageId;
+      payload['pageId'] = activeScreen.pageId;
+    }
+
+    const effectiveKey = erpKey || activeScreen?.pageName;
+    if (effectiveKey) {
+      payload['erp_key'] = effectiveKey.trim();
+      payload['erpKey'] = effectiveKey.trim();
     }
 
     if (threadId) {

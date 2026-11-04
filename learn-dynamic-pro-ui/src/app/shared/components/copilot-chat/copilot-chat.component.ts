@@ -715,6 +715,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       return;
     }
 
+    this.syncErpKey();
     const currentMode = this.isVisionAgentMode ? 'vision' : (this.isActionMode ? 'action' : 'qa');
     this.telemetry?.log('USER_QUERY', `User: "${query}"`, {
       query,
@@ -918,10 +919,27 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const targetPageId = msg.formFillData.pageId;
       const currentPageId = activeScreen?.pageId;
 
-      // Deterministic check: If targetPageId is given, compare page IDs directly!
-      const isSameScreen = targetPageId
-        ? (currentPageId === targetPageId)
-        : (targetScreen ? this.navigator.isScreenActive(targetScreen) : true);
+      const currentActiveNorm = (currentActive || '').toLowerCase();
+      const queryNorm = normalizeArabicText(msg.relatedUserQuery || '').toLowerCase();
+      const isPurchaseQuery = queryNorm.includes('مشتريات') || queryNorm.includes('شراء') || queryNorm.includes('مورد');
+      const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
+      const isCurrentPurchase = currentActiveNorm.includes('purchas') || currentActiveNorm.includes('مشتريات');
+      const isCurrentSales = currentActiveNorm.includes('sale') || currentActiveNorm.includes('مبيعات');
+
+      // Safety Guard: If user is already on a matching transactional screen for the requested query domain, NEVER navigate away to a mismatched targetScreen!
+      const isAlreadyOnMatchingDomain =
+        (isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales);
+
+      // Deterministic check:
+      let isSameScreen = false;
+      if (targetPageId) {
+        isSameScreen = (currentPageId === targetPageId);
+      } else if (isAlreadyOnMatchingDomain) {
+        // If current active screen already matches the query domain, keep current screen!
+        isSameScreen = true;
+      } else {
+        isSameScreen = targetScreen ? this.navigator.isScreenActive(targetScreen) : true;
+      }
 
       let effectiveTarget = targetScreen;
       if (targetScreen && !isSameScreen) {
@@ -1021,8 +1039,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
    * Keeps erpKey aligned with the real active ERP screen (bridge) instead of temporary DOM ids.
    */
   private syncErpKey(fallback?: string): void {
-    const next = this.bridge.getActiveScreen()?.pageName || fallback;
-    if (next) this.erpKey = next;
+    const active = this.bridge.getActiveScreen();
+    const next = active?.pageName || active?.screenKey || fallback;
+    if (next) this.erpKey = next.trim();
   }
 
   /**
@@ -1128,6 +1147,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     let shouldOfferVisionEscalation = false;
 
     if (this.isActionMode) {
+      this.syncErpKey();
       // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
       const activeScreen = this.bridge.getActiveScreen();
       // CRITICAL: Do NOT fall back to stale this.erpKey if activeScreen has empty pageName/screenKey (e.g. on Dashboard/Main screen)
@@ -1281,11 +1301,19 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       this.erpKey,
       (fillData: CopilotFormFillData) => {
         if (fillData && this.isValidFormFill(fillData)) {
+          const active = this.bridge.getActiveScreen();
+          if (!fillData.pageId && active?.pageId) {
+            fillData.pageId = active.pageId;
+          }
+          if (active?.pageName) {
+            fillData.screenKey = active.pageName.trim();
+          }
           this.messages[assistantMsgIndex].formFillData = fillData;
           this.messages[assistantMsgIndex].canEscalateToVisionAgent = false;
           this.messages[assistantMsgIndex].escalationGoal = undefined;
           this.telemetry?.log('AI_EXTRACT', `AI extracted form fill proposal for '${fillData.screenKey || this.erpKey}'`, {
             screenKey: fillData.screenKey || this.erpKey,
+            pageId: fillData.pageId,
             fields: fillData.fields,
             rows: fillData.rows
           });

@@ -423,129 +423,153 @@ export class ErpFormDriverService {
     // ──────────────────────────────────────────────
     // 3. Handle Payment Field with $TOTAL (Footer)
     // ──────────────────────────────────────────────
+    const queryNorm = normalizeArabicText(userMessage || '').toLowerCase();
+    const userWantsCashSettlement =
+      queryNorm.includes('نقدا') ||
+      queryNorm.includes('نقدي') ||
+      queryNorm.includes('كاش') ||
+      queryNorm.includes('سداد كامل') ||
+      queryNorm.includes('بالكامل') ||
+      queryNorm.includes('دفع الاجمالي') ||
+      queryNorm.includes('سدد الاجمالي') ||
+      queryNorm.includes('المحصل') ||
+      queryNorm.includes('المدفوع');
+
+    let explicitTotalKey: string | null = null;
     if (fields) {
       for (const [rawKey, rawVal] of Object.entries(fields)) {
         if (
           String(rawVal).toUpperCase() === '$TOTAL' ||
           String(rawVal).toUpperCase() === 'TOTAL'
         ) {
-          const cleanKey = rawKey.split('(')[0].trim().replace(/^['"]|['"]$/g, '');
-          let targetElement = this.findTargetElement(cleanKey, excludeContainer);
+          explicitTotalKey = rawKey;
+          break;
+        }
+      }
+    }
 
-          // If targetElement is not a text/number input (e.g. an ng-select like SafeAccounId), discard it
+    if (explicitTotalKey || (userWantsCashSettlement && rows && rows.length > 0)) {
+      const cleanKey = explicitTotalKey
+        ? explicitTotalKey.split('(')[0].trim().replace(/^['"]|['"]$/g, '')
+        : 'المدفوع نقداً';
+      let targetElement = explicitTotalKey ? this.findTargetElement(cleanKey, excludeContainer) : null;
+
+      // If targetElement is not a text/number input (e.g. an ng-select like SafeAccounId), discard it
+      if (
+        targetElement &&
+        !(targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
+      ) {
+        targetElement = null;
+      }
+
+      // Fallback 1: Search for paid / cash / settlement inputs in the form
+      if (!targetElement) {
+        const paidSelectors = [
+          'input[name="POPaid" i]',
+          'input[name*="popaid" i]',
+          'input[name*="paid" i]',
+          'input[id*="paid" i]',
+          'input[formcontrolname*="paid" i]',
+          'input[name*="cash" i]',
+          'input[id*="cash" i]',
+          'input[formcontrolname*="cash" i]',
+          'input[name*="pay" i]',
+          'input[id*="pay" i]',
+          'input[formcontrolname*="pay" i]',
+          'input[name*="madfou" i]',
+          'input[id*="madfou" i]',
+          'input[name*="mohasal" i]',
+          'input[id*="mohasal" i]',
+          'input[formcontrolname*="mohasal" i]',
+        ];
+        for (const sel of paidSelectors) {
+          const el = this.getActiveFormRoot().querySelector(sel) as HTMLInputElement;
           if (
-            targetElement &&
-            !(targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
+            el &&
+            (!excludeContainer || !excludeContainer.contains(el)) &&
+            !el.disabled &&
+            !el.readOnly
           ) {
-            targetElement = null;
-          }
-
-          // Fallback 1: Search for paid / cash / settlement inputs in the form
-          if (!targetElement) {
-            const paidSelectors = [
-              'input[name="POPaid" i]',
-              'input[name*="popaid" i]',
-              'input[name*="paid" i]',
-              'input[id*="paid" i]',
-              'input[formcontrolname*="paid" i]',
-              'input[name*="cash" i]',
-              'input[id*="cash" i]',
-              'input[formcontrolname*="cash" i]',
-              'input[name*="pay" i]',
-              'input[id*="pay" i]',
-              'input[formcontrolname*="pay" i]',
-              'input[name*="madfou" i]',
-              'input[id*="madfou" i]',
-            ];
-            for (const sel of paidSelectors) {
-              const el = this.getActiveFormRoot().querySelector(sel) as HTMLInputElement;
-              if (
-                el &&
-                (!excludeContainer || !excludeContainer.contains(el)) &&
-                !el.disabled &&
-                !el.readOnly
-              ) {
-                targetElement = el;
-                break;
-              }
-            }
-          }
-
-          // Fallback 2: Search by label containing "مدفوع" or "مسدد" or "نقدا"
-          if (!targetElement) {
-            const labels = Array.from(this.getActiveFormRoot().querySelectorAll('label'));
-            for (const lbl of labels) {
-              const text = normalizeArabicText(lbl.textContent || '');
-              if (
-                text.includes('مدفوع') ||
-                text.includes('مسدد') ||
-                text.includes('نقدا') ||
-                text.includes('سداد')
-              ) {
-                const group = lbl.closest('.form-group, .row, div');
-                const inp = group?.querySelector('input') as HTMLInputElement;
-                if (
-                  inp &&
-                  (!excludeContainer || !excludeContainer.contains(inp)) &&
-                  !inp.disabled &&
-                  !inp.readOnly
-                ) {
-                  targetElement = inp;
-                  break;
-                }
-              }
-            }
-          }
-
-          if (
-            targetElement &&
-            (targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
-          ) {
-            let finalVal = this.readCalculatedTotal();
-            if (!finalVal || finalVal === '0') {
-              // Calculate fallback sum from rows: sum(qty * price/cost)
-              let sum = 0;
-              for (const r of rows || []) {
-                const q = parseFloat(String(r['الكمية'] || r['كمية'] || r['qty'] || 0)) || 0;
-                const p =
-                  parseFloat(
-                    String(
-                      r['السعر'] ||
-                        r['سعر'] ||
-                        r['التكلفة'] ||
-                        r['تكلفة'] ||
-                        r['price'] ||
-                        r['cost'] ||
-                        0
-                    )
-                  ) || 0;
-                sum += q * p;
-              }
-              if (sum > 0) {
-                finalVal = String(sum);
-              } else {
-                finalVal = finalVal || '0';
-              }
-            }
-            this.setTextOrDate(targetElement, finalVal);
-            filledCount++;
-            results.push({
-              field: cleanKey || 'المدفوع نقداً',
-              value: finalVal,
-              status: 'filled',
-              message: `تم نسخ القيمة الإجمالية المحسوبة (${finalVal}) إلى خانة السداد والمدفوع نقداً`,
-            });
-            this.telemetry?.log(
-              'FILL',
-              `Populated calculated total (${finalVal}) into cash paid field`,
-              {
-                field: cleanKey,
-                total: finalVal,
-                targetId: targetElement.id || targetElement.getAttribute('name'),
-              }
-            );
+            targetElement = el;
+            break;
           }
         }
+      }
+
+      // Fallback 2: Search by label containing "مدفوع" or "مسدد" or "نقدا" or "محصل"
+      if (!targetElement) {
+        const labels = Array.from(this.getActiveFormRoot().querySelectorAll('label'));
+        for (const lbl of labels) {
+          const text = normalizeArabicText(lbl.textContent || '');
+          if (
+            text.includes('مدفوع') ||
+            text.includes('مسدد') ||
+            text.includes('نقدا') ||
+            text.includes('سداد') ||
+            text.includes('محصل')
+          ) {
+            const group = lbl.closest('.form-group, .row, div, .dp-field');
+            const inp = group?.querySelector('input') as HTMLInputElement;
+            if (
+              inp &&
+              (!excludeContainer || !excludeContainer.contains(inp)) &&
+              !inp.disabled &&
+              !inp.readOnly
+            ) {
+              targetElement = inp;
+              break;
+            }
+          }
+        }
+      }
+
+      if (
+        targetElement &&
+        (targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
+      ) {
+        let finalVal = this.readCalculatedTotal();
+        if (!finalVal || finalVal === '0') {
+          // Calculate fallback sum from rows: sum(qty * price/cost)
+          let sum = 0;
+          for (const r of rows || []) {
+            const q = parseFloat(String(r['الكمية'] || r['كمية'] || r['qty'] || 0)) || 0;
+            const p =
+              parseFloat(
+                String(
+                  r['السعر'] ||
+                    r['سعر'] ||
+                    r['التكلفة'] ||
+                    r['تكلفة'] ||
+                    r['price'] ||
+                    r['cost'] ||
+                    0
+                )
+              ) || 0;
+            sum += q * p;
+          }
+          if (sum > 0) {
+            finalVal = String(sum);
+          } else {
+            finalVal = finalVal || '0';
+          }
+        }
+        this.setTextOrDate(targetElement, finalVal);
+        filledCount++;
+        results.push({
+          field: cleanKey || 'المدفوع نقداً',
+          value: finalVal,
+          status: 'filled',
+          message: `تم نسخ القيمة الإجمالية المحسوبة (${finalVal}) إلى خانة السداد والمدفوع نقداً`,
+        });
+        this.telemetry?.log(
+          'FILL',
+          `Populated calculated total (${finalVal}) into cash paid field`,
+          {
+            field: cleanKey,
+            total: finalVal,
+            targetId: targetElement.id || targetElement.getAttribute('name'),
+          }
+        );
       }
     }
 
