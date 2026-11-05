@@ -194,7 +194,7 @@ export function setTextOrDate(
 /**
  * Sets value on native <select> matching by value or visible text.
  */
-export function setNativeSelect(selectEl: HTMLSelectElement, val: any): boolean {
+export function setNativeSelect(selectEl: HTMLSelectElement, val: any, telemetry?: any): boolean {
   const strVal = normalizeArabicText(String(val));
   let matched = false;
 
@@ -212,13 +212,27 @@ export function setNativeSelect(selectEl: HTMLSelectElement, val: any): boolean 
 
   if (!matched) {
     selectEl.value = String(val);
+    const availableOptions = Array.from(selectEl.options)
+      .map((o) => o.text.trim())
+      .filter(Boolean);
+    telemetry?.log(
+      'FILL',
+      `native <select> unmatched value '${val}'`,
+      {
+        attemptedValue: val,
+        targetSelector: selectEl.id ? `#${selectEl.id}` : selectEl.name || 'select',
+        availableOptions: availableOptions.slice(0, 20),
+        optionsCount: availableOptions.length,
+      },
+      'WARN'
+    );
   }
 
   selectEl.dispatchEvent(new Event('input', { bubbles: true }));
   selectEl.dispatchEvent(new Event('change', { bubbles: true }));
   selectEl.dispatchEvent(new Event('blur', { bubbles: true }));
   highlightElement(selectEl);
-  return true;
+  return matched;
 }
 
 /**
@@ -316,17 +330,38 @@ export async function setNgSelect(
   telemetry?: any
 ): Promise<'filled' | 'ambiguous' | 'not_found'> {
   const startTime = Date.now();
+  let lastObservedOptions: string[] = [];
+  const targetSelector = hostEl.id
+    ? `#${hostEl.id}`
+    : hostEl.getAttribute('name')
+    ? `[name="${hostEl.getAttribute('name')}"]`
+    : hostEl.getAttribute('formcontrolname')
+    ? `[formcontrolname="${hostEl.getAttribute('formcontrolname')}"]`
+    : hostEl.tagName.toLowerCase();
+
   try {
     const ngSelect = (hostEl.tagName.toLowerCase() === 'ng-select'
       ? hostEl
       : hostEl.querySelector('ng-select')) as HTMLElement;
 
-    if (!ngSelect) return 'not_found';
+    if (!ngSelect) {
+      telemetry?.log('FILL', `ng-select host not found for selector '${targetSelector}'`, {
+        targetSelector,
+        attemptedValue: searchTerm,
+      }, 'WARN');
+      return 'not_found';
+    }
 
     const input = (ngSelect.querySelector('input[role="combobox"]') ||
       ngSelect.querySelector('input')) as HTMLInputElement;
 
-    if (!input) return 'not_found';
+    if (!input) {
+      telemetry?.log('FILL', `ng-select input combobox not found inside '${targetSelector}'`, {
+        targetSelector,
+        attemptedValue: searchTerm,
+      }, 'WARN');
+      return 'not_found';
+    }
 
     // 1. Focus input and click container to trigger dropdown open
     const container = (ngSelect.querySelector('.ng-select-container') || ngSelect) as HTMLElement;
@@ -335,7 +370,7 @@ export async function setNgSelect(
 
     const termStr = String(searchTerm).trim();
 
-    const performSearch = async (term: string): Promise<'filled' | 'ambiguous' | 'not_found'> => {
+    const performSearch = async (term: string, maxWaitMs = 1200): Promise<'filled' | 'ambiguous' | 'not_found'> => {
       // Prototype setter
       const nativeSetter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
@@ -362,26 +397,25 @@ export async function setNgSelect(
           (p) => !p.hasAttribute('hidden') && p.style.display !== 'none' && (p.offsetWidth > 0 || p.offsetHeight > 0)
         );
         return visiblePanels.length > 0 ? visiblePanels[visiblePanels.length - 1] : (panels[panels.length - 1] || null);
-      }, 2000);
+      }, Math.min(maxWaitMs, 1000));
 
       if (!panel) {
-        console.warn('[ControlInteractor] ng-dropdown-panel not found for ng-select');
         return 'not_found';
       }
 
-      // Wait for spinner / loading indicator to disappear first if present
+      // Wait for spinner / loading indicator to disappear first if present (max 800ms)
       await waitFor<boolean>(() => {
         const loadingEl = panel.querySelector('.ng-spinner-loader, .ng-load-more, .loading');
         return !loadingEl;
-      }, 2500);
+      }, 800);
 
-      // 4. Wait for .ng-option items to render (expanded to 3000ms for slow remote APIs)
+      // 4. Wait for .ng-option items to render
       const options = await waitFor<HTMLElement[]>(() => {
         const items = (Array.from(panel.querySelectorAll('.ng-option')) as HTMLElement[]).filter(
           (o) => !o.classList.contains('ng-option-disabled')
         );
         return items.length > 0 ? items : null;
-      }, 3000);
+      }, maxWaitMs);
 
       const optionsCount = options?.length || 0;
 
@@ -395,6 +429,8 @@ export async function setNgSelect(
         const rawOptText = (labelEl.textContent || '').trim();
         return { el: opt, rawText: rawOptText };
       });
+
+      lastObservedOptions = candidateItems.map((c) => c.rawText).filter(Boolean);
 
       const best = pickBestOption(candidateItems, term);
       const matchToClick = best ? best.el : null;
@@ -413,7 +449,7 @@ export async function setNgSelect(
               'verify_mismatch on ng-select',
               {
                 term,
-                elementId: ngSelect.id || ngSelect.getAttribute('name'),
+                targetSelector,
                 reason: 'No .ng-value-label rendered after option selection',
               },
               'WARN'
@@ -421,40 +457,29 @@ export async function setNgSelect(
           }
         }, 80);
 
-        telemetry?.log('FILL', `ng-select matched option for '${term}'`, {
-          term,
-          optionsCount,
-          elapsedMs,
-          selected: (matchToClick.textContent || '').trim(),
-        });
+        telemetry?.log(
+          'FILL',
+          `ng-select matched option for '${term}'`,
+          {
+            term,
+            targetSelector,
+            optionsCount,
+            elapsedMs,
+            selected: (matchToClick.textContent || '').trim(),
+          },
+          'INFO',
+          elapsedMs
+        );
         return 'filled';
       }
 
       return 'not_found';
     };
 
-    let result = await performSearch(termStr);
+    let result = await performSearch(termStr, 1200);
 
-    // 1. If not found, try common Arabic morphology fallbacks (feminine/masculine stem, prefix Al-)
-    if (result === 'not_found') {
-      const strippedStem = termStr.replace(/[ةه]$/, '').replace(/^ال/, '').trim();
-      if (strippedStem && strippedStem !== termStr && strippedStem.length >= 3) {
-        console.info(`[ControlInteractor] Retrying ng-select with stem: "${strippedStem}"`);
-        result = await performSearch(strippedStem);
-      }
-    }
-
-    // 2. If still not found and search term contains multiple words, retry once with the first primary word
-    if (result === 'not_found') {
-      const words = termStr.split(/\s+/).filter((w) => w.length > 2);
-      if (words.length > 1) {
-        const firstWord = words[0];
-        console.info(`[ControlInteractor] Retrying ng-select with first word: "${firstWord}"`);
-        result = await performSearch(firstWord);
-      }
-    }
-
-    // 3. Fallback: If typing filtered out all options, clear input to reveal all options and pickBestOption from unfiltered panel
+    // 1. If not found, try fallback: Clear input once to reveal unfiltered list and pickBestOption directly
+    // This is vastly faster and more accurate than making multiple remote typeahead calls with partial stems!
     if (result === 'not_found') {
       const nativeSetter = Object.getOwnPropertyDescriptor(
         window.HTMLInputElement.prototype,
@@ -466,7 +491,7 @@ export async function setNgSelect(
         input.value = '';
       }
       input.dispatchEvent(new Event('input', { bubbles: true }));
-      await new Promise((r) => setTimeout(r, 150));
+      await new Promise((r) => setTimeout(r, 80));
 
       const panel = document.querySelector(
         'body > ng-dropdown-panel, ng-dropdown-panel, .ng-dropdown-panel'
@@ -480,17 +505,37 @@ export async function setNgSelect(
             el: opt,
             rawText: (opt.querySelector('.ng-option-label') || opt).textContent?.trim() || '',
           }));
+          lastObservedOptions = candidates.map((c) => c.rawText).filter(Boolean);
+
           const best = pickBestOption(candidates, termStr);
           if (best) {
             best.el.click();
             highlightElement(ngSelect);
-            telemetry?.log('FILL', `ng-select matched option from unfiltered panel for '${termStr}'`, {
-              term: termStr,
-              selected: best.rawText,
-            });
+            const elapsedMs = Date.now() - startTime;
+            telemetry?.log(
+              'FILL',
+              `ng-select matched option from unfiltered panel for '${termStr}'`,
+              {
+                term: termStr,
+                targetSelector,
+                selected: best.rawText,
+                elapsedMs,
+              },
+              'INFO',
+              elapsedMs
+            );
             result = 'filled';
           }
         }
+      }
+    }
+
+    // 2. Targeted fallback: if search term contains multiple words and still not found, try first word
+    if (result === 'not_found') {
+      const words = termStr.split(/\s+/).filter((w) => w.length > 2);
+      if (words.length > 1) {
+        const firstWord = words[0];
+        result = await performSearch(firstWord, 600);
       }
     }
 
@@ -500,13 +545,17 @@ export async function setNgSelect(
       const elapsedMs = Date.now() - startTime;
       telemetry?.log(
         'FILL',
-        `ng-select failed for '${termStr}' (${result})`,
+        `ng-select failed for '${termStr}' (${result}) after ${elapsedMs}ms`,
         {
-          term: termStr,
+          attemptedValue: termStr,
+          targetSelector,
           result,
           elapsedMs,
+          availableOptions: lastObservedOptions.slice(0, 20),
+          optionsCount: lastObservedOptions.length,
         },
-        'WARN'
+        'WARN',
+        elapsedMs
       );
     }
 

@@ -720,11 +720,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
     this.syncErpKey();
     const currentMode = this.isVisionAgentMode ? 'vision' : (this.isActionMode ? 'action' : 'qa');
+    const traceId = 'trc_' + Math.random().toString(36).substring(2, 8);
+    this.telemetry?.setTraceId(traceId);
     this.telemetry?.log('USER_QUERY', `User: "${query}"`, {
       query,
       skipCache,
       screenKey: this.erpKey,
-      mode: currentMode
+      mode: currentMode,
+      traceId
     });
 
     // Add user message
@@ -908,6 +911,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     msg.isApplyingFormFill = true;
     this.cdr.detectChanges();
 
+    if (!this.telemetry?.getTraceId()) {
+      this.telemetry?.setTraceId('trc_' + Math.random().toString(36).substring(2, 8));
+    }
+
     const targetScreen = (msg.formFillData.pageId ? String(msg.formFillData.pageId) : undefined)
       || msg.formFillData.screenKey;
     this.telemetry?.log('FILL', `User clicked Apply Form Fill for '${targetScreen || this.erpKey}'`, {
@@ -979,6 +986,15 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
         filledCount: report.filledCount,
         fieldsProcessed: report.fieldsProcessed,
         results: report.results
+      });
+
+      this.telemetry?.logSessionEnd({
+        success: report.success,
+        fieldsFilled: report.filledCount,
+        fieldsProcessed: report.fieldsProcessed,
+        rowsFilled: msg.formFillData.rows?.length || 0,
+        unresolvedCount: report.results.filter(r => r.status === 'not_found' || r.status === 'ambiguous').length,
+        screenKey: targetScreen || this.erpKey
       });
 
       // 🧠 Train Decision Memory: If navigation decision was attached and fill succeeded, confirm to backend
@@ -1351,7 +1367,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     msg.isRetrying = true;
     msg.threadId = undefined;
 
-    console.info('%c[CoPilot] RETRY', 'color:#f59e0b;font-weight:bold', { userQuery, msgIndex });
+    const traceId = 'trc_' + Math.random().toString(36).substring(2, 8);
+    this.telemetry?.setTraceId(traceId);
+    console.info('%c[CoPilot] RETRY', 'color:#f59e0b;font-weight:bold', { userQuery, msgIndex, traceId });
 
     this.isStreaming = true;
 

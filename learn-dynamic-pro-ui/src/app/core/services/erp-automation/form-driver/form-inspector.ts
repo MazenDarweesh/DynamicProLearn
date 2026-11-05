@@ -4,6 +4,7 @@ import {
   FieldGroup,
 } from '../../../models/erp-form.models';
 import { getActiveFormRoot } from './dom-synchronizer';
+import { normalizeArabicText } from './arabic-normalizer';
 
 /**
  * Compares two form schemas to identify newly revealed or newly enabled fields.
@@ -203,10 +204,14 @@ export function collectFormSchema(
         host.getAttribute('aria-label') ||
         host.getAttribute('title') ||
         '';
-      const cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
+      let cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
+      if (cleanName === 'undefined' || cleanName === 'null') {
+        cleanName = '';
+      }
 
       const labelText = findLabelForElement(host) || host.getAttribute('placeholder') || host.getAttribute('aria-label') || '';
-      const key = cleanName || (labelText ? `select_${labelText}` : 'custom_select');
+      const normLabel = labelText ? normalizeArabicText(labelText).replace(/\s+/g, '_') : '';
+      const key = cleanName || (normLabel ? `select_${normLabel}` : 'custom_select');
 
       // Stamp data-copilot-field so findTargetElement can reliably locate this custom host even if it lacks name/id
       try {
@@ -265,17 +270,21 @@ export function collectFormSchema(
         el.id ||
         el.getAttribute('placeholder') ||
         '';
-      const cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
+      let cleanName = rawName.replace(/^['"]|['"]$/g, '').trim();
+      if (cleanName === 'undefined' || cleanName === 'null') {
+        cleanName = '';
+      }
 
       // Filter out non-business pagination/limits controls
       if (/^(dpCheckAll|pageSeachValue|dpLimit)$/i.test(cleanName)) continue;
 
       const labelText = findLabelForElement(el);
+      const normLabel = labelText ? normalizeArabicText(labelText).replace(/\s+/g, '_') : '';
 
       // If cleanName is purely digits (e.g. table row index), prefer labelText as key if available
       let key = cleanName;
       if (/^\d+$/.test(cleanName) || !cleanName) {
-        key = labelText ? `field_${labelText}` : cleanName;
+        key = normLabel ? `field_${normLabel}` : cleanName;
       }
       if (!key) continue;
 

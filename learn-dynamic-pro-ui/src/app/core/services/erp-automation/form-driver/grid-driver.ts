@@ -281,6 +281,7 @@ export async function fillGridRows(
 
     if (!table) {
       console.warn('[GridDriver] No grid table found for rows filling');
+      telemetry?.log('GRID', 'No grid table found for rows filling', { totalTablesFound: tables.length }, 'WARN');
       return 0;
     }
 
@@ -295,6 +296,25 @@ export async function fillGridRows(
       index,
       text: normalizeArabicText(th.textContent || ''),
     }));
+
+    const totalRawRows = Array.from(table.querySelectorAll('tr, mat-row')).length;
+    const initialGenuineRows = getGenuineRows(table);
+    const excludedCount = totalRawRows - initialGenuineRows.length;
+    const tableIdentifier = table.id ? `#${table.id}` : table.className ? `.${table.className.trim().split(/\s+/).join('.')}` : 'table';
+    const colSummary = colHeaderMap.filter((c) => c.text).map((c) => `[${c.index}]: ${c.text}`);
+
+    telemetry?.log(
+      'GRID',
+      `Grid topology: '${tableIdentifier}' (${initialGenuineRows.length} genuine rows, ${excludedCount} header/toolbar rows excluded)`,
+      {
+        tableSelector: tableIdentifier,
+        genuineRowsCount: initialGenuineRows.length,
+        excludedRowsCount: excludedCount,
+        columnsCount: colHeaderMap.length,
+        columns: colSummary,
+      },
+      'INFO'
+    );
 
     for (let rIdx = 0; rIdx < rows.length; rIdx++) {
       const rowData = rows[rIdx];

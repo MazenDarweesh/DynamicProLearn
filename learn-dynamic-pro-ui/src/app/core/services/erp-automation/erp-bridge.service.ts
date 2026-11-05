@@ -23,10 +23,18 @@ export class ErpBridgeService {
     return typeof window !== 'undefined' && !!window.DynamicERP;
   }
 
-  getActiveScreen(): ErpActiveScreen | null {
+  private lastActiveScreenCache: { time: number; val: ErpActiveScreen | null } | null = null;
+  private lastFormContextCache: { time: number; val: ErpActiveFormContext | null } | null = null;
+
+  getActiveScreen(forceRefresh = false): ErpActiveScreen | null {
     if (!this.isAvailable) return null;
+    const now = Date.now();
+    if (!forceRefresh && this.lastActiveScreenCache && (now - this.lastActiveScreenCache.time < 100)) {
+      return this.lastActiveScreenCache.val;
+    }
     try {
       const screen = window.DynamicERP!.getActiveScreen?.() ?? null;
+      this.lastActiveScreenCache = { time: now, val: screen };
       this.telemetry?.logBridge('getActiveScreen', undefined, screen);
       if (screen?.pageName) {
         this.telemetry?.setScreenKey(screen.pageName);
@@ -99,6 +107,25 @@ export class ErpBridgeService {
       return { success: false, errors: ['جسر الـ ERP غير متاح في هذه البيئة.'] };
     }
     if (typeof (window.DynamicERP as any)?.submitActiveForm !== 'function') {
+      const saveBtn = this.findSaveButtonInDom();
+      if (saveBtn) {
+        this.telemetry?.log(
+          'BRIDGE',
+          `submitActiveForm not supported by bridge: Clicked DOM Save button [${saveBtn.tagName.toLowerCase()}${saveBtn.className ? `.${saveBtn.className.slice(0, 30)}` : ''}]`,
+          {
+            buttonText: saveBtn.textContent?.trim(),
+            buttonSelector: saveBtn.id ? `#${saveBtn.id}` : saveBtn.className,
+            fallbackAttempted: 'DOM_SAVE_BUTTON'
+          },
+          'INFO'
+        );
+        saveBtn.click();
+        return {
+          success: true,
+          message: 'تم إرسال أمر الحفظ عبر زر الشاشة (DOM Fallback) بنجاح.'
+        };
+      }
+
       this.telemetry?.logBridge('submitActiveForm', undefined, false, 'submitActiveForm not supported by host bridge');
       return {
         success: false,
@@ -136,6 +163,38 @@ export class ErpBridgeService {
   }
 
   /**
+   * Helper to locate the primary Save button in the active form root or toolbar.
+   */
+  findSaveButtonInDom(): HTMLElement | null {
+    if (typeof document === 'undefined') return null;
+    const selectors = [
+      'button.dp-btn--save',
+      'button[title*="حفظ" i]',
+      'button[aria-label*="حفظ" i]',
+      'button.btn-save',
+      '[data-action="save"]',
+      '.dp-form-actions button.btn-primary',
+      '.actions-bar button.btn-primary'
+    ];
+    for (const sel of selectors) {
+      const btn = document.querySelector(sel) as HTMLElement;
+      if (btn && btn.offsetWidth > 0 && btn.offsetHeight > 0 && !btn.hasAttribute('disabled')) {
+        return btn;
+      }
+    }
+    const allButtons = Array.from(document.querySelectorAll('button, a.btn')) as HTMLElement[];
+    for (const btn of allButtons) {
+      if (btn.offsetWidth > 0 && btn.offsetHeight > 0 && !btn.hasAttribute('disabled')) {
+        const text = (btn.textContent || '').trim();
+        if (text === 'حفظ' || text.includes('حفظ المستند') || text.includes('حفظ الفاتورة')) {
+          return btn;
+        }
+      }
+    }
+    return null;
+  }
+
+  /**
    * Directly populates form state and grid rows via the official host ERP bridge.
    * Leverages in-memory binding (excelObject / dataObject) without fragile DOM scraping.
    */
@@ -152,12 +211,17 @@ export class ErpBridgeService {
   /**
    * Directly checks if the host ERP indicates an active transaction or document form is currently open.
    */
-  getActiveFormContext(): ErpActiveFormContext | null {
+  getActiveFormContext(forceRefresh = false): ErpActiveFormContext | null {
     if (!this.isAvailable || typeof window.DynamicERP!.getActiveFormContext !== 'function') {
       return null;
     }
+    const now = Date.now();
+    if (!forceRefresh && this.lastFormContextCache && (now - this.lastFormContextCache.time < 100)) {
+      return this.lastFormContextCache.val;
+    }
     try {
       const ctx = window.DynamicERP!.getActiveFormContext() || null;
+      this.lastFormContextCache = { time: now, val: ctx };
       this.telemetry?.logBridge('getActiveFormContext', undefined, ctx);
       return ctx;
     } catch {

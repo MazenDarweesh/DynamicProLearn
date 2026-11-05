@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
 import { AuthService } from '../platform-core/auth.service';
 import { CopilotNetworkService } from './copilot-network.config';
+import { ErpTelemetryService } from '../erp-automation/erp-telemetry.service';
 import {
   CopilotSource,
   CopilotFormFillData,
@@ -20,6 +21,7 @@ export type {
 export class CopilotSearchStreamService {
   private authService = inject(AuthService);
   private networkService = inject(CopilotNetworkService);
+  private telemetry = inject(ErpTelemetryService, { optional: true });
 
   async streamSearch(
     query: string,
@@ -192,6 +194,7 @@ export class CopilotSearchStreamService {
       const decoder = new TextDecoder('utf-8');
       let buffer = '';
       let tokenCount = 0;
+      let ttftMs: number | null = null;
       let doneCalled = false;
 
       while (true) {
@@ -236,19 +239,46 @@ export class CopilotSearchStreamService {
 
               } else if (currentEvent === 'token' && onToken) {
                 tokenCount++;
+                if (tokenCount === 1) {
+                  ttftMs = Date.now() - startTime;
+                }
                 const tokenText = typeof data === 'string' ? data : (data.text || data.token || '');
                 onToken(tokenText);
 
               } else if (currentEvent === 'done' && onDone) {
                 const elapsedMs = Date.now() - startTime;
+                if (data && typeof data === 'object') {
+                  data.metrics = {
+                    ...(data.metrics || {}),
+                    ttftMs,
+                    streamDurationMs: elapsedMs,
+                    tokenCount
+                  };
+                }
                 console.info('%c[CoPilot SSE] DONE', 'color:#6366f1;font-weight:bold',
-                  { tokenCount, elapsedMs, meta: data });
+                  { tokenCount, ttftMs, elapsedMs, meta: data });
+                this.telemetry?.log(
+                  'AI_EXTRACT',
+                  `SSE stream completed (${tokenCount} tokens, TTFT: ${ttftMs ?? 0}ms)`,
+                  {
+                    tokenCount,
+                    ttftMs,
+                    totalLatencyMs: elapsedMs,
+                    cacheHit: data?.cache_hit,
+                    provenance: data?.provenance
+                  },
+                  'INFO',
+                  elapsedMs
+                );
                 onDone(data);
                 doneCalled = true;
               }
             } catch (e) {
               if (currentEvent === 'token' && onToken) {
                 tokenCount++;
+                if (tokenCount === 1) {
+                  ttftMs = Date.now() - startTime;
+                }
                 onToken(dataStr);
               }
             }
@@ -257,7 +287,7 @@ export class CopilotSearchStreamService {
       }
 
       const totalMs = Date.now() - startTime;
-      console.info('%c[CoPilot SSE] STREAM_END', 'color:#6366f1;font-weight:bold', { tokenCount, totalMs });
+      console.info('%c[CoPilot SSE] STREAM_END', 'color:#6366f1;font-weight:bold', { tokenCount, ttftMs, totalMs });
       if (onDone && !doneCalled) onDone();
     } catch (err) {
       const elapsedMs = Date.now() - startTime;
