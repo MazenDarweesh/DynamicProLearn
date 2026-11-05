@@ -3,7 +3,7 @@ import { RouterOutlet, Router, NavigationEnd } from '@angular/router';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { filter, map, startWith } from 'rxjs';
 import { CopilotChatComponent } from './shared/components/copilot-chat/copilot-chat.component';
-import { AuthService } from './core/services/auth.service';
+import { AuthService } from './core/services/platform-core/auth.service';
 
 @Component({
   selector: 'app-root',

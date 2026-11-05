@@ -1,7 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AdminService } from '../../../core/services/admin.service';
+import { AdminService } from '../../../core/services/platform-core/admin.service';
 import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';

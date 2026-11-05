@@ -1,19 +1,23 @@
-import { Injectable, inject } from '@angular/core';
-import { CopilotService } from './copilot.service';
+import { Injectable, inject, Injector } from '@angular/core';
+import { CopilotService } from '../ai-copilot/copilot.service';
 
-export interface TelemetryEventPayload {
-  timestamp: string;
-  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG';
-  stage: 'USER_QUERY' | 'BRIDGE' | 'SCAN' | 'AI_EXTRACT' | 'FILL' | 'GRID' | 'ERROR' | 'GENERAL';
-  event: string;
-  details?: Record<string, any>;
-}
+import { TelemetryEventPayload } from '../../models/erp-telemetry.models';
+
+export type { TelemetryEventPayload };
 
 @Injectable({
   providedIn: 'root'
 })
 export class ErpTelemetryService {
-  private copilotService = inject(CopilotService, { optional: true });
+  private injector = inject(Injector);
+
+  private get copilotService(): CopilotService | null {
+    try {
+      return this.injector.get(CopilotService, null);
+    } catch {
+      return null;
+    }
+  }
 
   private sessionId = this.generateSessionId();
   private screenKey: string | null = null;

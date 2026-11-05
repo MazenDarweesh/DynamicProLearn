@@ -1,12 +1,12 @@
-import { Injectable, inject } from '@angular/core';
+import { Injectable, inject, Injector } from '@angular/core';
 import {
   FormFieldSchema,
   FormFillResult,
   FormFillExecutionReport,
   FieldSignatureIn,
   LeftoverResponse,
-} from '../models/erp-form.models';
-import { CopilotService } from './copilot.service';
+} from '../../models/erp-form.models';
+import { CopilotService } from '../ai-copilot/copilot.service';
 import { ErpTelemetryService } from './erp-telemetry.service';
 import { ErpBridgeService } from './erp-bridge.service';
 
@@ -48,9 +48,17 @@ export { normalizeArabicText, convertEasternToWesternNumerals };
   providedIn: 'root',
 })
 export class ErpFormDriverService {
-  private copilotService = inject(CopilotService, { optional: true });
+  private injector = inject(Injector);
   private telemetry = inject(ErpTelemetryService, { optional: true });
   private bridge = inject(ErpBridgeService, { optional: true });
+
+  private get copilotService(): CopilotService | null {
+    try {
+      return this.injector.get(CopilotService, null);
+    } catch {
+      return null;
+    }
+  }
 
   /**
    * Resolves the live form container so hidden background tabs are never inspected.
@@ -267,7 +275,6 @@ export class ErpFormDriverService {
       });
 
       if (readyKeys.length === 0) {
-        // Check if there are newly revealed fields we don't have values for yet
         if (activeCopilotService && userMessage && Object.keys(filledFields).length > 0) {
           const newUnmappedFields = currentSchema
             .filter((s) => !s.disabled && !filledFields[s.key] && !pendingFields[s.key])
@@ -292,17 +299,16 @@ export class ErpFormDriverService {
 
               if (leftoverRes && leftoverRes.fields && Object.keys(leftoverRes.fields).length > 0) {
                 Object.assign(pendingFields, leftoverRes.fields);
-                continue; // Re-run pass with newly resolved fields!
+                continue;
               }
             } catch (err) {
               console.warn('[ProgressiveFill] leftover resolution error', err);
             }
           }
         }
-        break; // No more fields to process in this pass
+        break;
       }
 
-      // Process ready fields in this pass
       for (const rawKey of readyKeys) {
         const rawVal = pendingFields[rawKey];
         if (rawVal == null) {
@@ -328,7 +334,6 @@ export class ErpFormDriverService {
         }
 
         if (isElementDisabled(targetElement)) {
-          // Defer disabled fields: only drop if we exhausted all passes
           if (pass >= maxPasses) {
             delete pendingFields[rawKey];
             this.telemetry?.logFill(
@@ -381,7 +386,6 @@ export class ErpFormDriverService {
             status: 'filled',
             message: 'تم إدخال القيمة بنجاح',
           });
-          // Quiesce/settle DOM after each successful input to trigger dependent reactive fields
           await this.settle(
             (targetElement.closest('form, app-base, .erp-card, [data-screen-content]') as HTMLElement) || undefined,
             { quietMs: 60, maxMs: 500 }
@@ -406,9 +410,6 @@ export class ErpFormDriverService {
       }
     }
 
-    // ──────────────────────────────────────────────
-    // 2. Fill Grid Rows (Items Table)
-    // ──────────────────────────────────────────────
     if (rows && rows.length > 0) {
       const rowFilledCount = await this.fillGridRows(rows, excludeContainer, results);
       filledCount += rowFilledCount;
@@ -420,9 +421,6 @@ export class ErpFormDriverService {
       await this.settle(undefined, { quietMs: 60, maxMs: 400 });
     }
 
-    // ──────────────────────────────────────────────
-    // 3. Handle Payment Field with $TOTAL (Footer)
-    // ──────────────────────────────────────────────
     const queryNorm = normalizeArabicText(userMessage || '').toLowerCase();
     const userWantsCashSettlement =
       queryNorm.includes('نقدا') ||
@@ -454,7 +452,6 @@ export class ErpFormDriverService {
         : 'المدفوع نقداً';
       let targetElement = explicitTotalKey ? this.findTargetElement(cleanKey, excludeContainer) : null;
 
-      // If targetElement is not a text/number input (e.g. an ng-select like SafeAccounId), discard it
       if (
         targetElement &&
         !(targetElement instanceof HTMLInputElement || targetElement instanceof HTMLTextAreaElement)
@@ -462,7 +459,6 @@ export class ErpFormDriverService {
         targetElement = null;
       }
 
-      // Fallback 1: Search for paid / cash / settlement inputs in the form
       if (!targetElement) {
         const paidSelectors = [
           'input[name="POPaid" i]',
@@ -496,7 +492,6 @@ export class ErpFormDriverService {
         }
       }
 
-      // Fallback 2: Search by label containing "مدفوع" or "مسدد" or "نقدا" or "محصل"
       if (!targetElement) {
         const labels = Array.from(this.getActiveFormRoot().querySelectorAll('label'));
         for (const lbl of labels) {
@@ -529,7 +524,6 @@ export class ErpFormDriverService {
       ) {
         let finalVal = this.readCalculatedTotal();
         if (!finalVal || finalVal === '0') {
-          // Calculate fallback sum from rows: sum(qty * price/cost)
           let sum = 0;
           for (const r of rows || []) {
             const q = parseFloat(String(r['الكمية'] || r['كمية'] || r['qty'] || 0)) || 0;

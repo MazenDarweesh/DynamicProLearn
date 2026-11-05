@@ -1,4 +1,4 @@
-import { FormFillResult, ControlIn } from '../../models/erp-form.models';
+import { FormFillResult, ControlIn, GridFillOptions } from '../../../models/erp-form.models';
 import { normalizeArabicText, matchesColKey } from './arabic-normalizer';
 import { getActiveFormRoot, waitFor, settle } from './dom-synchronizer';
 import {
@@ -8,12 +8,7 @@ import {
   readCalculatedTotal,
 } from './control-interactor';
 
-export interface GridFillOptions {
-  excludeContainer?: HTMLElement;
-  resultsOut?: FormFillResult[];
-  telemetry?: any;
-  copilotService?: any;
-}
+export type { GridFillOptions };
 
 /**
  * Checks whether a table row is a genuine editable item row (not a filter/template/empty row).
@@ -30,6 +25,10 @@ export function isGenuineItemRow(r: HTMLElement): boolean {
     className.includes('empty') ||
     className.includes('template') ||
     className.includes('dub') ||
+    className.includes('dp-pd') ||
+    r.closest('.dp-pd') ||
+    r.querySelector('.dp-pd, .dp-pd__inner, .dp-pd__pick, .dp-pd__pull, [title*="pullProducts" i], .dp-pd__ttl') ||
+    r.querySelector('ng-select#product, eg-select#product, [id="product"]') ||
     r.querySelector('.no-data-msg, .dataTables_empty')
   ) {
     return false;
@@ -44,6 +43,11 @@ export function isGenuineItemRow(r: HTMLElement): boolean {
       return name.includes('dub') || label.includes('dub');
     });
     if (onlyDub) return false;
+
+    // Disqualify if all selects belong to header product-picker toolbar (e.g. id="product" or inside .dp-pd)
+    const onlyHeaderProductPicker = selects.every((s) => s.id === 'product' || !!s.closest('.dp-pd'));
+    if (onlyHeaderProductPicker) return false;
+
     return true;
   }
 
@@ -103,6 +107,9 @@ export async function findAddRowButton(
   const isValidBtn = (btn: HTMLElement): boolean => {
     if (excludeContainer && excludeContainer.contains(btn)) return false;
     if (!btn.offsetWidth && !btn.offsetHeight && !btn.getClientRects().length) return false;
+    if (btn.closest('.dp-pd') || btn.classList.contains('dp-pd__pull') || btn.classList.contains('dp-pd__opt')) {
+      return false;
+    }
     return true;
   };
 
@@ -371,14 +378,15 @@ export async function fillGridRows(
           }
         }
 
-        // Direct Fallback 1: match product/item column directly to cell with eg-select / ng-select (excluding Dub)
+        // Direct Fallback 1: match product/item column directly to cell with eg-select / ng-select (excluding Dub, #product, and .dp-pd)
         if (!targetCell && (matchesColKey('الصنف', colKey) || matchesColKey('اسم المنتج', colKey))) {
           targetCell =
             cells.find((c) => {
+              if (c.closest('.dp-pd') || c.querySelector('.dp-pd, [id="product"]')) return false;
               const sel = c.querySelector('eg-select, ng-select');
               if (!sel) return false;
               const name = (sel.getAttribute('name') || sel.getAttribute('formcontrolname') || sel.id || '').toLowerCase();
-              return !name.includes('dub');
+              return !name.includes('dub') && sel.id !== 'product' && !sel.closest('.dp-pd');
             }) || null;
         }
 
@@ -405,7 +413,8 @@ export async function fillGridRows(
         }
 
         if (targetCell) {
-          const ngSelect = targetCell.querySelector('eg-select, ng-select') as HTMLElement;
+          const selects = Array.from(targetCell.querySelectorAll('eg-select, ng-select')) as HTMLElement[];
+          const ngSelect = selects.find((s) => s.id !== 'product' && !s.closest('.dp-pd')) || selects[0];
           if (ngSelect) {
             const status = await setNgSelect(ngSelect, rawVal, telemetry);
             if (status === 'filled') {

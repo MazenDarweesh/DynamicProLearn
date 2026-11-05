@@ -1,8 +1,8 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../../core/services/auth.service';
-import { AdminService } from '../../../core/services/admin.service';
+import { AuthService } from '../../../core/services/platform-core/auth.service';
+import { AdminService } from '../../../core/services/platform-core/admin.service';
 import { Router, RouterModule } from '@angular/router';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';

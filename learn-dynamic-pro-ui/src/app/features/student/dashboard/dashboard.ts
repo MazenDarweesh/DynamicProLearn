@@ -1,7 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AuthService } from '../../../core/services/auth.service';
-import { StudentService, ModuleDto, LessonDetailDto } from '../../../core/services/student.service';
+import { AuthService } from '../../../core/services/platform-core/auth.service';
+import { StudentService, ModuleDto, LessonDetailDto } from '../../../core/services/platform-core/student.service';
 import { Router, ActivatedRoute } from '@angular/router';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { Dialog } from '../../../core/utils/dialog';

@@ -2,7 +2,7 @@ import {
   FormFieldSchema,
   FieldKind,
   FieldGroup,
-} from '../../models/erp-form.models';
+} from '../../../models/erp-form.models';
 import { getActiveFormRoot } from './dom-synchronizer';
 
 /**
@@ -180,6 +180,16 @@ export function collectFormSchema(
     for (const host of customSelectHosts) {
       if (excludeContainer && excludeContainer.contains(host)) continue;
 
+      // GENERIC EXCLUSION: Skip header quick-add product picker toolbars (.dp-pd, pullProducts, id="product")
+      // Product items belong strictly to table grid rows, not single-value header form fields!
+      if (
+        host.id === 'product' ||
+        host.closest('.dp-pd, .dp-pd__pick, .dp-pd__inner, [class*="dp-pd"]') ||
+        host.querySelector('[id="product"]')
+      ) {
+        continue;
+      }
+
       const tagName = host.tagName.toLowerCase();
       const isNgSelect = tagName === 'eg-select' || tagName === 'ng-select';
       const isMatSelect = tagName === 'mat-select';
@@ -237,6 +247,14 @@ export function collectFormSchema(
       // Skip internal combobox inputs of already captured ng-select/mat-select hosts
       if (el.closest('ng-select, eg-select, mat-select')) continue;
       if (el.type === 'hidden') continue;
+
+      // Skip product quick-add header toolbars (.dp-pd, id="product")
+      if (
+        el.id === 'product' ||
+        el.closest('.dp-pd, .dp-pd__pick, .dp-pd__inner, [class*="dp-pd"]')
+      ) {
+        continue;
+      }
 
       // Skip table pagination, master-list internal search bar, and numeric row checkboxes
       if (el.closest('.dp-table__pagination, app-master-list-switch, .dataTables_paginate')) continue;

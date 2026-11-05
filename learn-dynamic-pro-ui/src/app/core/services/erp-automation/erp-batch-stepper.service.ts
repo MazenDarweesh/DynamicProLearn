@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { ErpFormDriverService } from './erp-form-driver.service';
 import { ErpNavigatorService } from './erp-navigator.service';
-import { ErpBatchItem, ErpBatchState, FormFillExecutionReport } from '../models/erp-form.models';
+import { ErpBatchItem, ErpBatchState, FormFillExecutionReport } from '../../models/erp-form.models';
 
 @Injectable({
   providedIn: 'root'
@@ -124,7 +124,6 @@ export class ErpBatchStepperService {
           this.updateBatchStatus('waiting_confirm');
           await this.waitForUserConfirmation();
         } else {
-          // Visual micro-wait so the user can observe the fields filled on screen
           await this.delay(1200);
         }
       }
@@ -192,7 +191,6 @@ export class ErpBatchStepperService {
       ...s,
       autoAdvance: enable !== undefined ? enable : !s.autoAdvance
     }));
-    // If currently waiting for confirmation and user turned auto-advance on, proceed immediately
     if (this.state().autoAdvance && this.state().status === 'waiting_confirm') {
       this.confirmAndNext();
     }

@@ -1,6 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { CopilotTopFilterBarComponent } from './copilot-top-filter-bar.component';
-import { CopilotService, StudentCopilotFilterData, CopilotFilterState } from '../../../core/services/copilot.service';
+import { CopilotService, StudentCopilotFilterData, CopilotFilterState } from '../../../core/services/ai-copilot/copilot.service';
 import { of } from 'rxjs';
 import { SimpleChange } from '@angular/core';
 

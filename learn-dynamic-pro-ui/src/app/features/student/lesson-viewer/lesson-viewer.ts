@@ -11,11 +11,11 @@ import {
   StudentLessonSummaryDto,
   StudentQuizStateDto,
   QuestionEvaluationResultDto 
-} from '../../../core/services/student.service';
+} from '../../../core/services/platform-core/student.service';
 import { Dialog } from '../../../core/utils/dialog';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { LessonSidebarComponent } from '../../../shared/components/lesson-sidebar/lesson-sidebar.component';
-import { CopilotService } from '../../../core/services/copilot.service';
+import { CopilotService } from '../../../core/services/ai-copilot/copilot.service';
 
 export interface UnitWithLessons {
   id: string;

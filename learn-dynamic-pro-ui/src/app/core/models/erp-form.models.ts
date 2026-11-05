@@ -141,3 +141,10 @@ export interface LeftoverResponse {
   ask_user: string[];
 }
 
+export interface GridFillOptions {
+  excludeContainer?: HTMLElement;
+  resultsOut?: FormFillResult[];
+  telemetry?: any;
+  copilotService?: any;
+}
+

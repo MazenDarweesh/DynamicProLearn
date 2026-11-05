@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Dialog } from '../../../core/utils/dialog';
-import { TesterService } from '../../../core/services/tester.service';
+import { TesterService } from '../../../core/services/platform-core/tester.service';
 
 @Component({
   selector: 'app-tester-setup',

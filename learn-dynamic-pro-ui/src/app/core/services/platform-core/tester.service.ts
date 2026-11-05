@@ -1,22 +1,9 @@
 import { Injectable, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
+import { ErpVersionDto, FeedbackRequest, LookupDto } from '../../models/tester.models';
 
-export interface ErpVersionDto {
-  id: string;
-  versionLabel: string;
-}
-
-export interface FeedbackRequest {
-  lessonId: string;
-  conditionOptionId: string;
-  notes: string;
-}
-
-export interface LookupDto {
-  id: string;
-  label: string;
-}
+export type * from '../../models/tester.models';
 
 @Injectable({
   providedIn: 'root'

@@ -46,6 +46,14 @@ export function findTargetElement(
     ) as HTMLElement[];
     for (const cand of customCandidates) {
       if (excludeContainer && excludeContainer.contains(cand)) continue;
+      // Disqualify quick-add product toolbar elements (.dp-pd / id="product")
+      if (
+        cand.id === 'product' ||
+        cand.closest('.dp-pd, .dp-pd__pick, .dp-pd__inner') ||
+        cand.querySelector('[id="product"]')
+      ) {
+        continue;
+      }
       return cand;
     }
 
@@ -69,6 +77,12 @@ export function findTargetElement(
     ) as HTMLElement[];
     for (const el of elements) {
       if (excludeContainer && excludeContainer.contains(el)) continue;
+      if (
+        el.id === 'product' ||
+        el.closest('.dp-pd, .dp-pd__pick, .dp-pd__inner')
+      ) {
+        continue;
+      }
       return el;
     }
   }
@@ -90,7 +104,12 @@ export function findTargetElement(
         const target = group.querySelector(
           'eg-select, ng-select, select, input, textarea'
         ) as HTMLElement;
-        if (target && (!excludeContainer || !excludeContainer.contains(target))) {
+        if (
+          target &&
+          (!excludeContainer || !excludeContainer.contains(target)) &&
+          target.id !== 'product' &&
+          !target.closest('.dp-pd')
+        ) {
           return target;
         }
       }

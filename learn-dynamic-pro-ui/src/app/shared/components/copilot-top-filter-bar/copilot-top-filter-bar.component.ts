@@ -9,9 +9,9 @@ import {
   CopilotFilterLesson,
   CopilotFilterOption,
   CopilotFilterState
-} from '../../../core/services/copilot.service';
+} from '../../../core/services/ai-copilot/copilot.service';
 
-import { AuthService } from '../../../core/services/auth.service';
+import { AuthService } from '../../../core/services/platform-core/auth.service';
 
 @Component({
   selector: 'app-copilot-top-filter-bar',

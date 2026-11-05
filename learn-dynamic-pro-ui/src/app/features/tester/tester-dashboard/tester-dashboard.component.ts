@@ -1,8 +1,8 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { AuthService } from '../../../core/services/auth.service';
-import { TesterService } from '../../../core/services/tester.service';
-import { StudentService } from '../../../core/services/student.service';
+import { AuthService } from '../../../core/services/platform-core/auth.service';
+import { TesterService } from '../../../core/services/platform-core/tester.service';
+import { StudentService } from '../../../core/services/platform-core/student.service';
 import { Router } from '@angular/router';
 
 export interface DashboardModule {

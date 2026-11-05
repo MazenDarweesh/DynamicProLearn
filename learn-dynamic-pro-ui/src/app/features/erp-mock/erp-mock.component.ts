@@ -1,8 +1,8 @@
 import { Component, CUSTOM_ELEMENTS_SCHEMA, OnInit, OnDestroy, inject, ChangeDetectorRef, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../core/services/auth.service';
-import { CopilotService } from '../../core/services/copilot.service';
+import { AuthService } from '../../core/services/platform-core/auth.service';
+import { CopilotService } from '../../core/services/ai-copilot/copilot.service';
 
 interface ErpScreen {
   key: string;

@@ -1,7 +1,7 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { AdminService } from '../../../core/services/admin.service';
+import { AdminService } from '../../../core/services/platform-core/admin.service';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
 import { EvaluationsDashboardComponent } from '../../../shared/components/evaluations-dashboard/evaluations-dashboard.component';
 import { Dialog } from '../../../core/utils/dialog';

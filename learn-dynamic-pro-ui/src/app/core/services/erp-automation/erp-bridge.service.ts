@@ -5,7 +5,7 @@ import {
   ErpSaveResult,
   ErpFormFillPayload,
   ErpActiveFormContext
-} from '../models/erp-bridge.models';
+} from '../../models/erp-bridge.models';
 import { ErpTelemetryService } from './erp-telemetry.service';
 
 /**

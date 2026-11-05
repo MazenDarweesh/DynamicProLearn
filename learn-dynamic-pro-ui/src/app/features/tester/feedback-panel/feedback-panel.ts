@@ -1,9 +1,9 @@
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AuthService } from '../../../core/services/auth.service';
-import { TesterService, LookupDto } from '../../../core/services/tester.service';
-import { StudentService, UnitDto, LessonDto } from '../../../core/services/student.service';
+import { AuthService } from '../../../core/services/platform-core/auth.service';
+import { TesterService, LookupDto } from '../../../core/services/platform-core/tester.service';
+import { StudentService, UnitDto, LessonDto } from '../../../core/services/platform-core/student.service';
 import { Router, ActivatedRoute } from '@angular/router';
 
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';

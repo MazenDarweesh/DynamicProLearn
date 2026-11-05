@@ -5,14 +5,17 @@ import { Router } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
-import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData, AgentStepItem } from '../../../core/services/copilot.service';
-import { ErpFormDriverService, normalizeArabicText } from '../../../core/services/erp-form-driver.service';
-import { ErpBatchStepperService } from '../../../core/services/erp-batch-stepper.service';
-import { ErpNavigatorService } from '../../../core/services/erp-navigator.service';
-import { ErpBridgeService } from '../../../core/services/erp-bridge.service';
-import { ErpTelemetryService } from '../../../core/services/erp-telemetry.service';
+import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData, AgentStepItem } from '../../../core/services/ai-copilot/copilot.service';
+import {
+  ErpFormDriverService,
+  ErpBatchStepperService,
+  ErpNavigatorService,
+  ErpBridgeService,
+  ErpTelemetryService,
+  normalizeArabicText
+} from '../../../core/services/erp-automation';
 import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } from '../../../core/models/erp-form.models';
-import { AuthService } from '../../../core/services/auth.service';
+import { AuthService } from '../../../core/services/platform-core/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
 

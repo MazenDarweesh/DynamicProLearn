@@ -1,7 +1,7 @@
 import { Component, EventEmitter, Input, Output, inject, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { AdminService } from '../../../core/services/admin.service';
+import { AdminService } from '../../../core/services/platform-core/admin.service';
 import { Dialog } from '../../../core/utils/dialog';
 
 @Component({

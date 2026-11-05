@@ -1,21 +1,25 @@
-import { Injectable, inject } from '@angular/core';
-import { NavCandidateIn, NavResolution, NavScored, ControlIn } from '../models/erp-form.models';
-import { normalizeArabicText } from './erp-form-driver.service';
-import { CopilotService } from './copilot.service';
+import { Injectable, inject, Injector } from '@angular/core';
+import { NavCandidateIn, NavResolution, NavScored, ControlIn } from '../../models/erp-form.models';
+import { normalizeArabicText } from './form-driver/arabic-normalizer';
+import { CopilotService } from '../ai-copilot/copilot.service';
 import { ErpBridgeService } from './erp-bridge.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class ErpNavigatorService {
-  private copilotService = inject(CopilotService, { optional: true });
+  private injector = inject(Injector);
   private bridge = inject(ErpBridgeService);
   private candidateElementsMap = new Map<string, HTMLElement>();
 
-  /**
-   * Detects if the specified screen is currently active in the DOM.
-   * Completely dynamic: checks screen attributes and tags without hardcoded dictionaries.
-   */
+  private get copilotService(): CopilotService | null {
+    try {
+      return this.injector.get(CopilotService, null);
+    } catch {
+      return null;
+    }
+  }
+
   /**
    * Detects if the specified screen is currently active in the DOM.
    * Completely dynamic: checks screen attributes, tabs, and page headers without hardcoded dictionaries.
@@ -40,8 +44,6 @@ export class ErpNavigatorService {
       )) {
         return true;
       }
-      // If bridge has listScreens(), check if active page corresponds to the requested screenKey
-      // CRITICAL: Only match if active has a genuine non-empty pageName or screenKey (never match when on Dashboard/Main screen)
       const screens = this.bridge.listScreens();
       if (screens && (active.pageName || active.screenKey)) {
         const matchedTarget = screens.find(s =>
@@ -201,7 +203,6 @@ export class ErpNavigatorService {
     while (Date.now() - startTime < timeoutMs) {
       if (this.isScreenActive(screenKey)) {
         tabActivated = true;
-        // Verify screen content itself has finished rendering and is not busy
         if (this.isScreenContentLoaded()) {
           return true;
         }
@@ -218,18 +219,15 @@ export class ErpNavigatorService {
   isScreenContentLoaded(): boolean {
     if (typeof document === 'undefined') return true;
 
-    // 1. Check if the bridge reports PageBusyService is active
     if (this.bridge.isPageBusy()) {
       return false;
     }
 
-    // 2. Identify the active screen container in DynamicPro shell
     const activeContainer =
       (document.querySelector('.dp-shell__pages > div:not([hidden])') as HTMLElement) ||
       (document.querySelector('[role="main"]') as HTMLElement) ||
       document.body;
 
-    // 3. Check for active loading spinners inside container
     const spinner = activeContainer.querySelector(
       '.dp-spinner, .loading-spinner, .dp-busy, .spinner-border, [role="progressbar"], .mat-progress-spinner, app-loading'
     );
@@ -237,7 +235,6 @@ export class ErpNavigatorService {
       return false;
     }
 
-    // 4. Check if standard ERP elements exist (Grid, Table, MasterList, or Form)
     const hasCoreComponent = activeContainer.querySelector(
       '#dpGrid, app-master-list, .dp-table, .dp-list__act, button.dp-btn--primary, app-add-or-edit, .dp-form, input, select'
     );
@@ -276,28 +273,14 @@ export class ErpNavigatorService {
   /**
    * Clicks the "New Document / اضافة جديد" button on the screen or master list
    * to open the creation form before filling data.
-   * Completely dynamic and resilient to slow screen loading:
-   * 1. Checks if form is already open
-   * 2. Tries official bridge triggerAddNew()
-   * 3. Falls back to DOM buttons with retry polling
-   * 4. Confirms that the AddOrEdit form container has rendered in the D  /**
-   * Clicks the "New Document / اضافة جديد" button on the screen or master list
-   * to open the creation form before filling data.
-   * Completely dynamic and resilient to slow screen loading:
-   * 1. Checks if form is already open
-   * 2. Tries official bridge triggerAddNew()
-   * 3. Falls back to DOM buttons with retry polling
-   * 4. Confirms that the AddOrEdit form container has rendered in the DOM
    */
   async prepareFreshForm(maxWaitMs = 2500): Promise<boolean> {
-    // 0. If form is already open and ready, proceed immediately in 0ms!
     if (this.isFormAlreadyOpen()) {
       return true;
     }
 
     const start = Date.now();
 
-    // Priority 1: Official ERP bridge
     if (this.bridge.isAvailable) {
       try {
         const opened = await this.bridge.triggerAddNew();
@@ -310,7 +293,6 @@ export class ErpNavigatorService {
       }
     }
 
-    // Priority 2: Wait for DOM Add-New button to render, then click it
     while (Date.now() - start < maxWaitMs) {
       if (this.isFormAlreadyOpen()) return true;
       const clicked = this.triggerDomAddNew();
@@ -328,13 +310,8 @@ export class ErpNavigatorService {
    * Checks whether an AddOrEdit form container, modal, transactional document editor, or mock form is currently open.
    */
   isFormAlreadyOpen(): boolean {
-    // 0. Official ERP bridge context check (instant in-memory authority)
     const ctx = this.bridge.getActiveFormContext();
     if (ctx) {
-      // Genuinely active in-memory form check:
-      // Must have dataObject, or populated transactional rows/excelObject, or explicit isInvoice flag.
-      // A fallback { isOpen: true, formType: 'dom', dataObject: null, rows: null }
-      // merely means the page container is in the DOM, NOT that a document creation form is open!
       if (ctx.dataObject || (ctx.rows && ctx.rows.length >= 0 && ctx.formType !== 'dom') || ctx.isInvoice) {
         return true;
       }
@@ -342,7 +319,6 @@ export class ErpNavigatorService {
 
     if (typeof document === 'undefined') return false;
 
-    // Check modal overlays first (always top priority for creation forms)
     const modalForm = document.querySelector(
       '.cdk-overlay-container .dp-modal app-add-or-edit, ' +
       '.cdk-overlay-container .dp-modal, ' +
@@ -352,14 +328,12 @@ export class ErpNavigatorService {
       return true;
     }
 
-    // Check strictly within the active, non-hidden page tab for an actual AddOrEdit form or in-page edit section
     const activePage = document.querySelector('.dp-shell__pages > div:not([hidden])') || document;
     const pageForm = activePage.querySelector('app-add-or-edit, .dp-edit, .dp-list__pre, .dp-edit__head, section.dp-pu__sup');
     if (pageForm && this.isElementVisible(pageForm)) {
       return true;
     }
 
-    // Secondary check: Presence of visible transactional entry inputs
     const primaryInput = activePage.querySelector<HTMLElement>(
       'ng-select[formcontrolname], [formcontrolname="SupplierID"], [formcontrolname="CustomerID"], [formcontrolname="StoreID"], [formcontrolname="EmpId"], input#productQty'
     );
@@ -390,7 +364,6 @@ export class ErpNavigatorService {
   private triggerDomAddNew(): boolean {
     if (typeof document === 'undefined') return false;
 
-    // 1. Direct DynamicPro ERP Master-List action button (.dp-btn--primary.dp-list__act, or .fa-plus)
     const masterAddBtn = document.querySelector<HTMLElement>(
       'button.dp-btn--primary.dp-list__act, .dp-list__act.dp-btn--primary, button.dp-btn--new, [data-action="new"], button.dp-list__act'
     );
@@ -401,7 +374,6 @@ export class ErpNavigatorService {
       return true;
     }
 
-    // 2. Text-based or icon-based matching for action toolbar buttons
     const allButtons = Array.from(document.querySelectorAll<HTMLElement>(
       'app-master-list button, .dp-list__actions button, .header-actions button, .dp-shell__pages button, button'
     ));
@@ -427,10 +399,8 @@ export class ErpNavigatorService {
     return false;
   }
 
-
   /**
    * Scans visible ERP screen items (tiles, modules, tabs, cards, chips) from the active DOM.
-   * Dynamically inspects DynamicPro ERP DOM hierarchy and extracts rich contextual paths.
    */
   scanVisibleCandidates(): NavCandidateIn[] {
     this.candidateElementsMap.clear();
@@ -441,7 +411,6 @@ export class ErpNavigatorService {
       return candidates;
     }
 
-    // Official catalog from the ERP bridge (ids are real page names, never candidate_N)
     const catalog = this.bridge.listScreens();
     if (catalog && catalog.length > 0) {
       return catalog.map((s: any) => {
@@ -456,7 +425,6 @@ export class ErpNavigatorService {
         };
       });
     }
-
 
     const badContainers = '.dp-set, #dpSettingsLabel, lms-ai-copilot, app-copilot-chat';
     const domSelectors = [
@@ -473,7 +441,6 @@ export class ErpNavigatorService {
 
     const elements = Array.from(document.querySelectorAll<HTMLElement>(domSelectors));
 
-    // Detect currently active module name for hierarchical path context
     const activeModEl = document.querySelector<HTMLElement>('.dp-pgs__mod.is-active .dp-pgs__mod-name, .dp-pgs__mod.is-active');
     const activeModuleName = (activeModEl?.textContent || '').trim() || 'الرئيسية';
 
@@ -482,12 +449,10 @@ export class ErpNavigatorService {
       if (el.closest(badContainers)) continue;
       if (!this.isElementVisible(el)) continue;
 
-      // Extract clean label: prioritize inner label element if present, else sanitize textContent
       const labelSpan = el.querySelector<HTMLElement>(
         '.dp-pgs__tile-name, .dp-pgs__mod-name, .screen-label, .dp-mods__title, .dp-hdr__tabtxt, .dp-hdr__tab-name, .dp-cats__txt'
       );
       let rawText = (labelSpan?.textContent || el.textContent || '').trim();
-      // Remove bracketed codes like [PURCHASE_INVOICE] from text for cleaner matching
       rawText = rawText.replace(/\[.*?\]/g, '').trim();
 
       if (!rawText || rawText.length < 2 || rawText.length > 150) continue;
@@ -506,11 +471,9 @@ export class ErpNavigatorService {
         `candidate_${index++}`;
       this.candidateElementsMap.set(candidateId, el);
 
-      // Determine contextual hierarchical path for AI reasoning
       const path: string[] = [];
       if (el.classList.contains('dp-pgs__tile')) {
         path.push(activeModuleName);
-        // Look for preceding group head inside page
         const cell = el.closest('.dp-pgs__cell');
         const prevGroup = cell?.previousElementSibling?.querySelector('.dp-grouphead__name') ||
                           el.closest('[class*="group"]')?.querySelector('.dp-grouphead__name');
@@ -537,9 +500,6 @@ export class ErpNavigatorService {
 
   /**
    * Resolves target screen using AI Backend (/v1/erp/navigation/resolve).
-   * - 'go' (confidence >= 0.80): Navigates immediately and triggers prepareFreshForm().
-   * - 'ask': Returns top 3 scored options for the user to select.
-   * - 'clarify': Prompts user for clearer input.
    */
   async resolveAndNavigate(userMessage: string): Promise<{
     success: boolean;
@@ -571,7 +531,6 @@ export class ErpNavigatorService {
       if (res.decision === 'go' && res.candidates.length > 0) {
         const top = res.candidates[0];
 
-        // If user is already on the target screen, avoid redundant navigation cycles
         if (activeScreenName && this.isScreenActive(top.id)) {
           console.info('%c[ErpNavigator] Already on target screen:', 'color:#10b981;font-weight:bold', top.id);
           return {
@@ -582,7 +541,6 @@ export class ErpNavigatorService {
           };
         }
 
-        // Downgrade protection: If already on a primary transactional screen (e.g. Purchases) and target is a secondary detail screen (e.g. Details purchases), keep the current screen!
         const activeNorm = (activeScreenName || '').trim().toLowerCase();
         const topIdNorm = top.id.trim().toLowerCase();
         const isDetailScreen =
@@ -611,9 +569,7 @@ export class ErpNavigatorService {
         }
 
         const targetEl = this.candidateElementsMap.get(top.id);
-        const targetLabel = (targetEl?.textContent || top.id).trim();
 
-        // Extract real ERP screen identifier if present on element or passed from catalog
         const realScreenName =
           targetEl?.getAttribute('data-screen') ||
           targetEl?.getAttribute('data-page-name') ||
@@ -621,7 +577,6 @@ export class ErpNavigatorService {
           targetEl?.getAttribute('pageName') ||
           (!top.id.startsWith('candidate_') ? top.id : undefined);
 
-        // If target element is an existing DOM tile/button, click it directly; otherwise navigate via bridge/events
         if (targetEl) {
           this.simulateClick(targetEl);
           await this.delay(400);
@@ -629,7 +584,6 @@ export class ErpNavigatorService {
           await this.navigateToScreen(realScreenName);
         }
 
-        // Prepare fresh form if we reached the form/list
         await this.prepareFreshForm();
 
         return {
@@ -672,4 +626,3 @@ export class ErpNavigatorService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
-
