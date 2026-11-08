@@ -86,7 +86,64 @@ export class ErpBridgeService {
 
   /** Returns true if the bridge call completed without error and was not rejected by host. */
   async navigateToScreen(screenNameOrId: string | number): Promise<boolean> {
-    return this.invoke('navigateToScreen', () => window.DynamicERP!.navigateToScreen(screenNameOrId), { screen: screenNameOrId });
+    const normalizedArg =
+      typeof screenNameOrId === 'string' && /^\d+$/.test(screenNameOrId.trim())
+        ? Number(screenNameOrId.trim())
+        : screenNameOrId;
+
+    const ok = await this.invoke(
+      'navigateToScreen',
+      () => window.DynamicERP!.navigateToScreen(normalizedArg),
+      { screen: normalizedArg }
+    );
+
+    // Verify if we reached the target pageId; if not (e.g., shared pageName like "Sales Types" 225 vs 244),
+    // fallback directly to Angular's app-base.pageService.addNewPage with the exact page object
+    const activeAfter = this.getActiveScreen(true);
+    const targetMatched =
+      typeof normalizedArg === 'number'
+        ? activeAfter?.pageId === normalizedArg
+        : ok && !!activeAfter;
+
+    if (targetMatched) {
+      return true;
+    }
+
+    try {
+      const ng = (window as any).ng;
+      const appBaseEl = typeof document !== 'undefined' ? document.querySelector('app-base') : null;
+      const baseComp = ng && appBaseEl ? ng.getComponent(appBaseEl) : null;
+      const pageService = baseComp?.pageService;
+      if (pageService && typeof pageService.addNewPage === 'function') {
+        const screens = this.listScreens() || (Array.isArray(baseComp?.pages) ? baseComp.pages : []);
+        const targetPage = screens.find((p: any) => {
+          const pid = p.pageId ?? p.page_id ?? p.id;
+          if (typeof normalizedArg === 'number') {
+            return Number(pid) === normalizedArg;
+          }
+          const strArg = String(normalizedArg).trim().toLowerCase();
+          return (
+            String(pid).toLowerCase() === strArg ||
+            String(p.title ?? p.name_ar ?? '').trim().toLowerCase() === strArg ||
+            String(p.pageName ?? p.screen_key ?? '').trim().toLowerCase() === strArg
+          );
+        });
+        if (targetPage) {
+          pageService.addNewPage(targetPage);
+          this.lastActiveScreenCache = null;
+          this.telemetry?.log('BRIDGE', 'Navigated via Angular app-base.pageService.addNewPage fallback', {
+            pageId: targetPage.pageId ?? targetPage.id,
+            pageName: targetPage.pageName,
+            title: targetPage.title
+          });
+          return true;
+        }
+      }
+    } catch (err) {
+      console.warn('[ErpBridge] Angular pageService.addNewPage fallback error:', err);
+    }
+
+    return ok;
   }
 
   /**

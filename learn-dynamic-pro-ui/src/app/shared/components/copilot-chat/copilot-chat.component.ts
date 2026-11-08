@@ -930,20 +930,30 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const currentPageId = activeScreen?.pageId;
 
       const currentActiveNorm = (currentActive || '').toLowerCase();
+      const activeTitleNorm = normalizeArabicText(activeScreen?.title || '').toLowerCase();
       const queryNorm = normalizeArabicText(msg.relatedUserQuery || '').toLowerCase();
       const isPurchaseQuery = queryNorm.includes('مشتريات') || queryNorm.includes('شراء') || queryNorm.includes('مورد');
       const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
       const isCurrentPurchase = currentActiveNorm.includes('purchas') || currentActiveNorm.includes('مشتريات');
       const isCurrentSales = currentActiveNorm.includes('sale') || currentActiveNorm.includes('مبيعات');
+      const isCurrentSetupOrTypes =
+        String(currentPageId) === '225' ||
+        activeTitleNorm.includes('انواع') ||
+        activeTitleNorm.includes('أنواع') ||
+        activeTitleNorm.includes('اعدادات') ||
+        activeTitleNorm.includes('إعدادات') ||
+        currentActiveNorm.includes('setting') ||
+        currentActiveNorm.includes('config');
 
-      // Safety Guard: If user is already on a matching transactional screen for the requested query domain, NEVER navigate away to a mismatched targetScreen!
+      // Safety Guard: If user is already on a matching transactional screen (NOT a setup/types screen like 225), retain it
       const isAlreadyOnMatchingDomain =
-        (isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales);
+        !isCurrentSetupOrTypes &&
+        ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
 
       // Deterministic check:
       let isSameScreen = false;
-      if (targetPageId) {
-        isSameScreen = (currentPageId === targetPageId);
+      if (targetPageId != null && currentPageId != null) {
+        isSameScreen = String(currentPageId) === String(targetPageId);
       } else if (isAlreadyOnMatchingDomain) {
         // If current active screen already matches the query domain, keep current screen!
         isSameScreen = true;
@@ -1172,37 +1182,52 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       // CRITICAL: Do NOT fall back to stale this.erpKey if activeScreen has empty pageName/screenKey (e.g. on Dashboard/Main screen)
       const activeRaw = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
       const activeName = activeRaw.toLowerCase();
+      const activeTitleNorm = normalizeArabicText(activeScreen?.title || '').toLowerCase();
+      const activePid = activeScreen?.pageId != null ? String(activeScreen.pageId) : '';
       const queryNorm = normalizeArabicText(query).toLowerCase();
 
       // Check domain relevance between query and current active screen
       const isInvoiceQuery = queryNorm.includes('فاتورة') || queryNorm.includes('فواتير') || queryNorm.includes('سند') || queryNorm.includes('قيد');
+      const isInvoiceScreen =
+        activePid === '244' ||
+        activePid === '289' ||
+        activeTitleNorm.includes('فاتورة') ||
+        activeTitleNorm.includes('فواتير') ||
+        activeTitleNorm.includes('مشتريات') ||
+        activeName.includes('invoice') ||
+        activeName === 'purchases';
+
       const isSetupOrConfigScreen =
-        activeName.includes('type') ||
+        activePid === '225' ||
+        (!isInvoiceScreen && activeName.includes('type')) ||
         activeName.includes('setting') ||
         activeName.includes('config') ||
         activeName.includes('تعريف') ||
         activeName.includes('أنواع') ||
         activeName.includes('انواع') ||
-        activeName.includes('تهيئة');
+        activeName.includes('تهيئة') ||
+        activeTitleNorm.includes('انواع') ||
+        activeTitleNorm.includes('أنواع') ||
+        activeTitleNorm.includes('اعدادات');
 
       const isPurchaseQuery =
         queryNorm.includes('مشتريات') ||
         queryNorm.includes('شراء') ||
         queryNorm.includes('مورد');
-      const isCurrentPurchase = !!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات'));
+      const isCurrentPurchase = !!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات') || activePid === '289');
 
       const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
-      const isCurrentSales = !!activeName && (activeName.includes('sale') || activeName.includes('مبيعات'));
+      const isCurrentSales = !!activeName && (activeName.includes('sale') || activeName.includes('مبيعات') || activePid === '244');
 
       const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
 
       // Only skip navigation if activeName is genuinely present AND confirmed active in the DOM
       // AND current screen is NOT a setup/types screen while user asks for transactions
-      const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activeRaw) || this.navigator.isScreenActive(activeName));
+      const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activePid || activeRaw) || this.navigator.isScreenActive(activeName));
       const isAlreadyOnMatchingScreen =
         isDomActive &&
         !isSetupOrConfigScreen &&
-        (!isInvoiceQuery || activeName.includes('invoice') || activeName.includes('فاتورة')) &&
+        (!isInvoiceQuery || isInvoiceScreen) &&
         ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
 
       // If user is already on a matching screen and did NOT explicitly ask to navigate to a different screen:
@@ -1324,7 +1349,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
           if (!fillData.pageId && active?.pageId) {
             fillData.pageId = active.pageId;
           }
-          if (active?.pageName) {
+          if (!fillData.screenKey && active?.pageName) {
+            fillData.screenKey = active.pageName.trim();
+          } else if (active?.pageName && (!fillData.pageId || String(active.pageId) === String(fillData.pageId))) {
             fillData.screenKey = active.pageName.trim();
           }
           this.messages[assistantMsgIndex].formFillData = fillData;

@@ -226,16 +226,21 @@ export class ErpFormDriverService {
         const bridgeFields = Object.fromEntries(
           Object.entries(fields || {}).filter(([k]) => !lookupKeys.has(k))
         );
+        // Only pass rows to in-memory bridge if they already carry resolved numeric ProductID / ItemId;
+        // otherwise let fillGridRows add them via the DOM product picker so Angular resolves ProductID & price!
+        const preResolvedRows = hasExistingRows
+          ? []
+          : (rows || []).filter((r: any) => r && (r.ProductID != null || r.ItemId != null));
 
         await this.bridge.fillFormData({
           fields: bridgeFields,
-          rows: hasExistingRows ? [] : (rows || [])
+          rows: preResolvedRows
         });
         const fieldKeys = Object.keys(fields || {});
         this.telemetry?.log(
           'FILL',
-          `Direct bridge fillFormData synchronized in memory (${fieldKeys.length} fields, ${hasExistingRows ? 0 : (rows || []).length} rows)`,
-          { fields, rows: hasExistingRows ? [] : rows, hasExistingRows }
+          `Direct bridge fillFormData synchronized in memory (${fieldKeys.length} fields, ${preResolvedRows.length} pre-resolved rows)`,
+          { fields: bridgeFields, rows: preResolvedRows, hasExistingRows }
         );
       } catch (err) {
         console.warn('[ErpFormDriver] Host bridge fillFormData error, continuing with DOM driver:', err);
@@ -461,6 +466,7 @@ export class ErpFormDriverService {
 
       if (!targetElement) {
         const paidSelectors = [
+          'input[name="POPaidCurrancy" i]',
           'input[name="POPaid" i]',
           'input[name*="popaid" i]',
           'input[name*="paid" i]',

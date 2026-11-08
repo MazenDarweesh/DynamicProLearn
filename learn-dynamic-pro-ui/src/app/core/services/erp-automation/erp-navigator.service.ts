@@ -32,6 +32,10 @@ export class ErpNavigatorService {
     // 0. Official ERP bridge (authoritative positive match)
     const active = this.bridge.getActiveScreen();
     if (active) {
+      // If screenKey is a numeric pageId (e.g. "244" vs "225"), pageId equality is strictly authoritative!
+      if (/^\d+$/.test(screenKey.trim()) && active.pageId != null) {
+        return String(active.pageId) === screenKey.trim();
+      }
       if (active.pageName && (
         normalizeArabicText(active.pageName) === normalizedKey ||
         active.pageName.toUpperCase().trim() === upperKey
@@ -45,20 +49,20 @@ export class ErpNavigatorService {
         return true;
       }
       const screens = this.bridge.listScreens();
-      if (screens && (active.pageName || active.screenKey)) {
+      if (screens && (active.pageName || active.screenKey || active.pageId != null)) {
         const matchedTarget = screens.find(s =>
-          (s.pageName && s.pageName.toUpperCase().trim() === upperKey) ||
+          String(s.pageId) === screenKey.trim() ||
           (s.title && normalizeArabicText(s.title) === normalizedKey) ||
-          String(s.pageId) === screenKey
+          (s.pageName && s.pageName.toUpperCase().trim() === upperKey)
         );
         if (matchedTarget) {
+          if (matchedTarget.pageId != null && active.pageId != null) {
+            return String(matchedTarget.pageId) === String(active.pageId);
+          }
           if (active.pageName && matchedTarget.pageName?.toUpperCase().trim() === active.pageName.toUpperCase().trim()) {
             return true;
           }
           if (active.screenKey && (matchedTarget.screenKey === active.screenKey || matchedTarget.pageName === active.screenKey)) {
-            return true;
-          }
-          if (matchedTarget.pageId === active.pageId && active.pageName) {
             return true;
           }
         }

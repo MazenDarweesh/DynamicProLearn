@@ -110,6 +110,17 @@ export async function findAddRowButton(
     if (btn.closest('.dp-pd') || btn.classList.contains('dp-pd__pull') || btn.classList.contains('dp-pd__opt')) {
       return false;
     }
+    // Never mistake the Master-List "اضافة جديد" (New Document) button for a Grid "+ Add Row" button!
+    if (
+      btn.classList.contains('dp-list__act') ||
+      btn.closest('.dp-list__actions, .dp-list__head, .dp-list__bar, .dp-hdr, app-master-list > header')
+    ) {
+      return false;
+    }
+    const normTxt = normalizeArabicText(btn.textContent || '');
+    if (normTxt === 'اضافه جديد' || normTxt === 'اضافة جديد' || normTxt === 'جديد') {
+      return false;
+    }
     return true;
   };
 
@@ -316,13 +327,98 @@ export async function fillGridRows(
       'INFO'
     );
 
+    const headerProductPicker = getActiveFormRoot().querySelector<HTMLElement>(
+      'ng-select#product, eg-select#product, ng-select[formcontrolname="product"]'
+    );
+
     for (let rIdx = 0; rIdx < rows.length; rIdx++) {
       const rowData = rows[rIdx];
 
       let rowEls = getGenuineRows(table);
       let targetRow: HTMLElement | null | undefined = rowEls[rIdx];
+      let pickedViaToolbar = false;
 
-      if (!targetRow) {
+      const itemEntry = Object.entries(rowData).find(
+        ([k, v]) =>
+          v != null &&
+          (matchesColKey('الصنف', k) ||
+            matchesColKey('اسم المنتج', k) ||
+            k.toLowerCase().includes('product') ||
+            k.toLowerCase().includes('item'))
+      );
+      const qtyEntry = Object.entries(rowData).find(
+        ([k, v]) =>
+          v != null &&
+          (matchesColKey('الكمية', k) ||
+            matchesColKey('العدد', k) ||
+            k.toLowerCase().includes('qty') ||
+            k.toLowerCase().includes('quantity'))
+      );
+
+      // Priority A: Real DynamicPro ERP Header Product Picker (ng-select#product + #productQty modal)
+      if (!targetRow && headerProductPicker && itemEntry) {
+        const prevTbodyRowCount = table.querySelectorAll('tbody > tr').length;
+        const pickStatus = await setNgSelect(headerProductPicker, itemEntry[1], telemetry);
+        if (pickStatus === 'filled') {
+          pickedViaToolbar = true;
+          telemetry?.log('GRID', `Selected product via header picker #product for row ${rIdx + 1}`, {
+            product: itemEntry[1],
+          });
+
+          // Wait briefly for either #productQty modal input or direct row insertion
+          await waitFor(() => {
+            const qInp = document.querySelector<HTMLInputElement>(
+              'input#productQty, input[name="productQty"], input[formcontrolname="productQty"]'
+            );
+            if (qInp && (qInp.offsetWidth > 0 || qInp.offsetHeight > 0)) return qInp;
+            if (table.querySelectorAll('tbody > tr').length > prevTbodyRowCount) return table;
+            return null;
+          }, 1500);
+
+          const qtyModalInput = document.querySelector<HTMLInputElement>(
+            'input#productQty, input[name="productQty"], input[formcontrolname="productQty"]'
+          );
+          if (qtyModalInput && (qtyModalInput.offsetWidth > 0 || qtyModalInput.offsetHeight > 0)) {
+            const desiredQty = qtyEntry ? qtyEntry[1] : 1;
+            setTextOrDate(qtyModalInput, desiredQty, telemetry);
+            qtyModalInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true }));
+            qtyModalInput.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', code: 'Enter', bubbles: true }));
+
+            const modalConfirmBtn = Array.from(
+              document.querySelectorAll<HTMLElement>(
+                '.modal button, .dp-modal button, [role="dialog"] button, .swal2-container button, button.dp-btn--primary, button'
+              )
+            ).find((b) => {
+              if (!b.offsetWidth && !b.offsetHeight) return false;
+              if (b.classList.contains('dp-list__act')) return false;
+              const t = normalizeArabicText(b.textContent || '');
+              return t === 'متابعه' || t === 'تاكيد' || t === 'موافق' || t === 'ادخال';
+            });
+            if (modalConfirmBtn) {
+              modalConfirmBtn.click();
+            }
+          }
+
+          targetRow =
+            (await waitFor<HTMLElement>(() => {
+              const currentGenuine = getGenuineRows(table);
+              if (currentGenuine.length > rowEls.length) {
+                return currentGenuine[rIdx] || currentGenuine[currentGenuine.length - 1] || null;
+              }
+              const tbodyRows = Array.from(table.querySelectorAll<HTMLElement>('tbody > tr')).filter(
+                (tr) => !tr.closest('.dp-pd') && !tr.querySelector('#product, .no-data-msg, .dataTables_empty')
+              );
+              if (tbodyRows.length > prevTbodyRowCount) {
+                return tbodyRows[rIdx] || tbodyRows[tbodyRows.length - 1] || null;
+              }
+              return null;
+            }, 2500)) || undefined;
+
+          await settle(table, { quietMs: 80, maxMs: 500 });
+        }
+      }
+
+      if (!targetRow && !pickedViaToolbar) {
         const addBtn = await findAddRowButton(table, excludeContainer, telemetry, copilotService);
         if (addBtn) {
           addBtn.click();
@@ -338,8 +434,8 @@ export async function fillGridRows(
         }
       }
 
-      // If targetRow exists but lacks an item selector dropdown, trigger addBtn to get a proper item row
-      if (targetRow && !targetRow.querySelector('eg-select, ng-select')) {
+      // If targetRow exists on a standard inline-select grid (no #product toolbar) and lacks an item selector dropdown, trigger addBtn
+      if (targetRow && !headerProductPicker && !pickedViaToolbar && !targetRow.querySelector('eg-select, ng-select')) {
         const addBtn = await findAddRowButton(table, excludeContainer, telemetry, copilotService);
         if (addBtn) {
           addBtn.click();
@@ -354,6 +450,18 @@ export async function fillGridRows(
       }
 
       if (!targetRow) {
+        if (pickedViaToolbar) {
+          filledRowsCount++;
+          if (resultsOut) {
+            resultsOut.push({
+              field: `سطر جدول #${rIdx + 1}`,
+              value: JSON.stringify(rowData),
+              status: 'filled',
+              message: 'تم اختيار الصنف وإضافته للفاتورة بنجاح',
+            });
+          }
+          continue;
+        }
         console.warn(`[GridDriver] Could not find or create grid row index ${rIdx}`);
         telemetry?.log('GRID', `Could not find or create grid row index ${rIdx}`, {
           row: rIdx + 1,
@@ -363,12 +471,12 @@ export async function fillGridRows(
       }
 
       const cells = Array.from(targetRow.querySelectorAll('td, mat-cell, [role="gridcell"]')) as HTMLElement[];
-      let cellFilled = false;
+      let cellFilled = pickedViaToolbar;
 
       // Sort entries so product/item dropdown is filled FIRST, allowing ERP async cascade to settle before setting qty/cost
       const sortedEntries = Object.entries(rowData).sort(([keyA], [keyB]) => {
-        const isItemA = matchesColKey('الصنف', keyA) || matchesColKey('اسم المنتج', keyA);
-        const isItemB = matchesColKey('الصنف', keyB) || matchesColKey('اسم المنتج', keyB);
+        const isItemA = matchesColKey('الصنف', keyA) || matchesColKey('اسم المنتج', keyA) || keyA.toLowerCase().includes('product');
+        const isItemB = matchesColKey('الصنف', keyB) || matchesColKey('اسم المنتج', keyB) || keyB.toLowerCase().includes('product');
         if (isItemA && !isItemB) return -1;
         if (!isItemA && isItemB) return 1;
         return 0;
@@ -376,6 +484,14 @@ export async function fillGridRows(
 
       for (const [colKey, rawVal] of sortedEntries) {
         if (rawVal == null) continue;
+        const isProductCol =
+          matchesColKey('الصنف', colKey) ||
+          matchesColKey('اسم المنتج', colKey) ||
+          colKey.toLowerCase().includes('product') ||
+          colKey.toLowerCase().includes('item');
+        if (pickedViaToolbar && isProductCol) {
+          continue;
+        }
 
         let targetCell: HTMLElement | null = null;
         for (let cIdx = 0; cIdx < cells.length; cIdx++) {
