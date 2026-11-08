@@ -107,11 +107,52 @@ export class ErpBridgeService {
       return { success: false, errors: ['جسر الـ ERP غير متاح في هذه البيئة.'] };
     }
     if (typeof (window.DynamicERP as any)?.submitActiveForm !== 'function') {
+      // 1. Try invoking save on the active Angular component instance in memory
+      try {
+        const comp = (window as any).DynamicERP?.getActiveComponentInstance?.();
+        if (comp) {
+          if (typeof comp.save === 'function') {
+            this.telemetry?.log(
+              'BRIDGE',
+              'submitActiveForm: Invoking activeComponent.save() in memory',
+              { method: 'save', compName: comp.constructor?.name },
+              'INFO'
+            );
+            const res = await comp.save();
+            const result: ErpSaveResult = {
+              success: res !== false,
+              docId: res?.docId || res?.id,
+              message: 'تم الحفظ عبر كائن المكون في الذاكرة بنجاح.'
+            };
+            this.telemetry?.logBridge('submitActiveForm', undefined, result);
+            return result;
+          } else if (typeof comp.onSave === 'function') {
+            this.telemetry?.log(
+              'BRIDGE',
+              'submitActiveForm: Invoking activeComponent.onSave() in memory',
+              { method: 'onSave', compName: comp.constructor?.name },
+              'INFO'
+            );
+            const res = await comp.onSave();
+            const result: ErpSaveResult = {
+              success: res !== false,
+              docId: res?.docId || res?.id,
+              message: 'تم الحفظ عبر كائن المكون في الذاكرة بنجاح.'
+            };
+            this.telemetry?.logBridge('submitActiveForm', undefined, result);
+            return result;
+          }
+        }
+      } catch (err: any) {
+        this.telemetry?.log('BRIDGE', `activeComponent save invocation failed: ${err?.message}`, err, 'WARN');
+      }
+
+      // 2. Fallback to locating and clicking Save button in DOM
       const saveBtn = this.findSaveButtonInDom();
       if (saveBtn) {
         this.telemetry?.log(
           'BRIDGE',
-          `submitActiveForm not supported by bridge: Clicked DOM Save button [${saveBtn.tagName.toLowerCase()}${saveBtn.className ? `.${saveBtn.className.slice(0, 30)}` : ''}]`,
+          `submitActiveForm fallback: Clicked DOM Save button [${saveBtn.tagName.toLowerCase()}${saveBtn.className ? `.${saveBtn.className.slice(0, 30)}` : ''}]`,
           {
             buttonText: saveBtn.textContent?.trim(),
             buttonSelector: saveBtn.id ? `#${saveBtn.id}` : saveBtn.className,

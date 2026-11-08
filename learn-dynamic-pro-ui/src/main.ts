@@ -1,33 +1,6 @@
-import { bootstrapApplication, createApplication } from '@angular/platform-browser';
-import { createCustomElement } from '@angular/elements';
-import { provideZoneChangeDetection, provideExperimentalZonelessChangeDetection, ApplicationConfig } from '@angular/core';
-import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideMarkdown } from 'ngx-markdown';
+import { bootstrapApplication } from '@angular/platform-browser';
 import { appConfig } from './app/app.config';
 import { AppComponent } from './app/app.component';
-import { CopilotChatComponent } from './app/shared/components/copilot-chat/copilot-chat.component';
-import { jwtInterceptor } from './app/core/interceptors/jwt.interceptor';
-
-const isolatedCopilotConfig: ApplicationConfig = {
-  providers: [
-    typeof (window as any)?.Zone !== 'undefined'
-      ? provideZoneChangeDetection({ eventCoalescing: true })
-      : provideExperimentalZonelessChangeDetection(),
-    provideHttpClient(withInterceptors([jwtInterceptor])),
-    provideMarkdown()
-  ]
-};
-
-function registerCopilotElement(injector: any) {
-  const customTags = ['lms-ai-copilot', 'app-lms-copilot', 'app-copilot-chat'];
-  for (const tag of customTags) {
-    if (!customElements.get(tag)) {
-      const copilotElement = createCustomElement(CopilotChatComponent, { injector });
-      customElements.define(tag, copilotElement);
-      console.info(`%c[LMS AI Copilot] <${tag}> registered as Web Component`, 'color:#10b981;font-weight:bold');
-    }
-  }
-}
 
 // Check strictly for our LMS standalone app element
 // A generic 'app-root' query causes collision with host Angular applications (e.g., ERP)
@@ -37,13 +10,10 @@ const isOurStandaloneApp = !!lmsRootEl && !isExplicitlyEmbedded;
 
 if (isOurStandaloneApp) {
   bootstrapApplication(AppComponent, appConfig)
-    .then(appRef => registerCopilotElement(appRef.injector))
     .catch((err) => console.error(err));
 } else {
-  // Embedded mode (inside ERP or external page): only initialize injector and register Custom Element
-  // Uses isolated copilotElementConfig (NO ROUTER) to prevent hijacking host application routes/login!
-  createApplication(isolatedCopilotConfig)
-    .then(appRef => registerCopilotElement(appRef.injector))
-    .catch((err) => console.error(err));
+  // Embedded mode (inside ERP or external page): dynamically load copilot custom element without bloating main bundle
+  import('./copilot-element').catch((err) => console.error('[LMS AI Copilot Init Error]:', err));
 }
+
 

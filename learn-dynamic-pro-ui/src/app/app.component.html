@@ -1,7 +1,7 @@
 <main>
   <router-outlet></router-outlet>
 </main>
-@if (canShowCopilot) {
+@defer (when canShowCopilot) {
   <app-copilot-chat></app-copilot-chat>
 }
 
