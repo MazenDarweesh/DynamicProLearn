@@ -1,0 +1,648 @@
+.erp-container {
+  min-height: 100vh;
+  background: #f1f5f9;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  color: #1e293b;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Header ────────────────────────────────────────── */
+.erp-header {
+  background: #1e293b;
+  color: #ffffff;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 3px solid #3b82f6;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+.erp-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.erp-logo {
+  font-size: 28px;
+  background: rgba(255,255,255,0.1);
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.erp-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+.erp-subtitle {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.erp-user-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255,255,255,0.08);
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+.user-avatar { font-size: 18px; }
+.user-details { display: flex; flex-direction: column; text-align: right; }
+.user-name { font-size: 12px; font-weight: 600; color: #f8fafc; }
+.user-dept { font-size: 10px; color: #cbd5e1; }
+.conn-status {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+}
+.conn-status.connected { color: #4ade80; border-color: #22c55e; }
+
+/* ── Live ERP Header Tabs (.dp-hdr__tab) ──────────── */
+.dp-hdr__tabs-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 16px;
+}
+.dp-hdr__tab {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px 6px 0 0;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-size: 11px;
+  color: #cbd5e1;
+  transition: all 0.2s;
+}
+.dp-hdr__tab:hover {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+}
+.dp-hdr__tab.is-active {
+  background: #ffffff;
+  color: #1e293b;
+  font-weight: 700;
+  border-color: #ffffff;
+  box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.1);
+}
+.dp-hdr__tab-open {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  cursor: pointer;
+  padding: 0;
+}
+.dp-hdr__tab-close {
+  margin-right: 6px;
+  font-size: 14px;
+  color: #94a3b8;
+  cursor: pointer;
+}
+.dp-hdr__tab-close:hover {
+  color: #ef4444;
+}
+
+/* ── Live ERP Navigation Bar ───────────────────────── */
+.erp-nav-bar {
+  background: #ffffff;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.dp-nav-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.nav-headline {
+  font-size: 12px;
+  font-weight: 700;
+  color: #475569;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 1. Modules Bar (.dp-pgs__mod) */
+.dp-modules-bar {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dp-pgs__mod {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.dp-pgs__mod:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+.dp-pgs__mod.is-active {
+  background: #1e293b;
+  color: #ffffff;
+  border-color: #1e293b;
+  box-shadow: 0 2px 6px rgba(30, 41, 59, 0.2);
+}
+
+/* 2. Filter Chips (.dp-cats__chip) */
+.dp-cats-bar {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.dp-cats__chip {
+  padding: 3px 10px;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 11px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.dp-cats__chip:hover {
+  background: #f8fafc;
+}
+.dp-cats__chip.is-on {
+  background: #3b82f6;
+  color: #ffffff;
+  border-color: #3b82f6;
+  font-weight: 600;
+}
+
+/* 3. Screen Tiles (.dp-pgs__tile) */
+.dp-tiles-grid {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dp-pgs__cell {
+  display: inline-flex;
+}
+.dp-pgs__tile, .screen-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  transition: all 0.2s;
+}
+.dp-pgs__tile:hover, .screen-btn:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+.dp-pgs__tile.active, .screen-btn.active {
+  background: #eff6ff;
+  border-color: #3b82f6;
+  color: #1d4ed8;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
+  font-weight: 600;
+}
+.screen-badge {
+  font-size: 10px;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #475569;
+}
+.dp-pgs__tile.active .screen-badge, .screen-btn.active .screen-badge {
+  background: #dbeafe;
+  color: #1e40af;
+}
+.screen-code {
+  font-size: 10px;
+  color: #64748b;
+  font-family: monospace;
+}
+
+/* ── Workspace ─────────────────────────────────────── */
+.erp-workspace {
+  flex: 1;
+  padding: 16px 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 480px;
+  gap: 20px;
+  max-width: 1680px;
+  width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  align-items: start;
+}
+
+.erp-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+.card-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header-left h2 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: #0f172a;
+}
+.screen-tag {
+  font-size: 11px;
+  color: #64748b;
+}
+.screen-tag code {
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #2563eb;
+  font-weight: bold;
+}
+.header-actions {
+  display: flex;
+  gap: 6px;
+}
+.btn-erp {
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  border: 1px solid transparent;
+  font-weight: 500;
+}
+.btn-primary { background: #2563eb; color: #ffffff; }
+.btn-secondary { background: #f1f5f9; color: #334155; border-color: #cbd5e1; }
+.btn-outline { background: transparent; color: #64748b; border-color: #cbd5e1; }
+
+.card-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.screen-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin: 0;
+  background: #f8fafc;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-right: 3px solid #3b82f6;
+}
+
+.erp-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.form-group label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #475569;
+}
+.erp-input {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  font-family: inherit;
+  background: #ffffff;
+}
+
+.erp-table-box {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-top: 6px;
+}
+.erp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: right;
+}
+.erp-table th {
+  background: #f8fafc;
+  padding: 10px 12px;
+  color: #475569;
+  font-weight: 600;
+  border-bottom: 1px solid #e2e8f0;
+}
+.erp-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.integration-callout {
+  display: flex;
+  gap: 12px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  align-items: flex-start;
+}
+.callout-icon { font-size: 20px; }
+.callout-text {
+  font-size: 12px;
+  color: #166534;
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Dedicated Side-by-Side Copilot Panel strictly inside ERP Mock ── */
+.erp-copilot-col {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 480px;
+  max-width: 480px;
+  position: sticky;
+  top: 28px;
+  margin-top: 8px;
+  z-index: 100;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.erp-copilot-card {
+  background: #ffffff;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  height: 720px;
+  max-height: calc(100vh - 120px);
+  overflow: hidden;
+  transition: height 0.2s ease, box-shadow 0.2s ease;
+}
+
+.erp-copilot-col.floating-mode {
+  position: fixed;
+  bottom: 24px;
+  left: 24px;
+  width: 460px;
+  max-width: calc(100vw - 48px);
+  z-index: 99999;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.25);
+  border-radius: 14px;
+}
+
+.erp-copilot-col.floating-mode .erp-copilot-card {
+  height: 620px;
+  box-shadow: none;
+  border: 1px solid #94a3b8;
+}
+
+.erp-copilot-col.minimized .erp-copilot-card {
+  height: 48px;
+  overflow: hidden;
+}
+
+.erp-copilot-header {
+  background: #1e293b;
+  color: #ffffff;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  user-select: none;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.copilot-header-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.copilot-header-icon {
+  font-size: 16px;
+}
+
+.copilot-title-text {
+  color: #ffffff;
+}
+
+.copilot-screen-badge {
+  font-size: 10px;
+  background: #3b82f6;
+  color: #ffffff;
+  padding: 2px 7px;
+  border-radius: 10px;
+  font-weight: 500;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-dock-mode, .btn-dock-toggle {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #f1f5f9;
+  font-size: 11px;
+  cursor: pointer;
+  padding: 3px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+  font-family: inherit;
+}
+
+.btn-dock-mode:hover, .btn-dock-toggle:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.erp-copilot-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: #f8fafc;
+  overflow: hidden;
+  position: relative;
+  padding-top: 16px;
+  box-sizing: border-box;
+}
+
+.erp-copilot-body lms-ai-copilot {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.erp-copilot-body ::ng-deep .admin-cache-strip {
+  display: flex !important;
+  visibility: visible !important;
+  margin: 4px 10px 8px 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid #cbd5e1 !important;
+  background: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+}
+
+.erp-copilot-body ::ng-deep .copilot-window {
+  padding-top: 6px !important;
+  overflow: visible !important;
+}
+
+.erp-copilot-body ::ng-deep .filter-ribbon {
+  border-top: 1px solid #e2e8f0;
+  border-radius: 8px 8px 0 0;
+  margin-top: 4px;
+}
+
+/* ── Collapsible Specs Box ─────────────────────────── */
+.erp-specs-collapsible {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+.specs-header {
+  background: #f8fafc;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #e2e8f0;
+  user-select: none;
+}
+
+.specs-arrow {
+  font-size: 10px;
+  color: #64748b;
+}
+
+.specs-body {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.prompt-quick-card {
+  background: #eff6ff;
+  border: 1px dashed #3b82f6;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.prompt-quick-card:hover {
+  background: #dbeafe;
+}
+
+.prompt-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: #1e40af;
+  margin-bottom: 4px;
+}
+
+.prompt-text {
+  font-size: 11px;
+  color: #1d4ed8;
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+.copy-hint {
+  display: block;
+  font-size: 10px;
+  color: #2563eb;
+  margin-top: 6px;
+  text-align: left;
+  font-weight: 600;
+}
+
+.specs-mini-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+  color: #475569;
+}
+
+.specs-mini-list code {
+  font-family: monospace;
+  background: #f1f5f9;
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #0f172a;
+}
+
+@media (max-width: 1200px) {
+  .erp-workspace {
+    grid-template-columns: 1fr;
+  }
+  .erp-copilot-col {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+    position: static;
+  }
+}
+

@@ -39,11 +39,22 @@ if (fs.existsSync(mainPath)) {
 })();
 `;
 
-  fs.writeFileSync(bundlePath, finalBundle, 'utf8');
+  const writeIfChanged = (targetFile, content) => {
+    if (fs.existsSync(targetFile)) {
+      const existing = fs.readFileSync(targetFile, 'utf8');
+      if (existing === content) {
+        return false;
+      }
+    }
+    fs.writeFileSync(targetFile, content, 'utf8');
+    return true;
+  };
+
+  writeIfChanged(bundlePath, finalBundle);
   console.log(`[LMS Copilot] Clean IIFE bundle generated: ${bundlePath} (${(fs.statSync(bundlePath).size / 1024).toFixed(1)} KB)`);
 
-  fs.writeFileSync(publicPath, finalBundle, 'utf8');
-  console.log(`[LMS Copilot] Bundle copied to public assets: ${publicPath}`);
+  const updatedPublic = writeIfChanged(publicPath, finalBundle);
+  console.log(`[LMS Copilot] Bundle ${updatedPublic ? 'copied to' : 'already up-to-date in'} public assets: ${publicPath}`);
 } else {
   console.error('[LMS Copilot] main.js not found in output directory');
   process.exit(1);

@@ -1,4 +1,4 @@
-import { Component, inject, ElementRef, ViewChild, AfterViewChecked, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef, booleanAttribute, HostBinding } from '@angular/core';
+import { Component, inject, ElementRef, ViewChild, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef, booleanAttribute, HostBinding } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -18,6 +18,19 @@ import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } fro
 import { AuthService } from '../../../core/services/platform-core/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
+import {
+  buildCopilotSourceUrl,
+  deduplicateCopilotSources,
+  formatCopilotSourceLabel,
+  formatCopilotTimestamp,
+  isValidCopilotFormFill,
+  renderCopilotMessageText
+} from './utils/copilot-citation.utils';
+import {
+  applyEmbeddedHostStyles,
+  evaluateActiveScreenMatch,
+  readHostElementAttributes
+} from './utils/copilot-host-bridge.helper';
 
 export interface AgentExecutionState {
   isActive: boolean;
@@ -81,7 +94,7 @@ export interface ChatMessage {
   templateUrl: './copilot-chat.component.html',
   styleUrls: ['./copilot-chat.component.css']
 })
-export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked, OnDestroy {
+export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   private copilotService = inject(CopilotService);
   private formDriver = inject(ErpFormDriverService);
   private navigator = inject(ErpNavigatorService);
@@ -224,41 +237,27 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   private attrObserver?: MutationObserver;
 
   private readAttributesFromHost() {
-    const hostEl: HTMLElement = this.elRef?.nativeElement;
-    if (!hostEl || !hostEl.getAttribute) return;
-
-    const getAttr = (kebab: string, camel: string) => {
-      const val = hostEl.getAttribute(kebab) || hostEl.getAttribute(camel);
-      return val ? val.trim() : undefined;
-    };
-
-    const clean = (val?: string) => {
-      if (!val) return undefined;
-      return val.trim().replace(/[<>]/g, '');
-    };
-
-    this.apiUrl = clean(this.apiUrl || getAttr('api-url', 'apiUrl'));
-    this.backendUrl = clean(this.backendUrl || getAttr('backend-url', 'backendUrl'));
-    this.erpKey = clean(
-      this.erpKey ||
-      this.activeScreenKey ||
-      getAttr('active-screen-key', 'activeScreenKey') ||
-      getAttr('erp-key', 'erpKey') ||
-      getAttr('active-screen', 'activeScreen')
-    );
-    this.lmsPageId = clean(this.lmsPageId || getAttr('lms-page-id', 'lmsPageId'));
-    this.u = clean(this.u || getAttr('u', 'u'));
-    this.p = clean(this.p || getAttr('p', 'p'));
-    this.token = clean(this.token || getAttr('token', 'token'));
-
-    const hideHeaderAttr = getAttr('hide-header', 'hideHeader');
-    if (hideHeaderAttr != null) {
-      this.hideHeader = hideHeaderAttr === 'true' || hideHeaderAttr === '';
-    }
-    const inlineAttr = getAttr('inline', 'inline');
-    if (inlineAttr != null) {
-      this.inline = inlineAttr === 'true' || inlineAttr === '';
-    }
+    const snap = readHostElementAttributes(this.elRef?.nativeElement, {
+      apiUrl: this.apiUrl,
+      backendUrl: this.backendUrl,
+      erpKey: this.erpKey,
+      activeScreenKey: this.activeScreenKey,
+      lmsPageId: this.lmsPageId,
+      u: this.u,
+      p: this.p,
+      token: this.token,
+      hideHeader: this.hideHeader,
+      inline: this.inline
+    });
+    this.apiUrl = snap.apiUrl;
+    this.backendUrl = snap.backendUrl;
+    this.erpKey = snap.erpKey;
+    this.lmsPageId = snap.lmsPageId;
+    this.u = snap.u;
+    this.p = snap.p;
+    this.token = snap.token;
+    if (snap.hideHeader != null) this.hideHeader = snap.hideHeader;
+    if (snap.inline != null) this.inline = snap.inline;
   }
 
   private setupAttributeObserver() {
@@ -266,9 +265,31 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     if (!hostEl || typeof MutationObserver === 'undefined') return;
 
     this.attrObserver = new MutationObserver(() => {
+      const prevApiUrl = this.apiUrl;
+      const prevBackendUrl = this.backendUrl;
+      const prevToken = this.token;
+      const prevU = this.u;
+      const prevP = this.p;
+
       this.readAttributesFromHost();
-      this.applyInputs();
-      this.checkAiReadiness();
+
+      const authOrUrlChanged =
+        this.apiUrl !== prevApiUrl ||
+        this.backendUrl !== prevBackendUrl ||
+        this.token !== prevToken ||
+        this.u !== prevU ||
+        this.p !== prevP;
+
+      if (authOrUrlChanged) {
+        this.applyInputs();
+      } else if (this.lmsPageId) {
+        if (!this.erpKey) this.erpKey = this.lmsPageId;
+        if (!this.activeLessonId) this.activeLessonId = this.lmsPageId;
+      }
+
+      if (this.apiUrl !== prevApiUrl) {
+        this.checkAiReadiness();
+      }
     });
 
     this.attrObserver.observe(hostEl, {
@@ -282,53 +303,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   }
 
   private detectEmbeddedMode() {
-    const hostEl: HTMLElement = this.elRef?.nativeElement;
-    if (!hostEl) return;
-
-    const tagName = hostEl.tagName?.toLowerCase() || '';
-    const parent = hostEl.parentElement;
-    const parentTag = parent?.tagName?.toLowerCase() || '';
-
-    // If hosted as Web Component (<lms-ai-copilot> or <app-lms-copilot>) or inside an ERP container
-    const isCustomElement = tagName.includes('lms-copilot') || tagName.includes('ai-copilot') || tagName.includes('lms-ai');
-    const isInsideContainer = !!(parent && parentTag !== 'body' && parentTag !== 'app-root');
-    const hasEmbeddedFlag = !!(window as any)?.__LMS_COPILOT_EMBEDDED__ || !!(window as any)?.__ERP_HOST__;
-
-    if (isCustomElement || isInsideContainer || this.inline || hasEmbeddedFlag) {
-      this.isEmbedded = true;
-      this.inline = true;
-      hostEl.style.display = 'flex';
-      hostEl.style.flexDirection = 'column';
-      hostEl.style.width = '100%';
-      hostEl.style.height = '100%';
-      hostEl.style.flex = '1';
-      hostEl.style.minHeight = '0';
-
-      // Defensive: stretch all intermediate parent wrappers up to the window container
-      let current: HTMLElement | null = parent;
-      while (current && current.tagName.toLowerCase() !== 'body' && current.tagName.toLowerCase() !== 'app-root') {
-        if (current.classList.contains('ai-chat-window')) {
-          break;
-        }
-        current.style.flex = '1';
-        current.style.display = 'flex';
-        current.style.flexDirection = 'column';
-        current.style.minHeight = '0';
-        current.style.height = '100%';
-        current.style.overflow = 'hidden';
-        current = current.parentElement;
-      }
-
-      // If ERP has its own header (.ai-chat-header), hide internal copilot header
-      const hasOuterHeader = !!(
-        parent?.closest?.('.ai-chat-window') ||
-        parent?.querySelector?.('.ai-chat-header') ||
-        parent?.parentElement?.querySelector?.('.ai-chat-header')
-      );
-      if (hasOuterHeader) {
-        this.hideHeader = true;
-      }
-    }
+    const res = applyEmbeddedHostStyles(this.elRef?.nativeElement, this.inline, this.hideHeader);
+    this.isEmbedded = res.isEmbedded;
+    this.inline = res.inline;
+    this.hideHeader = res.hideHeader;
   }
 
   private applyInputs() {
@@ -383,8 +361,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     }
   }
 
-  ngAfterViewChecked() {
-    this.scrollToBottom();
+  trackByMessage(index: number, _msg: ChatMessage): number {
+    return index;
   }
 
   ngOnDestroy() {
@@ -560,111 +538,24 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
     } catch (err) { }
   }
 
-  /**
-   * Removes duplicate sources based on URL + start time combination.
-   */
   deduplicateSources(sources: CopilotSource[]): CopilotSource[] {
-    const seen = new Set<string>();
-    return sources.filter(src => {
-      const key = `${src.url ?? ''}::${src.start ?? 0}::${src.end ?? 0}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    return deduplicateCopilotSources(sources);
   }
 
-  /**
-   * Formats seconds into MM:SS or HH:MM:SS display format.
-   */
   formatTimestamp(seconds?: number): string {
-    if (seconds == null || seconds < 0) return '';
-    const totalSeconds = Math.floor(seconds);
-    const h = Math.floor(totalSeconds / 3600);
-    const m = Math.floor((totalSeconds % 3600) / 60);
-    const s = Math.floor(totalSeconds % 60);
-
-    if (h > 0) {
-      return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    }
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return formatCopilotTimestamp(seconds);
   }
 
-  /**
-   * Builds a YouTube URL that seeks to the given start time.
-   */
   buildSourceUrl(src: CopilotSource): string {
-    if (!src.url) return '#';
-    try {
-      const url = new URL(src.url);
-      // Only add t= if not already set by the server
-      if (src.start != null && src.start > 0 && !url.searchParams.has('t')) {
-        url.searchParams.set('t', `${src.start}s`);
-      }
-      return url.toString();
-    } catch {
-      return src.url;
-    }
+    return buildCopilotSourceUrl(src);
   }
 
-  /**
-   * Returns a clean, friendly display label for a source chip.
-   * Avoids showing raw video IDs, file extensions, or system hashes.
-   */
   formatSourceLabel(src: CopilotSource, index: number): string {
-    let rawTitle = src.lesson_title || src.title;
-    if (rawTitle && !this.isRawFileNameOrId(rawTitle)) {
-      // Strip redundant "المصدر [X] — " prefix from title if sent by backend
-      return rawTitle.replace(/^المصدر\s*\[\d+\]\s*[—\-]\s*/i, '').trim();
-    }
-
-    if (src.type === 'video' || (src.url && (src.url.includes('youtu') || src.url.includes('video')))) {
-      return `مقطع فيديو تعليمي ${index + 1}`;
-    }
-
-    if (src.type === 'pdf') {
-      if (src.page != null) {
-        return `مستند دراسي (صفحة ${src.page})`;
-      }
-      return `مستند دراسي ${index + 1}`;
-    }
-
-    return `مصدر تعليمي ${index + 1}`;
+    return formatCopilotSourceLabel(src, index);
   }
 
-  private isRawFileNameOrId(str: string): boolean {
-    return /\.(mp4|mkv|avi|webm|mov|flv|pdf|docx|txt)$/i.test(str)
-      || /^lesson_[a-zA-Z0-9_-]+$/i.test(str)
-      || /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str)
-      || /^[a-zA-Z0-9_-]{11}$/.test(str);
-  }
-
-  /**
-   * Transforms raw message text citations like [1], [1, 2], [1][2] into markdown links
-   * pointing directly to the corresponding source URL with timestamp.
-   * If a citation index exceeds available sources, preserves it gracefully without broken links.
-   */
   renderMessageText(msg: ChatMessage): string {
-    if (!msg.text) return '';
-    if (!msg.sources || msg.sources.length === 0) return msg.text;
-
-    // Matches bracketed citations e.g. [1], [1, 2], [1, 2, 3] or 【1】
-    const citationRegex = /\[([0-9]+(?:\s*,\s*[0-9]+)*)\]/g;
-
-    return msg.text.replace(citationRegex, (match, group) => {
-      const numbers = group.split(',').map((s: string) => parseInt(s.trim(), 10));
-      const formattedLinks = numbers.map((num: number) => {
-        const sourceIndex = num - 1;
-        if (sourceIndex >= 0 && sourceIndex < msg.sources!.length) {
-          const src = msg.sources![sourceIndex];
-          const url = this.buildSourceUrl(src);
-          const label = this.formatSourceLabel(src, sourceIndex);
-          return `[\[${num}\]](${url} "${label}")`;
-        }
-        // Graceful fallback for hallucinated citation indices
-        return `[${num}]`;
-      });
-      return formattedLinks.join(' ');
-    });
+    return renderCopilotMessageText(msg);
   }
 
   /**
@@ -928,34 +819,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       const currentActive = activeScreen?.pageName || this.erpKey || '';
       const targetPageId = msg.formFillData.pageId;
       const currentPageId = activeScreen?.pageId;
-
-      const currentActiveNorm = (currentActive || '').toLowerCase();
-      const activeTitleNorm = normalizeArabicText(activeScreen?.title || '').toLowerCase();
-      const queryNorm = normalizeArabicText(msg.relatedUserQuery || '').toLowerCase();
-      const isPurchaseQuery = queryNorm.includes('مشتريات') || queryNorm.includes('شراء') || queryNorm.includes('مورد');
-      const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
-      const isCurrentPurchase = currentActiveNorm.includes('purchas') || currentActiveNorm.includes('مشتريات');
-      const isCurrentSales = currentActiveNorm.includes('sale') || currentActiveNorm.includes('مبيعات');
-      const isCurrentSetupOrTypes =
-        String(currentPageId) === '225' ||
-        activeTitleNorm.includes('انواع') ||
-        activeTitleNorm.includes('أنواع') ||
-        activeTitleNorm.includes('اعدادات') ||
-        activeTitleNorm.includes('إعدادات') ||
-        currentActiveNorm.includes('setting') ||
-        currentActiveNorm.includes('config');
-
-      // Safety Guard: If user is already on a matching transactional screen (NOT a setup/types screen like 225), retain it
-      const isAlreadyOnMatchingDomain =
-        !isCurrentSetupOrTypes &&
-        ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
+      const { isAlreadyOnMatchingDomain } = evaluateActiveScreenMatch(
+        msg.relatedUserQuery || '',
+        activeScreen,
+        true
+      );
 
       // Deterministic check:
       let isSameScreen = false;
       if (targetPageId != null && currentPageId != null) {
         isSameScreen = String(currentPageId) === String(targetPageId);
       } else if (isAlreadyOnMatchingDomain) {
-        // If current active screen already matches the query domain, keep current screen!
         isSameScreen = true;
       } else {
         isSameScreen = targetScreen ? this.navigator.isScreenActive(targetScreen) : true;
@@ -1116,28 +990,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
   }
 
   isValidFormFill(data?: CopilotFormFillData): boolean {
-    if (!data) return false;
-
-    if (data.batch_mode) {
-      return Array.isArray(data.batch_items) && data.batch_items.length > 0;
-    }
-
-    const hasFields =
-      !!data.fields &&
-      Object.keys(data.fields).some((k) => {
-        const val = data.fields![k];
-        return val != null && String(val).trim() !== '';
-      });
-
-    const hasRows =
-      !!data.rows &&
-      Array.isArray(data.rows) &&
-      data.rows.length > 0 &&
-      data.rows.some((row) =>
-        Object.values(row).some((val) => val != null && String(val).trim() !== '')
-      );
-
-    return hasFields || hasRows;
+    return isValidCopilotFormFill(data);
   }
 
   async selectAskOption(option: NavScored, originalQuery?: string) {
@@ -1177,60 +1030,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
 
     if (this.isActionMode) {
       this.syncErpKey();
-      // 0. Autonomous ERP Navigation: Check if user intent targets a specific/different ERP screen
       const activeScreen = this.bridge.getActiveScreen();
-      // CRITICAL: Do NOT fall back to stale this.erpKey if activeScreen has empty pageName/screenKey (e.g. on Dashboard/Main screen)
       const activeRaw = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
       const activeName = activeRaw.toLowerCase();
-      const activeTitleNorm = normalizeArabicText(activeScreen?.title || '').toLowerCase();
       const activePid = activeScreen?.pageId != null ? String(activeScreen.pageId) : '';
-      const queryNorm = normalizeArabicText(query).toLowerCase();
-
-      // Check domain relevance between query and current active screen
-      const isInvoiceQuery = queryNorm.includes('فاتورة') || queryNorm.includes('فواتير') || queryNorm.includes('سند') || queryNorm.includes('قيد');
-      const isInvoiceScreen =
-        activePid === '244' ||
-        activePid === '289' ||
-        activeTitleNorm.includes('فاتورة') ||
-        activeTitleNorm.includes('فواتير') ||
-        activeTitleNorm.includes('مشتريات') ||
-        activeName.includes('invoice') ||
-        activeName === 'purchases';
-
-      const isSetupOrConfigScreen =
-        activePid === '225' ||
-        (!isInvoiceScreen && activeName.includes('type')) ||
-        activeName.includes('setting') ||
-        activeName.includes('config') ||
-        activeName.includes('تعريف') ||
-        activeName.includes('أنواع') ||
-        activeName.includes('انواع') ||
-        activeName.includes('تهيئة') ||
-        activeTitleNorm.includes('انواع') ||
-        activeTitleNorm.includes('أنواع') ||
-        activeTitleNorm.includes('اعدادات');
-
-      const isPurchaseQuery =
-        queryNorm.includes('مشتريات') ||
-        queryNorm.includes('شراء') ||
-        queryNorm.includes('مورد');
-      const isCurrentPurchase = !!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات') || activePid === '289');
-
-      const isSalesQuery = queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
-      const isCurrentSales = !!activeName && (activeName.includes('sale') || activeName.includes('مبيعات') || activePid === '244');
-
-      const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
-
-      // Only skip navigation if activeName is genuinely present AND confirmed active in the DOM
-      // AND current screen is NOT a setup/types screen while user asks for transactions
       const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activePid || activeRaw) || this.navigator.isScreenActive(activeName));
-      const isAlreadyOnMatchingScreen =
-        isDomActive &&
-        !isSetupOrConfigScreen &&
-        (!isInvoiceQuery || isInvoiceScreen) &&
-        ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));
+      const { isAlreadyOnMatchingScreen, isExplicitNavRequest } = evaluateActiveScreenMatch(
+        query,
+        activeScreen,
+        isDomActive
+      );
 
-      // If user is already on a matching screen and did NOT explicitly ask to navigate to a different screen:
       if (isAlreadyOnMatchingScreen && !isExplicitNavRequest) {
         console.info(
           `%c[Copilot Navigation] Active screen '${activeName}' already matches query domain and is active in DOM. Staying on current screen!`,
@@ -1252,9 +1062,47 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
             this.syncErpKey(navRes.chosen.id);
             // Wait for DOM & Angular components to settle on the new screen
             await this.formDriver.settle(undefined, { quietMs: 250, maxMs: 2500, minMs: 120 });
+
+            // If user intent is pure navigation ("اذهب إلى..."), finish cleanly without invoking Qdrant RAG or form fill!
+            if (resolvedIntent === 'navigate') {
+              const targetTitle = navRes.chosen.label || navRes.chosen.id;
+              this.messages.push({
+                sender: 'assistant',
+                text: `✅ تم الانتقال إلى شاشة «${targetTitle}» بنجاح.`,
+                sources: [],
+                isStreaming: false,
+                relatedUserQuery: query,
+                decisionId: resolvedDecisionId,
+                filters: { ...this.activeFilter },
+                lessonId: this.activeFilter.lessonId,
+                lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
+              });
+              this.isStreaming = false;
+              this.cdr.markForCheck();
+              this.scrollToBottom();
+              return;
+            }
           } else if (navRes?.decision === 'ask' && navRes.askOptions && navRes.askOptions.length > 0) {
-            console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options without blocking stream:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
+            console.info('%c[Copilot Navigation] Ambiguous intent -> displaying ask options:', 'color:#f59e0b;font-weight:bold', navRes.askOptions);
             pendingAskOptions = navRes.askOptions;
+            if (resolvedIntent === 'navigate') {
+              this.messages.push({
+                sender: 'assistant',
+                text: 'يرجى اختيار الشاشة أو الوحدة المطلوبة للانتقال إليها:',
+                sources: [],
+                isStreaming: false,
+                askOptions: pendingAskOptions,
+                relatedUserQuery: query,
+                decisionId: resolvedDecisionId,
+                filters: { ...this.activeFilter },
+                lessonId: this.activeFilter.lessonId,
+                lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
+              });
+              this.isStreaming = false;
+              this.cdr.markForCheck();
+              this.scrollToBottom();
+              return;
+            }
           }
         } catch (navErr) {
           console.warn('[Copilot Navigation] resolveAndNavigate error:', navErr);
@@ -1310,14 +1158,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, AfterViewChecked
       this.activeFilter.lessonId,
       (sources: CopilotSource[]) => {
         this.messages[assistantMsgIndex].sources = this.deduplicateSources(sources);
+        this.scrollToBottom();
       },
       (token: string) => {
         this.messages[assistantMsgIndex].text += token;
+        this.scrollToBottom();
       },
       (meta?: any) => {
         this.messages[assistantMsgIndex].isStreaming = false;
         this.messages[assistantMsgIndex].isRetrying = false;
         this.isStreaming = false;
+        this.scrollToBottom();
         if (meta?.thread_id) {
           this.messages[assistantMsgIndex].threadId = meta.thread_id;
         }

@@ -88,8 +88,16 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   loadLookups() {
-    this.adminService.getLevels().subscribe(res => this.allLevels = res);
-    this.adminService.getTypes().subscribe(res => this.allTypes = res);
+    if (this.allLevels.length === 0) {
+      this.adminService.getLevels().subscribe(res => this.allLevels = res);
+    }
+    if (this.allTypes.length === 0) {
+      this.adminService.getTypes().subscribe(res => this.allTypes = res);
+    }
+  }
+
+  trackById(_index: number, item: any): any {
+    return item?.id ?? item?.userId ?? _index;
   }
 
   loadStats() {
@@ -113,15 +121,22 @@ export class AdminDashboardComponent implements OnInit {
         this.companies = data;
         if (data.length > 0 && !this.selectedCompanyId) {
           this.selectedCompanyId = data[0].id;
-          this.onCompanyChange();
         }
-        // Load departments for each company to show badges
+        // Load departments for each company to show badges (and reuse for selectedCompanyId without duplicate HTTP call)
         this.companies.forEach(c => {
           this.adminService.getDepartments(c.id).subscribe(depts => {
             c.departments = depts;
-            // No need to manually count users anymore, stats handled it, but we can do it for display
+            if (c.id === this.selectedCompanyId) {
+              this.departments = depts;
+              if (depts.length > 0 && !this.selectedDepartmentId) {
+                this.selectedDepartmentId = depts[0].id;
+                this.onDepartmentChange();
+              } else if (depts.length === 0) {
+                this.progressUsers = [];
+              }
+            }
             let totalUsers = 0;
-            depts.forEach(d => {
+            depts.forEach((d: any) => {
               this.adminService.getUsers(d.id).subscribe(users => {
                 totalUsers += users.length;
                 c.totalUsers = totalUsers;
@@ -154,6 +169,17 @@ export class AdminDashboardComponent implements OnInit {
 
   onCompanyChange() {
     if (!this.selectedCompanyId) return;
+    const cachedCompany = this.companies.find(c => c.id === this.selectedCompanyId);
+    if (cachedCompany && Array.isArray(cachedCompany.departments)) {
+      this.departments = cachedCompany.departments;
+      if (this.departments.length > 0) {
+        this.selectedDepartmentId = this.departments[0].id;
+        this.onDepartmentChange();
+      } else {
+        this.progressUsers = [];
+      }
+      return;
+    }
     this.adminService.getDepartments(this.selectedCompanyId).subscribe(depts => {
       this.departments = depts;
       if (depts.length > 0) {

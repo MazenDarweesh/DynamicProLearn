@@ -1,5 +1,4 @@
-/* Import Readex Pro Font */
-@import url('https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600&display=swap');
+/* Readex Pro Font is loaded non-blockingly via <link rel="preconnect"> in index.html */
 
 :root {
   /* Primary & Brand Colors */

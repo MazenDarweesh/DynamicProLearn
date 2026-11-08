@@ -243,6 +243,14 @@ export function setNativeSelect(selectEl: HTMLSelectElement, val: any, telemetry
  * 4. Prefix match (+100 score).
  * 5. Substring match (+50 score) with length proximity penalty.
  */
+const OPTION_SYNONYM_GROUPS: string[][] = [
+  ['egp', 'مصري', 'جنيه', 'جنيه مصري', 'ج.م', 'عمله محليه'],
+  ['usd', 'دولار', 'دولار امريكي', '$'],
+  ['euro', 'eur', 'يورو'],
+  ['aed', 'درهم', 'درهم اماراتي', 'دينار اماراتي', 'اماراتي'],
+  ['sar', 'ريال', 'ريال سعودي', 'سعودي'],
+];
+
 export function pickBestOption<T extends { el: HTMLElement; rawText: string }>(
   items: T[],
   term: string
@@ -256,6 +264,24 @@ export function pickBestOption<T extends { el: HTMLElement; rawText: string }>(
     const cleaned = optText.replace(/^[0-9\-_[\]#\s.:]+/, '').replace(/[0-9\-_[\]#\s.:]+$/, '').trim();
     if (optText === normalizedTarget || cleaned === normalizedTarget) {
       return item;
+    }
+  }
+
+  // 1b. Bilingual / ISO synonym group match (e.g. "مصري" <-> "EGP", "يورو" <-> "EURO")
+  const matchedSynonyms = new Set<string>();
+  for (const group of OPTION_SYNONYM_GROUPS) {
+    const normGroup = group.map((g) => normalizeArabicText(g).trim());
+    if (normGroup.some((g) => g === normalizedTarget || (normalizedTarget.length >= 3 && normalizedTarget.includes(g)))) {
+      normGroup.forEach((g) => matchedSynonyms.add(g));
+    }
+  }
+  if (matchedSynonyms.size > 0) {
+    for (const item of items) {
+      const optText = normalizeArabicText(item.rawText).trim();
+      const cleaned = optText.replace(/^[0-9\-_[\]#\s.:]+/, '').replace(/[0-9\-_[\]#\s.:]+$/, '').trim();
+      if (matchedSynonyms.has(optText) || matchedSynonyms.has(cleaned)) {
+        return item;
+      }
     }
   }
 
@@ -536,6 +562,14 @@ export async function setNgSelect(
       if (words.length > 1) {
         const firstWord = words[0];
         result = await performSearch(firstWord, 600);
+      }
+    }
+
+    if (lastObservedOptions.length > 0) {
+      try {
+        hostEl.setAttribute('data-observed-options', JSON.stringify(lastObservedOptions.slice(0, 30)));
+      } catch {
+        // ignore attribute error
       }
     }
 

@@ -6,6 +6,7 @@
     "start": "ng serve --proxy-config proxy.conf.json",
     "build": "ng build",
     "build:element": "ng run learn-dynamic-pro-ui:build-element && node scripts/bundle-element.js",
+    "build:element:dev": "ng run learn-dynamic-pro-ui:build-element:development && node scripts/bundle-element.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },

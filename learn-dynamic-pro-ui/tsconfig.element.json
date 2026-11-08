@@ -1,0 +1,18 @@
+/* Dedicated TypeScript configuration for LMS Copilot Custom Element bundle.
+ * Compiles ONLY src/copilot-element.ts and its transitive imports (~14 files),
+ * avoiding AOT compilation of the full LMS application (src/main.ts & 60+ route components).
+ */
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./out-tsc/element",
+    "types": []
+  },
+  "files": [
+    "src/copilot-element.ts"
+  ],
+  "include": [
+    "src/**/*.d.ts"
+  ]
+}
+

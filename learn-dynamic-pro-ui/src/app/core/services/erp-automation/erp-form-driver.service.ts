@@ -249,6 +249,7 @@ export class ErpFormDriverService {
 
     const pendingFields: Record<string, any> = { ...(fields || {}) };
     const filledFields: Record<string, any> = {};
+    const failedAttempts = new Map<string, Set<string>>();
     const maxPasses = 8;
     let pass = 0;
 
@@ -280,9 +281,17 @@ export class ErpFormDriverService {
       });
 
       if (readyKeys.length === 0) {
-        if (activeCopilotService && userMessage && Object.keys(filledFields).length > 0) {
+        if (activeCopilotService && userMessage && (Object.keys(filledFields).length > 0 || failedAttempts.size > 0)) {
           const newUnmappedFields = currentSchema
-            .filter((s) => !s.disabled && !filledFields[s.key] && !pendingFields[s.key])
+            .filter((s) => {
+              if (s.disabled || filledFields[s.key] || pendingFields[s.key]) return false;
+              const prevFails = failedAttempts.get(s.key);
+              // Only re-ask AI for a previously failed field if we now have observed dropdown options and haven't failed twice
+              if (prevFails && (!s.options || s.options.length === 0 || prevFails.size >= 2)) {
+                return false;
+              }
+              return true;
+            })
             .map(
               (s): FieldSignatureIn => ({
                 key: s.key,
@@ -302,9 +311,21 @@ export class ErpFormDriverService {
                 new_fields: newUnmappedFields,
               });
 
-              if (leftoverRes && leftoverRes.fields && Object.keys(leftoverRes.fields).length > 0) {
-                Object.assign(pendingFields, leftoverRes.fields);
-                continue;
+              if (leftoverRes && leftoverRes.fields) {
+                let addedNewCandidate = false;
+                for (const [k, v] of Object.entries(leftoverRes.fields)) {
+                  if (v == null || filledFields[k]) continue;
+                  const normVal = normalizeArabicText(String(v)).trim();
+                  const prevFails = failedAttempts.get(k);
+                  if (prevFails && prevFails.has(normVal)) {
+                    continue; // Never retry the exact same value that already failed
+                  }
+                  pendingFields[k] = v;
+                  addedNewCandidate = true;
+                }
+                if (addedNewCandidate) {
+                  continue;
+                }
               }
             } catch (err) {
               console.warn('[ProgressiveFill] leftover resolution error', err);
@@ -385,6 +406,10 @@ export class ErpFormDriverService {
           filledCount++;
           filledFields[cleanKey] = rawVal;
           this.telemetry?.logFill(cleanKey, 'filled', 'تم إدخال القيمة بنجاح', rawVal);
+          const prevErrIdx = results.findIndex((r) => r.field === cleanKey && r.status !== 'filled');
+          if (prevErrIdx >= 0) {
+            results.splice(prevErrIdx, 1);
+          }
           results.push({
             field: cleanKey,
             value: rawVal,
@@ -399,18 +424,35 @@ export class ErpFormDriverService {
             await this.waitFor(() => !this.bridge?.isPageBusy(), 2500);
           }
         } else {
+          let failSet = failedAttempts.get(cleanKey);
+          if (!failSet) {
+            failSet = new Set<string>();
+            failedAttempts.set(cleanKey, failSet);
+          }
+          failSet.add(normalizeArabicText(String(rawVal)).trim());
+
           this.telemetry?.logFill(
             cleanKey,
             status,
             status === 'ambiguous' ? 'الخيار غامض' : 'لم يتم العثور على العنصر',
             rawVal
           );
-          results.push({
-            field: cleanKey,
-            value: rawVal,
-            status,
-            message: status === 'ambiguous' ? 'الخيار غامض' : 'لم يتم العثور على العنصر',
-          });
+          const existingIdx = results.findIndex((r) => r.field === cleanKey);
+          if (existingIdx >= 0) {
+            results[existingIdx] = {
+              field: cleanKey,
+              value: rawVal,
+              status,
+              message: status === 'ambiguous' ? 'الخيار غامض' : 'لم يتم العثور على العنصر',
+            };
+          } else {
+            results.push({
+              field: cleanKey,
+              value: rawVal,
+              status,
+              message: status === 'ambiguous' ? 'الخيار غامض' : 'لم يتم العثور على العنصر',
+            });
+          }
         }
       }
     }

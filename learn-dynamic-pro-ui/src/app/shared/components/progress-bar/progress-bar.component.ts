@@ -59,3 +59,4 @@ export class ProgressBarComponent {
     return Math.round((this.completed / this.total) * 100 * 10) / 10;
   }
 }
+

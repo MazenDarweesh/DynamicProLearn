@@ -4,10 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 import { AdminService } from '../../../core/services/platform-core/admin.service';
 import { AdminHeaderComponent } from '../../../shared/components/admin-header/admin-header.component';
-import { ProgressBarComponent } from '../../../shared/components/progress-bar/progress-bar.component';
 import { Dialog } from '../../../core/utils/dialog';
-import * as XLSX from 'xlsx';
-
 import { EvaluationsDashboardComponent } from '../../../shared/components/evaluations-dashboard/evaluations-dashboard.component';
 
 @Component({

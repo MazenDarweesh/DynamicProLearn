@@ -75,7 +75,7 @@
       </app-copilot-top-filter-bar>
 
       <div class="copilot-body" #scrollContainer>
-        <div *ngFor="let msg of messages; let idx = index" class="chat-msg" [class.user-msg]="msg.sender === 'user'"
+        <div *ngFor="let msg of messages; let idx = index; trackBy: trackByMessage" class="chat-msg" [class.user-msg]="msg.sender === 'user'"
           [class.bot-msg]="msg.sender === 'assistant'">
 
           <div class="msg-avatar">

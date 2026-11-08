@@ -173,6 +173,21 @@ export function collectFormSchema(
 
     const formRoot = getActiveFormRoot();
 
+    const SEMANTIC_ERP_LABELS: Record<string, string> = {
+      posetting: 'طريقة الشراء',
+      contracttype: 'طريقة البيع',
+      currancyid: 'العملة',
+      currencyid: 'العملة',
+      safeaccounid: 'الخزينة',
+      safeaccountid: 'الخزينة',
+      safeaccount: 'الخزينة',
+      costitemid: 'مركز التكلفة',
+      projectid: 'المشروع',
+      storeid: 'المخزن',
+      supplierid: 'المورد',
+      customerid: 'العميل',
+    };
+
     // 1. Gather custom dropdown hosts (e.g. <eg-select>, <ng-select>, <mat-select>)
     const customSelectHosts = Array.from(
       formRoot.querySelectorAll('eg-select, ng-select, mat-select')
@@ -209,7 +224,24 @@ export function collectFormSchema(
         cleanName = '';
       }
 
-      const labelText = findLabelForElement(host) || host.getAttribute('placeholder') || host.getAttribute('aria-label') || '';
+      // Skip quick-add sub-modal helper fields (InsertType, DefultValue) that confuse header extraction
+      if (/^(InsertType|DefultValue)$/i.test(cleanName)) {
+        continue;
+      }
+
+      let labelText = findLabelForElement(host) || host.getAttribute('placeholder') || host.getAttribute('aria-label') || '';
+      if ((!labelText || labelText.toLowerCase() === cleanName.toLowerCase()) && cleanName) {
+        const fallbackLabel = SEMANTIC_ERP_LABELS[cleanName.toLowerCase()];
+        if (fallbackLabel) {
+          labelText = fallbackLabel;
+        }
+      }
+
+      // Skip completely anonymous custom_select dropdowns with no name, no id, and no label
+      if (!cleanName && !labelText) {
+        continue;
+      }
+
       const normLabel = labelText ? normalizeArabicText(labelText).replace(/\s+/g, '_') : '';
       const key = cleanName || (normLabel ? `select_${normLabel}` : 'custom_select');
 
@@ -221,6 +253,19 @@ export function collectFormSchema(
         }
       } catch {
         // ignore attribute set errors in restricted DOM
+      }
+
+      let observedOptions: string[] | undefined;
+      const rawObs = host.getAttribute('data-observed-options');
+      if (rawObs) {
+        try {
+          const parsed = JSON.parse(rawObs);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            observedOptions = parsed;
+          }
+        } catch {
+          // ignore JSON parse error
+        }
       }
 
       const kind: FieldKind = isNgSelect ? 'ng-select' : isMatSelect ? 'mat-select' : 'select';
@@ -237,6 +282,7 @@ export function collectFormSchema(
           group,
           disabled,
           required: host.getAttribute('aria-required') === 'true',
+          ...(observedOptions ? { options: observedOptions } : {}),
         });
       }
     }
@@ -275,8 +321,8 @@ export function collectFormSchema(
         cleanName = '';
       }
 
-      // Filter out non-business pagination/limits controls
-      if (/^(dpCheckAll|pageSeachValue|dpLimit)$/i.test(cleanName)) continue;
+      // Filter out non-business pagination/limits and sub-modal helper controls
+      if (/^(dpCheckAll|pageSeachValue|dpLimit|InsertType|DefultValue)$/i.test(cleanName)) continue;
 
       const labelText = findLabelForElement(el);
       const normLabel = labelText ? normalizeArabicText(labelText).replace(/\s+/g, '_') : '';

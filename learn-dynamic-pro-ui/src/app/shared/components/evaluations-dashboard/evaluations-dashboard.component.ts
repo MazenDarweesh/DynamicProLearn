@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProgressBarComponent } from '../progress-bar/progress-bar.component';
 import { CurriculumViewerComponent } from '../curriculum-viewer/curriculum-viewer.component';
-import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'app-evaluations-dashboard',
@@ -88,7 +87,7 @@ export class EvaluationsDashboardComponent {
     this.filteredGroups = result;
   }
 
-  exportToExcel() {
+  async exportToExcel() {
     const rows: any[] = [];
     for (const g of this.filteredGroups) {
       for (const m of g.modules) {
@@ -113,6 +112,7 @@ export class EvaluationsDashboardComponent {
       return;
     }
 
+    const XLSX = await import('xlsx');
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'التقييمات');
