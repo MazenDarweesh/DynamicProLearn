@@ -139,7 +139,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   isClearingCache = false;
   clearCacheStatus: 'idle' | 'success' | 'error' = 'idle';
 
-  // ── Mode State (Mutually Exclusive: Q&A default | Action ⚡ | Vision 👁️) ──
+  // ── Mode State (Unified Two-State Architecture: Q&A default 💬 | Unified Action & Vision ⚡👁️) ──
   isActionMode = false;
   isVisionAgentMode = false;
   cdpPort = 9222;
@@ -157,17 +157,13 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   } | null = null;
 
   get currentModeKey(): string {
-    if (this.isVisionAgentMode) return 'mode-vision';
-    if (this.isActionMode) return 'mode-action';
+    if (this.isActionMode || this.isVisionAgentMode) return 'mode-action';
     return 'mode-qa';
   }
 
   get inputPlaceholder(): string {
-    if (this.isVisionAgentMode) {
-      return 'اكتب هدفك للوكيل البصري (مثال: اشتر 10 سن من المورد حسين)...';
-    }
-    if (this.isActionMode) {
-      return 'اكتب أمراً لتنفيذه مباشرة في شاشات النظام (مثال: سجل فاتورة مبيعات...)...';
+    if (this.isActionMode || this.isVisionAgentMode) {
+      return 'اكتب أمر التنفيذ (مثال: سجل فاتورة مشتريات 10 سن من المورد حسين) — يعمل بالـ DOM والرؤية البصرية معاً...';
     }
     if (this.hasConnectionError && !this.isAiReady) {
       return 'تعذر الاتصال بالمحرك، انقر إعادة الاتصال أعلاه...';
@@ -175,7 +171,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (this.isWarmingUp) {
       return 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...';
     }
-    return 'اسأل أي سؤال عن النظام أو شروحات المحاضرات (أو فعّل ⚡ للتنفيذ)...';
+    return 'اسأل أي سؤال تعليمي عن النظام والمحاضرات (أو اضغط ⚡👁️ للتنفيذ الذكي)...';
   }
 
   // ── Smart Top Filter Bar State ───────────────────────────────────────────
@@ -595,35 +591,37 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
+  /**
+   * Single Unified Mode Toggle:
+   * - OFF (false): Pure Educational Q&A Chat (answers questions only, never touches ERP screens).
+   * - ON  (true) : Unified Hybrid Action & Vision Mode (DOM-first execution + automatic Vision/CDP fallback).
+   */
   toggleActionMode(): void {
     this.isActionMode = !this.isActionMode;
-    if (this.isActionMode) {
-      this.isVisionAgentMode = false;
-    }
+    this.isVisionAgentMode = this.isActionMode;
     this.cdr.markForCheck();
   }
 
   toggleVisionAgentMode(): void {
-    this.isVisionAgentMode = !this.isVisionAgentMode;
-    if (this.isVisionAgentMode) {
-      this.isActionMode = false;
-    }
-    this.cdr.markForCheck();
+    this.toggleActionMode();
   }
 
   async sendMessage(skipCache: boolean = false) {
     const query = this.inputQuery.trim();
     if (!query || this.isStreaming || !this.isAiReady) return;
 
+    // Explicit slash command (/agent, /vision, /cdp) forces direct Vision Agent execution
     const isAgentSlash = /^\/(agent|vision|cdp)\s*/i.test(query);
-    if (isAgentSlash || this.isVisionAgentMode) {
+    if (isAgentSlash) {
       this.inputQuery = '';
+      this.isActionMode = true;
+      this.isVisionAgentMode = true;
       await this.runVisionAgent(query, this.cdpPort, this.cdpHost);
       return;
     }
 
     this.syncErpKey();
-    const currentMode = this.isVisionAgentMode ? 'vision' : (this.isActionMode ? 'action' : 'qa');
+    const currentMode = this.isActionMode ? 'unified_action_vision' : 'qa';
     const traceId = 'trc_' + Math.random().toString(36).substring(2, 8);
     this.telemetry?.setTraceId(traceId);
     this.telemetry?.log('USER_QUERY', `User: "${query}"`, {
@@ -659,7 +657,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
    * Executes autonomous Vision Agent loop via CDP over SSE.
    * Directly interfaces with Google Gemini 2.0 Multimodal Grounding Engine.
    */
-  async runVisionAgent(goal: string, cdpPort: number = 9222, cdpHost?: string) {
+  async runVisionAgent(goal: string, cdpPort: number = 9222, cdpHost?: string, skipUserBubble: boolean = false) {
     let cleanGoal = goal.replace(/^\/(agent|vision|cdp)\s*/i, '').trim();
     if (!cleanGoal || this.isStreaming) return;
 
@@ -679,10 +677,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     this.isStreaming = true;
     this.telemetry?.log('GENERAL', `Vision Agent goal: "${cleanGoal}"`, { goal: cleanGoal, cdpPort, cdpHost: host });
 
-    this.messages.push({
-      sender: 'user',
-      text: `👁️ [أتمتة بصرية]: ${cleanGoal}`
-    });
+    if (!skipUserBubble) {
+      this.messages.push({
+        sender: 'user',
+        text: `⚡👁️ [تنفيذ ذكي]: ${cleanGoal}`
+      });
+    }
 
     const assistantMsg: ChatMessage = {
       sender: 'assistant',
@@ -911,9 +911,18 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
 
       // 💾 Optional auto-save: only if every requested field was filled cleanly
-      const hasUnresolved = report.results.some(r => r.status === 'not_found' || r.status === 'ambiguous');
+      const unresolvedFields = report.results.filter(r => r.status === 'not_found' || r.status === 'ambiguous');
+      const hasUnresolved = unresolvedFields.length > 0;
       if (this.autoSaveAfterFill && report.success && !hasUnresolved) {
         await this.confirmSave(msg);
+      } else if (!report.success && report.filledCount === 0 && msg.relatedUserQuery) {
+        // 👁️ Phase 3 True Hybrid Fallback: If DOM driver couldn't fill any field (e.g. Canvas/iFrame/unmounted),
+        // automatically escalate to Vision Agent without manual user intervention!
+        console.info('%c[Copilot Hybrid] DOM fill applied 0 fields — auto-escalating to Vision Agent...', 'color:#7c3aed;font-weight:bold');
+        msg.isApplyingFormFill = false;
+        this.cdr.detectChanges();
+        await this.runVisionAgent(msg.relatedUserQuery, this.cdpPort, this.cdpHost);
+        return;
       }
     } catch (err) {
       console.error('[Copilot FormFill] Execution error:', err);
@@ -1320,11 +1329,25 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       formSchema = schemas.length > 0 ? schemas : undefined;
       shouldOfferVisionEscalation = isEntryIntent && (!visibleFields || visibleFields.length === 0) && !isOnTargetScreen && navRes?.decision !== 'go';
       console.info('%c[Copilot FormFill] Active Form Fields Detected:', 'color:#10b981;font-weight:bold', visibleFields);
+
+      // 🚀 Phase 3 Unified Hybrid Orchestrator:
+      // In Unified Action & Vision Mode, if the user wants to execute an action or navigate,
+      // and the in-page DOM could neither navigate nor find visible form fields, automatically
+      // hand off to the Vision Agent (CDP + Set-of-Mark VLM) seamlessly!
+      const isNavUnresolved = resolvedIntent === 'navigate' && (!navRes || !navRes.success) && !pendingAskOptions;
+      if (shouldOfferVisionEscalation || isNavUnresolved) {
+        console.info('%c[Copilot Unified Hybrid] DOM path could not reach target screen/fields — seamlessly invoking Vision Agent...', 'color:#7c3aed;font-weight:bold');
+        this.isStreaming = false;
+        await this.runVisionAgent(query, this.cdpPort, this.cdpHost, true);
+        return;
+      }
     } else {
-      // 💬 Pure Q&A Mode: Do NOT navigate, do NOT collect schemas, enforce question intent
+      // 💬 Pure Q&A Mode: Answer questions ONLY! Do NOT navigate, do NOT collect schemas, do NOT extract form_fill
       resolvedIntent = 'question';
+      visibleFields = undefined;
+      formSchema = undefined;
       shouldOfferVisionEscalation = false;
-      console.info('%c[Copilot Mode] Pure Educational Q&A Mode active — navigation and form inspection bypassed', 'color:#6366f1;font-weight:bold');
+      console.info('%c[Copilot Mode] Pure Educational Q&A Mode active — answering questions only', 'color:#6366f1;font-weight:bold');
     }
     const assistantMsgIndex = this.messages.length;
     this.messages.push({
