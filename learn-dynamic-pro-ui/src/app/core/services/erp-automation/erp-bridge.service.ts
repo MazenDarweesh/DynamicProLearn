@@ -9,9 +9,12 @@ import {
 import { ErpTelemetryService } from './erp-telemetry.service';
 import {
   CapturedSaveToast,
+  findOpenSaveMenuItem,
   isSaveMenuStillOpen,
   observeSaveToastAndValidation,
-  readVisibleSaveToasts
+  readVisibleSaveToasts,
+  SAVE_TRIGGER_SELECTOR,
+  triggerFullClick
 } from './save-recovery/erp-save-verifier';
 
 /**
@@ -233,13 +236,19 @@ export class ErpBridgeService {
         this.telemetry?.log('BRIDGE', `activeComponent save invocation failed: ${err?.message}`, err, 'WARN');
       }
 
-      // 2. Fallback to locating and clicking Save button in DOM (including split-button / dp-menu_text)
-      // If the Save drop-down is already open, do NOT re-click the trigger (that would just close it):
-      // the sub-option click performed by the verifier will pick the real "حفظ" item.
-      if (isSaveMenuStillOpen()) {
-        this.telemetry?.log('BRIDGE', 'submitActiveForm: Save menu already open — selecting its "حفظ" item', undefined, 'INFO');
-        return { success: true, message: 'قائمة الحفظ مفتوحة بالفعل، جارٍ اختيار «حفظ».' };
+      // 2. Fallback to locating and clicking Save button in DOM (including split-button / dp-menu__text)
+      const openMenuItem = findOpenSaveMenuItem('حفظ');
+      if (openMenuItem) {
+        this.telemetry?.log(
+          'BRIDGE',
+          'submitActiveForm: Save menu already open — clicking "حفظ" item directly',
+          { target: openMenuItem.tagName, text: openMenuItem.textContent?.trim() },
+          'INFO'
+        );
+        triggerFullClick(openMenuItem);
+        return { success: true, message: 'تم الضغط مباشرة على خيار «حفظ» في القائمة المفتوحة.' };
       }
+
       const saveBtn = this.findSaveButtonInDom();
       if (saveBtn) {
         this.telemetry?.log(
@@ -384,6 +393,29 @@ export class ErpBridgeService {
    */
   findSaveButtonInDom(): HTMLElement | null {
     if (typeof document === 'undefined') return null;
+
+    // Priority 1: Check if `<span class="dp-menu__text">حفظ</span>` is already visible in DOM (menu open)
+    const openItem = findOpenSaveMenuItem('حفظ');
+    if (openItem) {
+      return openItem;
+    }
+
+    const menuSpans = Array.from(
+      document.querySelectorAll<HTMLElement>('span.dp-menu__text, span.dp-menu_text')
+    ).filter(
+      (sp) =>
+        !sp.closest('lms-ai-copilot, app-copilot-chat') &&
+        !sp.closest(SAVE_TRIGGER_SELECTOR) &&
+        !sp.matches(SAVE_TRIGGER_SELECTOR)
+    );
+    for (const sp of menuSpans) {
+      const text = (sp.textContent || '').trim();
+      if ((text === 'حفظ' || text.startsWith('حفظ')) && sp.offsetWidth > 0 && sp.offsetHeight > 0) {
+        return (sp.closest('button, li, a, [role="menuitem"], .dp-menu__item') as HTMLElement) || sp;
+      }
+    }
+
+    // Priority 2: Primary trigger button (button.dp-edit__save)
     const selectors = [
       'button.dp-edit__save',
       'button.dp-btn--save',
@@ -398,18 +430,6 @@ export class ErpBridgeService {
       const btn = document.querySelector(sel) as HTMLElement;
       if (btn && btn.offsetWidth > 0 && btn.offsetHeight > 0 && !btn.hasAttribute('disabled')) {
         return btn;
-      }
-    }
-
-    // Check if `<span class="dp-menu_text">حفظ</span>` is already visible in DOM
-    const menuSpans = Array.from(
-      document.querySelectorAll<HTMLElement>('span.dp-menu_text, span.dp-menu__text')
-    );
-    for (const sp of menuSpans) {
-      if (sp.closest('lms-ai-copilot, app-copilot-chat')) continue;
-      const text = (sp.textContent || '').trim();
-      if ((text === 'حفظ' || text.startsWith('حفظ')) && sp.offsetWidth > 0 && sp.offsetHeight > 0) {
-        return (sp.closest('button, li, a, [role="menuitem"]') as HTMLElement) || sp;
       }
     }
 

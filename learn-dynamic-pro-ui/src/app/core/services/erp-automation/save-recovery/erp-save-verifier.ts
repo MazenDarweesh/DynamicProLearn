@@ -20,6 +20,7 @@ const SEMANTIC_FIELD_HINTS: Array<{ pattern: RegExp; key: string; label: string 
   { pattern: /طريقه الشراء|طريقة الشراء|نوع الشراء|اعدادات الشراء/i, key: 'POSetting', label: 'طريقة الشراء' },
   { pattern: /طريقه البيع|طريقة البيع|نوع البيع|نوع العقد/i, key: 'ContractType', label: 'طريقة البيع' },
   { pattern: /العمله|العملة|عمله الشراء|عملة الشراء/i, key: 'CurrancyID', label: 'العملة' },
+  { pattern: /سعر الصرف|سعر صرف|صرف العمله|حدد سعر الصرف/i, key: 'ExchangePrice', label: 'سعر الصرف' },
   { pattern: /المخزن|المستودع/i, key: 'StoreID', label: 'المخزن' },
   { pattern: /المورد/i, key: 'SupplierID', label: 'المورد' },
   { pattern: /العميل/i, key: 'CustomerID', label: 'العميل' },
@@ -36,19 +37,28 @@ function isElementVisible(el: Element | null): boolean {
   return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
 }
 
-function triggerFullClick(el: HTMLElement): void {
+export function triggerFullClick(el: HTMLElement): void {
   try {
     el.focus({ preventScroll: true });
   } catch {}
-  for (const type of ['mousedown', 'mouseup', 'click'] as const) {
-    el.dispatchEvent(
+
+  // 1. Authoritative Native .click() on the targeted clickable element (single invocation, no bubbling loop)
+  const clickableTarget =
+    (el.closest('button, a, [role="menuitem"], .dp-menu__item') as HTMLElement) || el;
+  try {
+    clickableTarget.click();
+  } catch {}
+
+  // 2. Standard pointer + mouse events dispatch on clickableTarget
+  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'] as const) {
+    clickableTarget.dispatchEvent(
       new MouseEvent(type, { bubbles: true, cancelable: true, view: window, buttons: 1 })
     );
   }
 }
 
 /** The primary split-button that owns the Save drop-down (its own label must never be mistaken for a menu item). */
-const SAVE_TRIGGER_SELECTOR = '.dp-edit__save, button.dp-btn--save';
+export const SAVE_TRIGGER_SELECTOR = '.dp-edit__save, button.dp-btn--save';
 
 const SAVE_MENU_ITEM_SELECTOR = [
   'button.dp-menu__item',
@@ -70,6 +80,26 @@ export function findOpenSaveMenuItem(preferredText: string = 'حفظ'): HTMLElem
   if (typeof document === 'undefined') return null;
   const normPreferred = normalizeArabicText(preferredText).trim();
 
+  // Priority 1: Direct span.dp-menu__text matching "حفظ" that is visible
+  const directSpans = Array.from(
+    document.querySelectorAll<HTMLElement>('span.dp-menu__text, span.dp-menu_text')
+  ).filter(
+    (sp) =>
+      !sp.closest('lms-ai-copilot, app-copilot-chat') &&
+      !sp.closest(SAVE_TRIGGER_SELECTOR) &&
+      !sp.matches(SAVE_TRIGGER_SELECTOR) &&
+      isElementVisible(sp)
+  );
+
+  for (const sp of directSpans) {
+    const txt = normalizeArabicText(sp.textContent || '').trim();
+    if (txt === normPreferred || (txt.startsWith('حفظ') && !txt.includes('الغاء') && !txt.includes('حذف'))) {
+      const parentBtn = (sp.closest('button.dp-menu__item, .dp-menu__item, button, li, a') as HTMLElement) || sp;
+      return parentBtn;
+    }
+  }
+
+  // Priority 2: Generic menu items matching text
   const items = Array.from(document.querySelectorAll<HTMLElement>(SAVE_MENU_ITEM_SELECTOR)).filter(
     (el) =>
       !el.closest('lms-ai-copilot, app-copilot-chat') &&
@@ -81,7 +111,7 @@ export function findOpenSaveMenuItem(preferredText: string = 'حفظ'): HTMLElem
 
   const labelOf = (el: HTMLElement) =>
     normalizeArabicText(
-      (el.querySelector('span.dp-menu_text, span.dp-menu__text')?.textContent || el.textContent || '')
+      (el.querySelector('span.dp-menu__text, span.dp-menu_text')?.textContent || el.textContent || '')
     ).trim();
 
   return (
@@ -101,12 +131,12 @@ export function isSaveMenuStillOpen(): boolean {
 
 /**
  * Inspects the DOM shortly after clicking the primary Save button to see if a split-button
- * drop-down opened (حفظ / إدخال أقساط / إدخال مصاريف), clicks the real "حفظ" item and verifies
- * the menu was consumed (retries once if it is still open).
+ * drop-down opened (حفظ / إدخال أقساط / إدخال مصاريف), clicks the real "حفظ" item with authoritative
+ * native click.
  */
 export async function completeSaveMenuSubOption(
   preferredText: string = 'حفظ',
-  maxWaitMs: number = 400
+  maxWaitMs: number = 1500
 ): Promise<string | undefined> {
   if (typeof document === 'undefined') return undefined;
 
@@ -116,24 +146,15 @@ export async function completeSaveMenuSubOption(
     if (item) {
       const clickedLabel = (item.textContent || preferredText).trim();
       console.info(
-        '%c[ErpSaveVerifier] Clicked Save sub-menu option:',
+        '%c[ErpSaveVerifier] Executing authoritative native Save click on:',
         'color:#10b981;font-weight:bold',
         clickedLabel,
         item
       );
       triggerFullClick(item);
-
-      // Verify the click actually consumed the menu; retry once on the freshly resolved item.
-      await new Promise((r) => setTimeout(r, 180));
-      const stillOpen = findOpenSaveMenuItem(preferredText);
-      if (stillOpen) {
-        console.warn('[ErpSaveVerifier] Save menu still open after click — retrying once', stillOpen);
-        triggerFullClick(stillOpen);
-        await new Promise((r) => setTimeout(r, 180));
-      }
       return clickedLabel;
     }
-    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => setTimeout(r, 60));
   }
 
   return undefined;
@@ -260,8 +281,8 @@ export async function observeSaveToastAndValidation<T>(
 
   try {
     actionResult = await saveAction();
-    // Immediately check if clicking Save opened `<span class="dp-menu_text">حفظ</span>`
-    subMenuClicked = await completeSaveMenuSubOption('حفظ', 380);
+    // Immediately check if clicking Save opened `<span class="dp-menu__text">حفظ</span>`
+    subMenuClicked = await completeSaveMenuSubOption('حفظ', 1500);
 
     // Wait briefly for ERP validation or backend response toast to render inside #toast-container
     const waitStart = Date.now();

@@ -81,29 +81,39 @@ export function findLabelForElement(el: HTMLElement): string {
     }
   }
 
-  // 3. Closest parent form-group or column container (STRICT: exclude .row to avoid pulling sibling field labels)
+  // 3. Closest parent form-group or column container (including DynamicPro ERP .dp-field, li, .field-wrapper)
   const parentGroup = el.closest(
-    '.form-group, .field-wrapper, .form-field, mat-form-field, [class*="col-"], label'
+    '.form-group, .field-wrapper, .form-field, mat-form-field, [class*="col-"], .dp-field, [class*="field"], li, label'
   );
   if (parentGroup) {
     const labelEl =
       parentGroup.tagName === 'LABEL'
         ? (parentGroup as HTMLElement)
-        : (parentGroup.querySelector('label, mat-label') as HTMLElement);
+        : (parentGroup.querySelector('label, mat-label, .dp-edit__totlbl, .totlbl') as HTMLElement);
     if (labelEl && labelEl !== el && labelEl.textContent) {
       const text = labelEl.textContent.trim().replace(/[:*]/g, '').trim();
       if (text) return text;
     }
   }
 
-  // 3b. Sibling / Parent container with .dp-edit__totlbl (DynamicPro ERP footer calculation labels)
+  // 3b. Sibling / Parent container (DynamicPro ERP field holders)
   const totHolder = el.closest('li, .dp-edit__total, .dp-field, .form-group') || el.parentElement;
   if (totHolder) {
-    const totLbl = totHolder.querySelector('.dp-edit__totlbl, .totlbl, [class*="totlbl"]') as HTMLElement;
+    const totLbl = totHolder.querySelector('label, mat-label, .dp-edit__totlbl, .totlbl, [class*="totlbl"]') as HTMLElement;
     if (totLbl && totLbl !== el && totLbl.textContent) {
       const text = totLbl.textContent.trim().replace(/[:*]/g, '').trim();
       if (text) return text;
     }
+  }
+
+  // 3c. Preceding sibling label
+  let prev = el.previousElementSibling;
+  while (prev) {
+    if (prev.tagName === 'LABEL' && prev.textContent) {
+      const text = prev.textContent.trim().replace(/[:*]/g, '').trim();
+      if (text) return text;
+    }
+    prev = prev.previousElementSibling;
   }
 
   // 4. Table cell -> Match corresponding <th> / columnheader by column index
@@ -178,6 +188,8 @@ export function collectFormSchema(
       contracttype: 'طريقة البيع',
       currancyid: 'العملة',
       currencyid: 'العملة',
+      exchangeprice: 'سعر الصرف',
+      exchangerate: 'سعر الصرف',
       safeaccounid: 'الخزينة',
       safeaccountid: 'الخزينة',
       safeaccount: 'الخزينة',
@@ -330,7 +342,11 @@ export function collectFormSchema(
       // If cleanName is purely digits (e.g. table row index), prefer labelText as key if available
       let key = cleanName;
       if (/^\d+$/.test(cleanName) || !cleanName) {
-        key = normLabel ? `field_${normLabel}` : cleanName;
+        if (/سعر.*صرف|صرف.*عمل|exchange.*price|exchange.*rate/i.test(labelText || cleanName)) {
+          key = 'ExchangePrice';
+        } else {
+          key = normLabel ? `field_${normLabel}` : cleanName;
+        }
       }
       if (!key) continue;
 

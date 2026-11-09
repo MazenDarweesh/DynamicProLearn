@@ -70,6 +70,18 @@ export const ERP_FIELD_ALIAS_MAP: Record<string, string[]> = {
     'نوع الشراء',
     'اعدادات الشراء',
   ],
+  currancyid: ['currency', 'currencyid', 'currancy', 'العملة', 'عملة', 'عملة الشراء'],
+  exchangeprice: [
+    'exchangeprice',
+    'exchange_price',
+    'exchangerate',
+    'currencyrate',
+    'rate',
+    'سعر الصرف',
+    'سعر صرف',
+    'سعرالصرف',
+    'معامل التحويل',
+  ],
   costitemid: ['costitem', 'costcenter', 'مركز التكلفة', 'مركزالتكلفة'],
   cashpaid: [
     'paid',

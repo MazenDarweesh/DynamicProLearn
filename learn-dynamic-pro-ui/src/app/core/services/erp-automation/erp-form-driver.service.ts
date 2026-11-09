@@ -214,6 +214,23 @@ export class ErpFormDriverService {
       return { success: true, fieldsProcessed: 0, filledCount: 0, results: [] };
     }
 
+    const pendingFields: Record<string, any> = { ...(fields || {}) };
+
+    // Auto-default ExchangePrice = 1 for home currency (EGP / default) if not explicitly specified
+    const currencyVal = String(
+      pendingFields['CurrancyID'] || pendingFields['currency'] || pendingFields['العملة'] || ''
+    ).trim().toUpperCase();
+    const hasExplicitRate =
+      pendingFields['ExchangePrice'] != null ||
+      pendingFields['سعر الصرف'] != null ||
+      pendingFields['exchangeprice'] != null;
+
+    if (!hasExplicitRate && (currencyVal === 'EGP' || currencyVal === '1' || currencyVal === '')) {
+      // Always inject ExchangePrice=1 for home currency — DOM schema discovery is unreliable
+      // when the input[type="number"] has no name/id/formcontrolname (Purchases screen pattern).
+      pendingFields['ExchangePrice'] = 1;
+    }
+
     // Priority 0: Clean Host Bridge (Direct In-Memory State Binding across excelObject / dataObject)
     if (this.bridge?.isAvailable) {
       try {
@@ -242,10 +259,14 @@ export class ErpFormDriverService {
           liveSchema.length === 0
             ? {}
             : Object.fromEntries(
-                Object.entries(fields || {}).filter(
+                Object.entries(pendingFields).filter(
                   ([k, v]) => !lookupKeys.has(k) && isSafeBridgeScalar(k, v)
                 )
               );
+        if (pendingFields['ExchangePrice'] != null && bridgeFields['ExchangePrice'] == null) {
+          bridgeFields['ExchangePrice'] = Number(pendingFields['ExchangePrice']) || 1;
+        }
+
         // Only pass rows to in-memory bridge if they already carry resolved numeric ProductID / ItemId;
         // otherwise let fillGridRows add them via the DOM product picker so Angular resolves ProductID & price!
         const preResolvedRows = hasExistingRows
@@ -256,6 +277,22 @@ export class ErpFormDriverService {
           fields: bridgeFields,
           rows: preResolvedRows
         });
+
+        // Direct DOM write for ExchangePrice — bridge memory alone is NOT sufficient:
+        // Angular reactive forms only detect changes via native input/change DOM events.
+        // Even if ExchangePrice exists in dataObject, ERP server ignores it without the event.
+        if (pendingFields['ExchangePrice'] != null) {
+          const rate = Number(pendingFields['ExchangePrice']) || 1;
+          const exchEl = this.writeExchangePriceDom(excludeContainer, rate);
+          this.telemetry?.log(
+            'FILL',
+            exchEl
+              ? `ExchangePrice DOM write succeeded (${rate}) — Angular event dispatched`
+              : `ExchangePrice DOM write: element not found in DOM (rate=${rate})`,
+            { rate, found: !!exchEl }
+          );
+        }
+
         const fieldKeys = Object.keys(fields || {});
         this.telemetry?.log(
           'FILL',
@@ -267,7 +304,6 @@ export class ErpFormDriverService {
       }
     }
 
-    const pendingFields: Record<string, any> = { ...(fields || {}) };
     const filledFields: Record<string, any> = {};
     const failedAttempts = new Map<string, Set<string>>();
     const maxPasses = 8;
@@ -275,7 +311,15 @@ export class ErpFormDriverService {
 
     while (pass < maxPasses) {
       pass++;
-      const currentSchema = this.collectFormSchema(excludeContainer);
+      let currentSchema = this.collectFormSchema(excludeContainer);
+      if (pass === 1 && currentSchema.length === 0 && Object.keys(pendingFields).length > 0) {
+        const waitMountStart = Date.now();
+        while (Date.now() - waitMountStart < 1200) {
+          await new Promise((r) => setTimeout(r, 120));
+          currentSchema = this.collectFormSchema(excludeContainer);
+          if (currentSchema.length > 0) break;
+        }
+      }
       const readyKeys = Object.keys(pendingFields).filter((k) => {
         if (
           String(pendingFields[k]).toUpperCase() === '$TOTAL' ||
@@ -731,5 +775,60 @@ export class ErpFormDriverService {
       }
     }
     return { revoked, bound, expected };
+  }
+
+  /**
+   * Writes an exchange rate value directly to the DOM input[type="number"] that
+   * represents ExchangePrice/سعر الصرف, dispatching native input+change events so
+   * Angular reactive forms detect the change and the ERP server persists the value.
+   *
+   * Returns the found element or null if no matching input was located.
+   */
+  writeExchangePriceDom(excludeContainer: HTMLElement | undefined, rate: number): HTMLInputElement | null {
+    try {
+      const formRoot = this.getActiveFormRoot() as HTMLElement;
+      // 1. Try named selectors (most reliable when attributes are present)
+      const selectors = [
+        'input[name="ExchangePrice"]',
+        'input[id="ExchangePrice"]',
+        'input[formcontrolname="ExchangePrice"]',
+        'input[name="exchangeprice" i]',
+        'input[formcontrolname="exchangeprice" i]',
+      ];
+      for (const sel of selectors) {
+        const el = formRoot.querySelector(sel) as HTMLInputElement | null;
+        if (el && (!excludeContainer || !excludeContainer.contains(el))) {
+          this._nativeSetInputValue(el, String(rate));
+          return el;
+        }
+      }
+      // 2. Fallback: scan all number inputs; match by nearby label containing "سعر الصرف"
+      const numberInputs = Array.from(formRoot.querySelectorAll('input[type="number"]')) as HTMLInputElement[];
+      for (const el of numberInputs) {
+        if (excludeContainer && excludeContainer.contains(el)) continue;
+        if (el.closest('ng-select, eg-select, mat-select')) continue;
+        const container = el.closest('li, .dp-field, .form-group, .field-wrapper') || el.parentElement;
+        const labelText = container?.textContent ?? '';
+        if (/سعر.*صرف|صرف.*عمل|exchange.*rate|exchange.*price/i.test(labelText)) {
+          this._nativeSetInputValue(el, String(rate));
+          return el;
+        }
+      }
+    } catch (err) {
+      console.warn('[ErpFormDriver] writeExchangePriceDom failed:', err);
+    }
+    return null;
+  }
+
+  /** Writes a value via Angular-compatible native prototype setter + input/change events. */
+  private _nativeSetInputValue(el: HTMLInputElement, value: string): void {
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+    if (nativeSetter) {
+      nativeSetter.call(el, value);
+    } else {
+      el.value = value;
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
   }
 }

@@ -879,6 +879,13 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       // Ensure form entry is prepared/opened if currently on a list view or if not prepared during intent
       if (!msg.formPrepared || !isSameScreen) {
         await this.navigator.prepareFreshForm();
+        // When switching screens, wait for destination form fields to mount in DOM
+        const schemaWaitStart = Date.now();
+        while (Date.now() - schemaWaitStart < 1500) {
+          const schema = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
+          if (schema.length > 0) break;
+          await new Promise((r) => setTimeout(r, 100));
+        }
       } else {
         this.telemetry?.log('NAV', 'Form already prepared during intent phase — skipping redundant prepareFreshForm');
       }
@@ -1060,7 +1067,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       const fieldsToPatch: Record<string, any> = {};
       const cleanReply = userReply.trim();
 
-      if (recovery.missingFields.length === 1) {
+      // Direct parser for Exchange Rate replies (e.g. "1", "سعر الصرف 1", "سعر الصرف = 1")
+      const exchangeMatch = cleanReply.match(/^(?:سعر\s*الصرف\s*[:=-]?\s*)?(\d+(?:\.\d+)?)$/i);
+      const isExchangeInMissing = recovery.missingFields.some(
+        (mf) => mf.key === 'ExchangePrice' || normalizeArabicText(mf.label).includes('سعر الصرف')
+      );
+      if (exchangeMatch && (isExchangeInMissing || recovery.rawErrors.some((e) => e.includes('سعر الصرف')))) {
+        fieldsToPatch['ExchangePrice'] = exchangeMatch[1];
+      } else if (recovery.missingFields.length === 1) {
         const mf = recovery.missingFields[0];
         let val = cleanReply;
         // Strip leading field label if user wrote e.g. "طريقة الشراء مشتريات مباشرة"
@@ -1118,6 +1132,21 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         this.copilotService,
         cleanReply
       );
+
+      // Fix C: Direct DOM write for ExchangePrice after recovery fill.
+      // applyProgressiveFill calls the bridge (memory), but Angular reactive forms only
+      // fire server-side validation on native input/change DOM events — not on memory writes.
+      if (fieldsToPatch['ExchangePrice'] != null) {
+        const rate = Number(fieldsToPatch['ExchangePrice']) || 1;
+        const exchEl = this.formDriver.writeExchangePriceDom(this.elRef?.nativeElement, rate);
+        this.telemetry?.log(
+          'FILL',
+          exchEl
+            ? `[Recovery] ExchangePrice DOM write succeeded (${rate})`
+            : `[Recovery] ExchangePrice DOM element not found — rate=${rate}`,
+          { rate, found: !!exchEl }
+        );
+      }
 
       // Merge patched results into targetMessage's formFillData & report
       if (recovery.targetMessage.formFillData) {
