@@ -356,7 +356,10 @@ export async function fillGridRows(
       );
 
       // Priority A: Real DynamicPro ERP Header Product Picker (ng-select#product + #productQty modal)
-      if (!targetRow && headerProductPicker && itemEntry) {
+      const hasInlineItemSelector = targetRow ? !!targetRow.querySelector('eg-select, ng-select') : false;
+      const shouldUseHeaderPicker = headerProductPicker && itemEntry && (!targetRow || !hasInlineItemSelector);
+
+      if (shouldUseHeaderPicker) {
         const prevTbodyRowCount = table.querySelectorAll('tbody > tr').length;
         const pickStatus = await setNgSelect(headerProductPicker, itemEntry[1], telemetry);
         if (pickStatus === 'filled') {
@@ -411,8 +414,8 @@ export async function fillGridRows(
               if (tbodyRows.length > prevTbodyRowCount) {
                 return tbodyRows[rIdx] || tbodyRows[tbodyRows.length - 1] || null;
               }
-              return null;
-            }, 2500)) || undefined;
+              return currentGenuine[rIdx] || null;
+            }, 2500)) || targetRow;
 
           await settle(table, { quietMs: 80, maxMs: 500 });
         }

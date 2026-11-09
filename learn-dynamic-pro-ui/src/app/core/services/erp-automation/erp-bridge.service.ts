@@ -7,7 +7,12 @@ import {
   ErpActiveFormContext
 } from '../../models/erp-bridge.models';
 import { ErpTelemetryService } from './erp-telemetry.service';
-import { observeSaveToastAndValidation } from './save-recovery/erp-save-verifier';
+import {
+  CapturedSaveToast,
+  isSaveMenuStillOpen,
+  observeSaveToastAndValidation,
+  readVisibleSaveToasts
+} from './save-recovery/erp-save-verifier';
 
 /**
  * Single safe access point to the host ERP's `window.DynamicERP` bridge.
@@ -26,6 +31,9 @@ export class ErpBridgeService {
 
   private lastActiveScreenCache: { time: number; val: ErpActiveScreen | null } | null = null;
   private lastFormContextCache: { time: number; val: ErpActiveFormContext | null } | null = null;
+  /** Last logged signatures — polling loops must not flood the session log with identical entries. */
+  private lastLoggedScreenSig = '';
+  private lastLoggedFormCtxSig = '';
 
   getActiveScreen(forceRefresh = false): ErpActiveScreen | null {
     if (!this.isAvailable) return null;
@@ -36,7 +44,11 @@ export class ErpBridgeService {
     try {
       const screen = window.DynamicERP!.getActiveScreen?.() ?? null;
       this.lastActiveScreenCache = { time: now, val: screen };
-      this.telemetry?.logBridge('getActiveScreen', undefined, screen);
+      const sig = `${screen?.pageId ?? ''}|${screen?.pageName ?? ''}`;
+      if (sig !== this.lastLoggedScreenSig) {
+        this.lastLoggedScreenSig = sig;
+        this.telemetry?.logBridge('getActiveScreen', undefined, screen);
+      }
       if (screen?.pageName) {
         this.telemetry?.setScreenKey(screen.pageName);
       }
@@ -222,6 +234,12 @@ export class ErpBridgeService {
       }
 
       // 2. Fallback to locating and clicking Save button in DOM (including split-button / dp-menu_text)
+      // If the Save drop-down is already open, do NOT re-click the trigger (that would just close it):
+      // the sub-option click performed by the verifier will pick the real "حفظ" item.
+      if (isSaveMenuStillOpen()) {
+        this.telemetry?.log('BRIDGE', 'submitActiveForm: Save menu already open — selecting its "حفظ" item', undefined, 'INFO');
+        return { success: true, message: 'قائمة الحفظ مفتوحة بالفعل، جارٍ اختيار «حفظ».' };
+      }
       const saveBtn = this.findSaveButtonInDom();
       if (saveBtn) {
         this.telemetry?.log(
@@ -248,39 +266,117 @@ export class ErpBridgeService {
       };
     };
 
+    const before = this.captureFormFingerprint();
+
     const { actionResult, toasts, subMenuClicked } = await observeSaveToastAndValidation(
       executePrimarySave,
-      950
+      1800
     );
 
-    const errorToasts = toasts.filter((t) => t.kind === 'error' || t.kind === 'warning');
-    const successToasts = toasts.filter((t) => t.kind === 'success');
+    let errorToasts = toasts.filter((t) => t.kind === 'error' || t.kind === 'warning');
+    let successToasts = toasts.filter((t) => t.kind === 'success');
 
-    let finalResult: ErpSaveResult = {
-      ...actionResult,
-      subMenuClicked
-    };
+    let finalResult: ErpSaveResult;
 
     if (errorToasts.length > 0) {
-      const toastTexts = errorToasts.map((t) => t.text);
+      finalResult = this.buildFailedSave(errorToasts.map((t) => t.text), subMenuClicked);
+    } else if (!actionResult.success) {
+      // Bridge/host/DOM level failure (button not found, host threw, ...).
       finalResult = {
+        ...actionResult,
         success: false,
-        errors: toastTexts,
-        message: toastTexts.join(' — '),
+        outcome: 'failed',
         subMenuClicked
       };
     } else if (successToasts.length > 0) {
-      const topSuccess = successToasts[0];
       finalResult = {
         success: true,
-        docId: actionResult.docId || topSuccess.docId,
-        message: topSuccess.text || actionResult.message,
+        outcome: 'saved',
+        docId: actionResult.docId || successToasts[0].docId,
+        message: successToasts[0].text || actionResult.message,
         subMenuClicked
       };
+    } else {
+      // No toast yet: look for positive evidence (late toast, form closed/cleared) before claiming anything.
+      const evidence = await this.waitForSaveEvidence(before, 2200);
+      errorToasts = evidence.toasts.filter((t) => t.kind === 'error' || t.kind === 'warning');
+      successToasts = evidence.toasts.filter((t) => t.kind === 'success');
+
+      if (errorToasts.length > 0) {
+        finalResult = this.buildFailedSave(errorToasts.map((t) => t.text), subMenuClicked);
+      } else if (successToasts.length > 0 || evidence.formChanged) {
+        finalResult = {
+          success: true,
+          outcome: 'saved',
+          docId: actionResult.docId || successToasts[0]?.docId,
+          message: successToasts[0]?.text || 'تم الحفظ (تأكيد من حالة الشاشة بعد الحفظ).',
+          subMenuClicked
+        };
+      } else {
+        const menuOpen = isSaveMenuStillOpen();
+        finalResult = {
+          success: false,
+          outcome: 'unconfirmed',
+          message: menuOpen
+            ? 'لم يكتمل الحفظ: قائمة الحفظ ما زالت مفتوحة في الشاشة. اضغط «حفظ» من القائمة يدوياً.'
+            : 'تم الضغط على الحفظ لكن لم أتمكن من تأكيد نجاحه. راجع الشاشة قبل المتابعة.',
+          subMenuClicked
+        };
+      }
     }
 
-    this.telemetry?.logBridge('submitActiveForm', { subMenuClicked, toastsCount: toasts.length }, finalResult);
+    this.telemetry?.logBridge(
+      'submitActiveForm',
+      { subMenuClicked, toastsCount: toasts.length, outcome: finalResult.outcome, before },
+      finalResult
+    );
     return finalResult;
+  }
+
+  private buildFailedSave(texts: string[], subMenuClicked?: string): ErpSaveResult {
+    return {
+      success: false,
+      outcome: 'failed',
+      errors: texts,
+      message: texts.join(' — '),
+      subMenuClicked
+    };
+  }
+
+  /**
+   * Cheap fingerprint of the open document used to detect that a Save really consumed it
+   * (rows with a resolved product, number of populated header values, form still open).
+   */
+  private captureFormFingerprint(): { isOpen: boolean; rowsWithProduct: number; dataKeys: number } {
+    const ctx = this.getActiveFormContext(true);
+    const rows = Array.isArray(ctx?.rows) ? ctx!.rows! : [];
+    const rowsWithProduct = rows.filter((r: any) => r && (r.ProductID || r.ItemId)).length;
+    const data = ctx?.dataObject || {};
+    const dataKeys = Object.keys(data).filter((k) => data[k] != null && data[k] !== '').length;
+    return { isOpen: !!ctx?.isOpen, rowsWithProduct, dataKeys };
+  }
+
+  /** Polls for late toasts / a closed-or-reset form after a Save click that produced no immediate toast. */
+  private async waitForSaveEvidence(
+    before: { isOpen: boolean; rowsWithProduct: number; dataKeys: number },
+    maxWaitMs: number
+  ): Promise<{ formChanged: boolean; toasts: CapturedSaveToast[] }> {
+    const start = Date.now();
+    let toasts: CapturedSaveToast[] = [];
+    while (Date.now() - start < maxWaitMs) {
+      await new Promise((r) => setTimeout(r, 250));
+      toasts = readVisibleSaveToasts();
+      if (toasts.length > 0) return { formChanged: false, toasts };
+
+      const after = this.captureFormFingerprint();
+      const closed = before.isOpen && !after.isOpen;
+      const rowsCleared = before.rowsWithProduct > 0 && after.rowsWithProduct === 0;
+      const headerReset = before.dataKeys >= 6 && before.dataKeys - after.dataKeys >= 4;
+      if (closed || rowsCleared || headerReset) {
+        return { formChanged: true, toasts };
+      }
+    }
+    return { formChanged: false, toasts };
   }
 
   /**
@@ -289,6 +385,7 @@ export class ErpBridgeService {
   findSaveButtonInDom(): HTMLElement | null {
     if (typeof document === 'undefined') return null;
     const selectors = [
+      'button.dp-edit__save',
       'button.dp-btn--save',
       'button[title*="حفظ" i]',
       'button[aria-label*="حفظ" i]',
@@ -357,7 +454,13 @@ export class ErpBridgeService {
     try {
       const ctx = window.DynamicERP!.getActiveFormContext() || null;
       this.lastFormContextCache = { time: now, val: ctx };
-      this.telemetry?.logBridge('getActiveFormContext', undefined, ctx);
+      const sig = ctx
+        ? `${ctx.isOpen}|${ctx.screenName ?? ''}|${ctx.formType ?? ''}|${ctx.dataObject ? Object.keys(ctx.dataObject).length : -1}|${ctx.rows ? ctx.rows.length : -1}`
+        : 'null';
+      if (sig !== this.lastLoggedFormCtxSig) {
+        this.lastLoggedFormCtxSig = sig;
+        this.telemetry?.logBridge('getActiveFormContext', undefined, ctx);
+      }
       return ctx;
     } catch {
       return null;

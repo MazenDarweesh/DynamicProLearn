@@ -24,6 +24,7 @@ export interface CopilotFormFillData {
   documentName?: string;
   batch_mode?: boolean;
   batch_items?: ErpBatchItem[];
+  missing_required?: { key: string; label: string }[];
 }
 
 export interface CopilotFilterState {

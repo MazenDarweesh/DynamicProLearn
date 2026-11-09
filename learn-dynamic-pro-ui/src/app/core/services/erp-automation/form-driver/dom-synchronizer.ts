@@ -3,15 +3,40 @@
  */
 
 /**
+ * True when the element is genuinely rendered (not display:none / visibility:hidden / detached from layout).
+ * Background ERP tabs stay in the DOM without the `hidden` attribute, so `:not([hidden])` alone is not enough.
+ */
+export function isElementRendered(el: Element | null | undefined): boolean {
+  if (!el || !(el instanceof HTMLElement)) return false;
+  if (el.getClientRects().length === 0) return false;
+  const style = window.getComputedStyle(el);
+  return style.display !== 'none' && style.visibility !== 'hidden';
+}
+
+function firstRendered(selector: string): Element | null {
+  return Array.from(document.querySelectorAll(selector)).find((el) => isElementRendered(el)) || null;
+}
+
+/**
+ * Resolves the container of the screen the user is actually looking at (visible tab page), so fields of
+ * previously opened screens that remain mounted in the background are never inspected.
+ */
+export function getActiveScreenContainer(): Element | null {
+  if (typeof document === 'undefined') return null;
+  return firstRendered('.dp-shell__pages > div:not([hidden])');
+}
+
+/**
  * Resolves the live form container so hidden background tabs are never inspected.
  * Order: floating modal form → visible tab's form → visible tab → whole document (non-ERP/mock hosts).
+ * Every tier requires the candidate to be rendered, not merely lacking the `hidden` attribute.
  */
 export function getActiveFormRoot(): ParentNode {
   if (typeof document === 'undefined') return document;
   const root =
-    document.querySelector('.cdk-overlay-container .dp-modal app-add-or-edit') ||
-    document.querySelector('.dp-shell__pages > div:not([hidden]) app-add-or-edit') ||
-    document.querySelector('.dp-shell__pages > div:not([hidden])');
+    firstRendered('.cdk-overlay-container .dp-modal app-add-or-edit') ||
+    firstRendered('.dp-shell__pages > div:not([hidden]) app-add-or-edit') ||
+    firstRendered('.dp-shell__pages > div:not([hidden])');
   return root || document;
 }
 

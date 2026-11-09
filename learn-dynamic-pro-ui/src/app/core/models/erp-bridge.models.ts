@@ -28,7 +28,14 @@ export interface ErpMissingFieldInfo {
 }
 
 export interface ErpSaveResult {
+  /** `true` only when `outcome === 'saved'` (positive evidence of a persisted document). */
   success: boolean;
+  /**
+   * - `saved`: success toast / document id / form closed-or-cleared after the click.
+   * - `failed`: an error toast or a bridge/server error was captured.
+   * - `unconfirmed`: the click was dispatched but no evidence either way was observed.
+   */
+  outcome?: 'saved' | 'failed' | 'unconfirmed';
   docId?: string | number;
   errors?: string[];
   message?: string;

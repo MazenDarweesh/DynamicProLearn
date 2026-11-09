@@ -249,6 +249,7 @@ const OPTION_SYNONYM_GROUPS: string[][] = [
   ['euro', 'eur', 'يورو'],
   ['aed', 'درهم', 'درهم اماراتي', 'دينار اماراتي', 'اماراتي'],
   ['sar', 'ريال', 'ريال سعودي', 'سعودي'],
+  ['كاش', 'نقدا', 'نقدى', 'نقد', 'الخزينة', 'الخزينه', 'خزينة', 'خزينه', 'الصندوق', 'صندوق', 'الخزينة الرئيسية', 'الخزينة العامة'],
 ];
 
 export function pickBestOption<T extends { el: HTMLElement; rawText: string }>(
@@ -300,6 +301,24 @@ export function pickBestOption<T extends { el: HTMLElement; rawText: string }>(
     // When user says "مباشرة" (no "غير"), disqualify options containing "غير" (e.g. "مبيعات غير مباشرة")
     if (!targetHasGhair && (optText.includes('غير') || cleaned.includes('غير'))) {
       continue;
+    }
+
+    // Multi-word target coverage guard:
+    // If target has 2 or more distinct tokens (e.g. "خامات تام" or "لودر 1"), ensure high coverage so partial tokens don't falsely match
+    const targetWords = normalizedTarget
+      .split(/\s+/)
+      .map((w) => w.replace(/^[وال]+/, '').trim())
+      .filter((w) => w.length >= 1);
+    if (targetWords.length >= 2) {
+      let matchedWords = 0;
+      for (const tw of targetWords) {
+        if (optText.includes(tw) || cleaned.includes(tw)) matchedWords++;
+      }
+      const coverage = matchedWords / targetWords.length;
+      if (coverage < 0.7) {
+        // Disqualify candidates that drop half the user's specific qualification
+        continue;
+      }
     }
 
     // Exact word boundary match
@@ -562,6 +581,18 @@ export async function setNgSelect(
       if (words.length > 1) {
         const firstWord = words[0];
         result = await performSearch(firstWord, 600);
+      }
+    }
+
+    // 3. Semantic Cash / Safe fallback: if searching for payment terms ('نقدا', 'كاش') or safe field, try 'الخزينة' / 'الصندوق'
+    if (result === 'not_found') {
+      const isCashTerm = /^(نقدا|نقدى|نقد|كاش)$/i.test(termStr);
+      const isSafeField = /safe|خزين|صندوق/i.test(targetSelector);
+      if (isCashTerm || isSafeField) {
+        result = await performSearch('الخزينة', 800);
+        if (result === 'not_found') {
+          result = await performSearch('الصندوق', 800);
+        }
       }
     }
 

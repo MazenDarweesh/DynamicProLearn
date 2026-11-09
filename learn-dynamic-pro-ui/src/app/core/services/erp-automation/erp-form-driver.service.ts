@@ -40,6 +40,19 @@ import { verifyPostFillAssertions } from './save-recovery/erp-save-verifier';
 // Re-export for backward compatibility with components & callers
 export { normalizeArabicText, convertEasternToWesternNumerals };
 
+/** Keys that hold lookup IDs/choices in the ERP model: a non-numeric string there is display text, not an ID. */
+const LOOKUP_LIKE_KEY = /(id$|setting|type|account|store|project|item|supplier|customer|currancy|currency|safe|salesman|employee|gov|categor)/i;
+
+/** True when `value` can be written straight into the host model without resolving a lookup option. */
+export function isSafeBridgeScalar(key: string, value: unknown): boolean {
+  if (value == null) return false;
+  if (typeof value === 'number' || typeof value === 'boolean') return true;
+  const text = String(value).trim();
+  if (text === '' || text.startsWith('$')) return false;
+  if (LOOKUP_LIKE_KEY.test(key)) return /^-?\d+(\.\d+)?$/.test(text);
+  return true;
+}
+
 /**
  * ErpFormDriverService - Lean Façade & Form Fill Orchestrator.
  * Coordinates DOM inspection, control interaction, grid automation,
@@ -219,14 +232,20 @@ export class ErpFormDriverService {
           );
 
         const lookupKinds = new Set(['ng-select', 'select', 'mat-select']);
-        const lookupKeys = new Set(
-          this.collectFormSchema(excludeContainer)
-            .filter((s) => lookupKinds.has(s.kind))
-            .map((s) => s.key)
-        );
-        const bridgeFields = Object.fromEntries(
-          Object.entries(fields || {}).filter(([k]) => !lookupKeys.has(k))
-        );
+        const liveSchema = this.collectFormSchema(excludeContainer);
+        const lookupKeys = new Set(liveSchema.filter((s) => lookupKinds.has(s.kind)).map((s) => s.key));
+        // Never push display text into lookup/ID model properties: the host would persist the raw string
+        // (e.g. StoreID:"مخزن خامات") and the server fails with "Incorrect syntax near ...".
+        // With an unknown/empty schema we cannot tell lookups apart, so nothing is forwarded to the bridge
+        // and the DOM driver (which resolves real option IDs) handles every field.
+        const bridgeFields =
+          liveSchema.length === 0
+            ? {}
+            : Object.fromEntries(
+                Object.entries(fields || {}).filter(
+                  ([k, v]) => !lookupKeys.has(k) && isSafeBridgeScalar(k, v)
+                )
+              );
         // Only pass rows to in-memory bridge if they already carry resolved numeric ProductID / ItemId;
         // otherwise let fillGridRows add them via the DOM product picker so Angular resolves ProductID & price!
         const preResolvedRows = hasExistingRows
@@ -267,7 +286,8 @@ export class ErpFormDriverService {
         const schemaField = currentSchema.find(
           (s) => s.key === k || normalizeArabicText(s.label) === normalizeArabicText(k)
         );
-        return schemaField && !schemaField.disabled;
+        // Grid cells / product toolbar controls are filled by the grid driver (rows), never as header fields.
+        return schemaField && !schemaField.disabled && schemaField.group !== 'grid';
       });
 
       // Sort readyKeys by DOM appearance in currentSchema to respect natural top-to-bottom cascade
@@ -285,7 +305,7 @@ export class ErpFormDriverService {
         if (activeCopilotService && userMessage && (Object.keys(filledFields).length > 0 || failedAttempts.size > 0)) {
           const newUnmappedFields = currentSchema
             .filter((s) => {
-              if (s.disabled || filledFields[s.key] || pendingFields[s.key]) return false;
+              if (s.disabled || s.group === 'grid' || filledFields[s.key] || pendingFields[s.key]) return false;
               const prevFails = failedAttempts.get(s.key);
               // Only re-ask AI for a previously failed field if we now have observed dropdown options and haven't failed twice
               if (prevFails && (!s.options || s.options.length === 0 || prevFails.size >= 2)) {
@@ -459,12 +479,26 @@ export class ErpFormDriverService {
     }
 
     if (rows && rows.length > 0) {
-      const rowFilledCount = await this.fillGridRows(rows, excludeContainer, results);
+      let rowFilledCount = 0;
+      try {
+        rowFilledCount = await this.fillGridRows(rows, excludeContainer, results);
+      } catch (gridErr) {
+        // Never swallow grid failures: surface them in the report and the session log.
+        this.telemetry?.logError('GRID', 'fillGridRows threw an exception', gridErr);
+        results.push({
+          field: 'الأصناف',
+          value: JSON.stringify(rows),
+          status: 'not_found',
+          message: `تعذر ملء جدول الأصناف: ${(gridErr as any)?.message || 'خطأ غير معروف'}`,
+        });
+      }
+      const verification = await this.verifyGridRowsViaBridge(rows, results);
+      rowFilledCount = Math.max(0, rowFilledCount - verification.revoked);
       filledCount += rowFilledCount;
       this.telemetry?.log(
         'GRID',
-        `Completed filling grid rows: ${rowFilledCount}/${rows.length} rows filled`,
-        { total: rows.length, filled: rowFilledCount }
+        `Completed filling grid rows: ${rowFilledCount}/${rows.length} rows verified`,
+        { total: rows.length, filled: rowFilledCount, revoked: verification.revoked }
       );
       await this.settle(undefined, { quietMs: 60, maxMs: 400 });
     }
@@ -597,22 +631,38 @@ export class ErpFormDriverService {
           }
         }
         this.setTextOrDate(targetElement, finalVal);
-        filledCount++;
-        results.push({
-          field: cleanKey || 'المدفوع نقداً',
-          value: finalVal,
-          status: 'filled',
-          message: `تم نسخ القيمة الإجمالية المحسوبة (${finalVal}) إلى خانة السداد والمدفوع نقداً`,
-        });
-        this.telemetry?.log(
-          'FILL',
-          `Populated calculated total (${finalVal}) into cash paid field`,
-          {
-            field: cleanKey,
-            total: finalVal,
-            targetId: targetElement.id || targetElement.getAttribute('name'),
-          }
-        );
+        if (!finalVal || Number(finalVal) <= 0) {
+          // A zero total means the lines were not priced/bound — never claim a cash settlement of 0.
+          this.telemetry?.log(
+            'FILL',
+            'Cash settlement skipped: calculated total is 0 (rows not priced/bound)',
+            { field: cleanKey, total: finalVal },
+            'WARN'
+          );
+          results.push({
+            field: cleanKey || 'المدفوع نقداً',
+            value: finalVal,
+            status: 'not_found',
+            message: 'الإجمالي صفر لأن الأصناف لم تُسعَّر/تُربط بالفاتورة — لم أعبّئ المدفوع نقداً.',
+          });
+        } else {
+          filledCount++;
+          results.push({
+            field: cleanKey || 'المدفوع نقداً',
+            value: finalVal,
+            status: 'filled',
+            message: `تم نسخ القيمة الإجمالية المحسوبة (${finalVal}) إلى خانة السداد والمدفوع نقداً`,
+          });
+          this.telemetry?.log(
+            'FILL',
+            `Populated calculated total (${finalVal}) into cash paid field`,
+            {
+              field: cleanKey,
+              total: finalVal,
+              targetId: targetElement.id || targetElement.getAttribute('name'),
+            }
+          );
+        }
       }
     }
 
@@ -625,5 +675,61 @@ export class ErpFormDriverService {
       filledCount: verifiedFilledCount,
       results: verifiedResults,
     };
+  }
+
+  /**
+   * Closed-loop check of the grid: asks the host (in-memory model) how many lines really carry a bound product.
+   * Lines the DOM driver reported as filled but that have no product binding are revoked (reported `not_found`),
+   * so the UI never shows a false "2/2 filled" and auto-save is never triggered on empty/unpriced lines.
+   */
+  private async verifyGridRowsViaBridge(
+    rows: Record<string, any>[],
+    results: FormFillResult[]
+  ): Promise<{ revoked: number; bound: number; expected: number }> {
+    const productKey = /(product|item|الصنف|المنتج)/i;
+    const expected = rows.filter((r) => r && Object.keys(r).some((k) => productKey.test(k))).length;
+    if (!this.bridge?.isAvailable || expected === 0) {
+      return { revoked: 0, bound: expected, expected };
+    }
+
+    await this.settle(undefined, { quietMs: 150, maxMs: 600 });
+    const ctx = this.bridge.getActiveFormContext(true);
+    const ctxRows = Array.isArray(ctx?.rows) ? ctx!.rows! : [];
+    if (ctxRows.length === 0) {
+      return { revoked: 0, bound: expected, expected }; // host exposes no row model: cannot verify
+    }
+
+    const isBound = (r: Record<string, any>) =>
+      Object.keys(r || {}).some((k) => /(product|item)/i.test(k) && /id$/i.test(k) && !!r[k]);
+    const isPriced = (r: Record<string, any>) =>
+      Number(r?.['Total'] ?? r?.['TotalCurrancy'] ?? 0) > 0 || Number(r?.['UnitePrice'] ?? r?.['Cost'] ?? 0) > 0;
+    const dataRows = ctxRows.filter((r) => r && Object.keys(r).some((k) => k !== 'new'));
+    const bound = dataRows.filter(isBound).length;
+    const priced = dataRows.filter((r) => isBound(r) && isPriced(r)).length;
+
+    this.telemetry?.log(
+      'GRID',
+      `Bridge row verification: ${bound}/${expected} lines have a bound product (${priced} priced)`,
+      { expected, bound, priced, modelRows: dataRows.length },
+      bound >= expected ? 'INFO' : 'WARN'
+    );
+
+    if (bound >= expected) return { revoked: 0, bound, expected };
+
+    let toRevoke = expected - bound;
+    let revoked = 0;
+    for (let i = results.length - 1; i >= 0 && toRevoke > 0; i--) {
+      const res = results[i];
+      if (res.status === 'filled' && (/^row_\d+$/.test(res.field) || res.field.startsWith('سطر جدول'))) {
+        results[i] = {
+          ...res,
+          status: 'not_found',
+          message: 'الصنف لم يُربط بالفاتورة داخل النظام (لا يوجد ProductID) — راجع الصنف يدوياً.',
+        };
+        toRevoke--;
+        revoked++;
+      }
+    }
+    return { revoked, bound, expected };
   }
 }

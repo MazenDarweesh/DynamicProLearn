@@ -47,9 +47,62 @@ function triggerFullClick(el: HTMLElement): void {
   }
 }
 
+/** The primary split-button that owns the Save drop-down (its own label must never be mistaken for a menu item). */
+const SAVE_TRIGGER_SELECTOR = '.dp-edit__save, button.dp-btn--save';
+
+const SAVE_MENU_ITEM_SELECTOR = [
+  'button.dp-menu__item',
+  '.dp-menu__item',
+  '.dp-menu_item',
+  '.cdk-overlay-container [role="menuitem"]',
+  '.dp-menu li',
+  '.dp-menu button',
+  '.dropdown-menu.show a',
+  '.dropdown-menu.show button',
+].join(', ');
+
+/**
+ * Returns the clickable element of the open Save drop-down whose label is `preferredText`
+ * (default "حفظ"). Items inside the split-button trigger itself are excluded, so we never
+ * re-click the trigger (which would only toggle the menu closed/open).
+ */
+export function findOpenSaveMenuItem(preferredText: string = 'حفظ'): HTMLElement | null {
+  if (typeof document === 'undefined') return null;
+  const normPreferred = normalizeArabicText(preferredText).trim();
+
+  const items = Array.from(document.querySelectorAll<HTMLElement>(SAVE_MENU_ITEM_SELECTOR)).filter(
+    (el) =>
+      !el.closest('lms-ai-copilot, app-copilot-chat') &&
+      !el.closest(SAVE_TRIGGER_SELECTOR) &&
+      !el.matches(SAVE_TRIGGER_SELECTOR) &&
+      isElementVisible(el)
+  );
+  if (items.length === 0) return null;
+
+  const labelOf = (el: HTMLElement) =>
+    normalizeArabicText(
+      (el.querySelector('span.dp-menu_text, span.dp-menu__text')?.textContent || el.textContent || '')
+    ).trim();
+
+  return (
+    items.find((el) => labelOf(el) === normPreferred) ||
+    items.find((el) => {
+      const txt = labelOf(el);
+      return txt.startsWith('حفظ') && !txt.includes('الغاء') && !txt.includes('حذف');
+    }) ||
+    null
+  );
+}
+
+/** True while any visible item of the Save drop-down is still on screen (menu not consumed). */
+export function isSaveMenuStillOpen(): boolean {
+  return findOpenSaveMenuItem('حفظ') !== null;
+}
+
 /**
  * Inspects the DOM shortly after clicking the primary Save button to see if a split-button
- * or dropdown menu opened (e.g. `<span class="dp-menu_text">حفظ</span>`), and clicks the save option.
+ * drop-down opened (حفظ / إدخال أقساط / إدخال مصاريف), clicks the real "حفظ" item and verifies
+ * the menu was consumed (retries once if it is still open).
  */
 export async function completeSaveMenuSubOption(
   preferredText: string = 'حفظ',
@@ -58,45 +111,28 @@ export async function completeSaveMenuSubOption(
   if (typeof document === 'undefined') return undefined;
 
   const start = Date.now();
-  const normPreferred = normalizeArabicText(preferredText).trim();
-
   while (Date.now() - start < maxWaitMs) {
-    const menuSpans = Array.from(
-      document.querySelectorAll<HTMLElement>(
-        'span.dp-menu_text, span.dp-menu__text, [class*="dp-menu"] span, .cdk-overlay-container [role="menuitem"], .dp-menu li, .dp-menu button, .dropdown-menu.show a, .dropdown-menu.show button'
-      )
-    ).filter((el) => !el.closest('lms-ai-copilot, app-copilot-chat') && isElementVisible(el));
-
-    if (menuSpans.length > 0) {
-      // 1. Exact match on preferredText (typically 'حفظ')
-      let match = menuSpans.find(
-        (el) => normalizeArabicText(el.textContent || '').trim() === normPreferred
+    const item = findOpenSaveMenuItem(preferredText);
+    if (item) {
+      const clickedLabel = (item.textContent || preferredText).trim();
+      console.info(
+        '%c[ErpSaveVerifier] Clicked Save sub-menu option:',
+        'color:#10b981;font-weight:bold',
+        clickedLabel,
+        item
       );
+      triggerFullClick(item);
 
-      // 2. Fallback to any option starting with 'حفظ' (excluding cancel/delete)
-      if (!match) {
-        match = menuSpans.find((el) => {
-          const txt = normalizeArabicText(el.textContent || '').trim();
-          return txt.startsWith('حفظ') && !txt.includes('الغاء') && !txt.includes('حذف');
-        });
+      // Verify the click actually consumed the menu; retry once on the freshly resolved item.
+      await new Promise((r) => setTimeout(r, 180));
+      const stillOpen = findOpenSaveMenuItem(preferredText);
+      if (stillOpen) {
+        console.warn('[ErpSaveVerifier] Save menu still open after click — retrying once', stillOpen);
+        triggerFullClick(stillOpen);
+        await new Promise((r) => setTimeout(r, 180));
       }
-
-      if (match) {
-        const clickableTarget =
-          (match.closest('button, li, a, [role="menuitem"], .dp-menu__item, .dp-menu_item') as HTMLElement) ||
-          match;
-        const clickedLabel = (match.textContent || 'حفظ').trim();
-        console.info(
-          '%c[ErpSaveVerifier] Clicked Save sub-menu option:',
-          'color:#10b981;font-weight:bold',
-          clickedLabel,
-          clickableTarget
-        );
-        triggerFullClick(clickableTarget);
-        return clickedLabel;
-      }
+      return clickedLabel;
     }
-
     await new Promise((r) => setTimeout(r, 50));
   }
 
@@ -145,6 +181,28 @@ function parseToastElement(el: HTMLElement): CapturedSaveToast | null {
   };
 }
 
+const TOAST_SELECTORS = [
+  '#toast-container > div',
+  '.dp-toast-top-end > div',
+  '.overlay-container .ngx-toastr',
+  '.overlay-container [toast-component]',
+  '.toast-container .ngx-toastr',
+  '.toast-container .toast',
+  '.swal2-container .swal2-popup',
+].join(', ');
+
+/** One-shot read of the toasts currently visible on screen (used for late server-side errors). */
+export function readVisibleSaveToasts(): CapturedSaveToast[] {
+  if (typeof document === 'undefined') return [];
+  const out = new Map<string, CapturedSaveToast>();
+  for (const node of Array.from(document.querySelectorAll<HTMLElement>(TOAST_SELECTORS))) {
+    if (node.closest('lms-ai-copilot, app-copilot-chat')) continue;
+    const parsed = parseToastElement(node);
+    if (parsed && !out.has(parsed.text)) out.set(parsed.text, parsed);
+  }
+  return Array.from(out.values());
+}
+
 /**
  * Attaches a real-time MutationObserver to `#toast-container.dp-toast-top-end` and `.overlay-container`
  * BEFORE executing the save action so transient ngx-toastr notifications are captured immediately.
@@ -165,17 +223,7 @@ export async function observeSaveToastAndValidation<T>(
   const capturedMap = new Map<string, CapturedSaveToast>();
 
   const scanToastNodes = (root: ParentNode) => {
-    const toastSelectors = [
-      '#toast-container > div',
-      '.dp-toast-top-end > div',
-      '.overlay-container .ngx-toastr',
-      '.overlay-container [toast-component]',
-      '.toast-container .ngx-toastr',
-      '.toast-container .toast',
-      '.swal2-container .swal2-popup',
-    ].join(', ');
-
-    const nodes = Array.from(root.querySelectorAll<HTMLElement>(toastSelectors));
+    const nodes = Array.from(root.querySelectorAll<HTMLElement>(TOAST_SELECTORS));
     for (const node of nodes) {
       if (node.closest('lms-ai-copilot, app-copilot-chat')) continue;
       const parsed = parseToastElement(node);

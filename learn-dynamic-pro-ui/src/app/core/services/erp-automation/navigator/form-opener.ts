@@ -1,11 +1,34 @@
 import { normalizeArabicText } from '../form-driver/arabic-normalizer';
+import { getActiveScreenContainer } from '../form-driver/dom-synchronizer';
 import { ErpBridgeService } from '../erp-bridge.service';
 import { isNavElementVisible, simulateNavClick } from './nav-candidate-scanner';
 
+/**
+ * The host keeps the previous screen's document in memory while another screen is active, so
+ * `getActiveFormContext()` may describe a different screen than the one on display. A context is only
+ * trusted when its screen name matches the active screen reported by the bridge.
+ */
+function isContextOfActiveScreen(bridge: ErpBridgeService, ctxScreenName?: string): boolean {
+  const active = bridge.getActiveScreen()?.pageName;
+  if (!ctxScreenName || !active) return true; // nothing to compare against
+  return normalizeArabicText(ctxScreenName).trim().toLowerCase() === normalizeArabicText(active).trim().toLowerCase();
+}
+
+function hasVisibleFormMarkup(container: Element): boolean {
+  const el = container.querySelector(
+    'app-add-or-edit, .dp-edit, .dp-edit__head, section.dp-pu__sup, ng-select[formcontrolname], input#productQty'
+  );
+  return !!el && isNavElementVisible(el);
+}
+
 export function checkIsFormAlreadyOpen(bridge: ErpBridgeService): boolean {
   const ctx = bridge.getActiveFormContext();
-  if (ctx) {
-    if (ctx.dataObject || (ctx.rows && ctx.rows.length >= 0 && ctx.formType !== 'dom') || ctx.isInvoice) {
+  const container = typeof document === 'undefined' ? null : getActiveScreenContainer();
+  if (ctx && isContextOfActiveScreen(bridge, ctx.screenName)) {
+    // The host may keep the PREVIOUS screen's document object while a different screen is displayed
+    // (a Sales screen reporting Purchases' dataObject). The DOM of the visible screen must agree.
+    const domAgrees = !container || hasVisibleFormMarkup(container);
+    if (domAgrees && (ctx.dataObject || (ctx.rows && ctx.rows.length >= 0 && ctx.formType !== 'dom') || ctx.isInvoice)) {
       return true;
     }
   }
@@ -21,7 +44,7 @@ export function checkIsFormAlreadyOpen(bridge: ErpBridgeService): boolean {
     return true;
   }
 
-  const activePage = document.querySelector('.dp-shell__pages > div:not([hidden])') || document;
+  const activePage = getActiveScreenContainer() || document;
   const pageForm = activePage.querySelector(
     'app-add-or-edit, .dp-edit, .dp-list__pre, .dp-edit__head, section.dp-pu__sup'
   );

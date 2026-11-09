@@ -87,6 +87,8 @@ export interface ChatMessage {
   /** Dual-path escalation: suggest launching Vision Agent when form is not currently open in DOM */
   canEscalateToVisionAgent?: boolean;
   escalationGoal?: string;
+  /** Whether the form entry was already prepared/opened fresh during the intent stream phase */
+  formPrepared?: boolean;
 }
 
 @Component({
@@ -643,7 +645,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     // 🔄 Conversational Validation Recovery: If waiting for user to supply missing field(s) after a Save toast error,
     // patch the currently open form in-place (without resetting/re-opening) and auto-save!
     const isExplicitNewNavOrFullDoc =
-      /^(اذهب|انتقل|افتح|وديني|روح|سجل فاتور|انشئ فاتور|أنشئ فاتور|اضف فاتور|أضف فاتور)\s/i.test(query);
+      /^(اذهب|انتقل|افتح|وديني|روح|سجل|انشئ|أنشئ|اضف|أضف|اعمل|إعمل|عمل|سوي|سوّي|دخل|أدخل|ادخل)\s/i.test(query) ||
+      /(فاتور|سند|قيد|إذن|اذن|طلب)/i.test(query);
     if (this.pendingMissingFieldsRecovery && !isExplicitNewNavOrFullDoc) {
       await this.applyMissingFieldsRecoveryReply(query);
       return;
@@ -873,8 +876,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
       this.syncErpKey(effectiveTarget || currentActive);
 
-      // Ensure form entry is prepared/opened if currently on a list view
-      await this.navigator.prepareFreshForm();
+      // Ensure form entry is prepared/opened if currently on a list view or if not prepared during intent
+      if (!msg.formPrepared || !isSameScreen) {
+        await this.navigator.prepareFreshForm();
+      } else {
+        this.telemetry?.log('NAV', 'Form already prepared during intent phase — skipping redundant prepareFreshForm');
+      }
 
       const report = await this.formDriver.applyProgressiveFill(
         msg.formFillData.fields,
@@ -910,11 +917,29 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         this.copilotService.feedbackErpNavigation(msg.decisionId, 'applied');
       }
 
-      // 💾 Optional auto-save: only if every requested field was filled cleanly
+      // 💾 Optional auto-save: triggered when the user checked "حفظ تلقائي بعد التعبئة"
       const unresolvedFields = report.results.filter(r => r.status === 'not_found' || r.status === 'ambiguous');
       const hasUnresolved = unresolvedFields.length > 0;
-      if (this.autoSaveAfterFill && report.success && !hasUnresolved) {
-        await this.confirmSave(msg);
+      if (this.autoSaveAfterFill) {
+        if (report.success) {
+          this.telemetry?.log('FILL', 'autoSaveAfterFill triggered: initiating confirmSave', {
+            filledCount: report.filledCount,
+            hasUnresolved,
+            unresolvedCount: unresolvedFields.length
+          });
+          await this.confirmSave(msg);
+        } else {
+          this.telemetry?.log('FILL', 'autoSaveAfterFill skipped because form fill failed', {
+            results: report.results
+          }, 'WARN');
+          this.messages.push({
+            sender: 'assistant',
+            text: `⚠️ لم يتم الحفظ التلقائي لأن تعبئة بعض البيانات لم تكتمل (${unresolvedFields.map(r => r.label || r.field).join('، ')}). يرجى مراجعة الحقول والضغط على زر الحفظ يدوياً.`,
+            sources: [],
+            isStreaming: false
+          });
+          this.scrollToBottom();
+        }
       } else if (!report.success && report.filledCount === 0 && msg.relatedUserQuery) {
         // 👁️ Phase 3 True Hybrid Fallback: If DOM driver couldn't fill any field (e.g. Canvas/iFrame/unmounted),
         // automatically escalate to Vision Agent without manual user intervention!
@@ -1225,6 +1250,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     let visibleFields: string[] | undefined = undefined;
     let formSchema: any[] | undefined = undefined;
     let shouldOfferVisionEscalation = false;
+    let formPreparedDuringStream = false;
 
     if (this.isActionMode) {
       this.syncErpKey();
@@ -1315,6 +1341,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         try {
           const formOpened = await this.navigator.prepareFreshForm(2000);
           if (formOpened) {
+            formPreparedDuringStream = true;
             await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
           }
         } catch (formErr) {
@@ -1356,6 +1383,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       sources: [],
       isStreaming: true,
       askOptions: pendingAskOptions,
+      formPrepared: formPreparedDuringStream,
       canEscalateToVisionAgent: shouldOfferVisionEscalation,
       escalationGoal: shouldOfferVisionEscalation ? query : undefined,
       relatedUserQuery: query,
