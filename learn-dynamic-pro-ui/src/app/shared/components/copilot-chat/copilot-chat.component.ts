@@ -12,7 +12,9 @@ import {
   ErpNavigatorService,
   ErpBridgeService,
   ErpTelemetryService,
-  normalizeArabicText
+  normalizeArabicText,
+  detectMissingFieldsFromToastAndDom,
+  ErpMissingFieldInfo
 } from '../../../core/services/erp-automation';
 import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } from '../../../core/models/erp-form.models';
 import { AuthService } from '../../../core/services/platform-core/auth.service';
@@ -142,6 +144,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   isVisionAgentMode = false;
   cdpPort = 9222;
   cdpHost = typeof localStorage !== 'undefined' ? (localStorage.getItem('copilot_cdp_host') || '127.0.0.1') : '127.0.0.1';
+
+  /**
+   * Conversational Validation Recovery state:
+   * Holds missing fields detected from `#toast-container.dp-toast-top-end` or `.ng-invalid` controls
+   * after a Save attempt, so the user's next reply patches the active form without resetting it.
+   */
+  pendingMissingFieldsRecovery: {
+    targetMessage: ChatMessage;
+    missingFields: ErpMissingFieldInfo[];
+    rawErrors: string[];
+  } | null = null;
 
   get currentModeKey(): string {
     if (this.isVisionAgentMode) return 'mode-vision';
@@ -628,6 +641,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     this.inputQuery = '';
+
+    // 🔄 Conversational Validation Recovery: If waiting for user to supply missing field(s) after a Save toast error,
+    // patch the currently open form in-place (without resetting/re-opening) and auto-save!
+    const isExplicitNewNavOrFullDoc =
+      /^(اذهب|انتقل|افتح|وديني|روح|سجل فاتور|انشئ فاتور|أنشئ فاتور|اضف فاتور|أضف فاتور)\s/i.test(query);
+    if (this.pendingMissingFieldsRecovery && !isExplicitNewNavOrFullDoc) {
+      await this.applyMissingFieldsRecoveryReply(query);
+      return;
+    }
+
+    this.pendingMissingFieldsRecovery = null;
     await this.streamQuery(query, skipCache);
   }
 
@@ -902,8 +926,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
 
   /**
-   * Saves the currently open ERP form through the official bridge.
-   * Triggered only by the user's explicit click or by the opt-in auto-save toggle.
+   * Saves the currently open ERP form through the official bridge or DOM Save + `span.dp-menu_text`.
+   * Observes `#toast-container.dp-toast-top-end` in real time; if validation errors occur,
+   * identifies the missing fields and enters Conversational Slot-Filling Recovery mode.
    */
   async confirmSave(msg: ChatMessage): Promise<void> {
     if (msg.saveStatus === 'saving' || msg.saveStatus === 'saved') return;
@@ -912,7 +937,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     msg.saveMessage = undefined;
     this.cdr.markForCheck();
 
-    if (!this.bridge.isAvailable) {
+    if (!this.bridge.isAvailable && typeof document === 'undefined') {
       msg.saveStatus = 'failed';
       msg.saveMessage = 'جسر الـ ERP غير متاح هنا. اضغط زر الحفظ يدوياً داخل الشاشة.';
       this.cdr.markForCheck();
@@ -921,20 +946,184 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
     const res = await this.bridge.submitActiveForm();
     if (res.success) {
+      this.pendingMissingFieldsRecovery = null;
       msg.saveStatus = 'saved';
       msg.saveMessage = res.docId
         ? `✅ تم الحفظ بنجاح في نظام الـ ERP! رقم المستند: #${res.docId}`
         : (res.message || '✅ تم إرسال أمر الحفظ بنجاح إلى الـ ERP.');
     } else {
       msg.saveStatus = 'failed';
+      const rawErrors =
+        res.errors && res.errors.length > 0
+          ? res.errors
+          : res.message
+            ? [res.message]
+            : ['تعذر إتمام الحفظ لوجود بيانات إلزامية ناقصة'];
+
+      const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
+      const missingFields = detectMissingFieldsFromToastAndDom(
+        rawErrors,
+        schemas,
+        this.elRef?.nativeElement
+      );
+
       if (res.errors && res.errors.length > 0) {
-        msg.saveMessage = `⚠️ لم يتم الحفظ لوجود حقول إلزامية ناقصة: ${res.errors.join('، ')}`;
+        msg.saveMessage = `⚠️ لم يتم الحفظ: ${res.errors.join('، ')}`;
       } else {
-        msg.saveMessage = res.message || '⚠️ تعذر إرسال أمر الحفظ. راجع الحقول في الشاشة ثم اضغط حفظ يدوياً.';
+        msg.saveMessage = res.message || '⚠️ تعذر إرسال أمر الحفظ. راجع الحقول الناقصة أدناه.';
       }
+
+      this.pendingMissingFieldsRecovery = {
+        targetMessage: msg,
+        missingFields,
+        rawErrors
+      };
+
+      const fieldsBulletList =
+        missingFields.length > 0
+          ? missingFields
+              .map((mf) => {
+                const optsHint =
+                  mf.options && mf.options.length > 0
+                    ? ` *(الخيارات المتاحة: ${mf.options.slice(0, 8).join('، ')})*`
+                    : '';
+                return `- **${mf.label}**${optsHint}`;
+              })
+              .join('\n')
+          : `- يرجى كتابة اسم الحقل وقيمته المطلوبة بناءً على رسالة التنبيه أعلاه.`;
+
+      const promptText =
+        `⚠️ **تنبيه من النظام عند محاولة الحفظ:**\n` +
+        `> «${rawErrors.join(' — ')}»\n\n` +
+        `لاستكمال حفظ الفاتورة المفتوحة حالياً **دون مسح البيانات المدخلة**، يرجى تزويدي بالقيمة المطلوبة لـ:\n` +
+        `${fieldsBulletList}\n\n` +
+        `💬 *اكتب القيمة هنا مباشرةً وسأقوم بملئها والضغط على حفظ تلقائياً.*`;
+
+      this.messages.push({
+        sender: 'assistant',
+        text: promptText,
+        sources: [],
+        isStreaming: false
+      });
+      this.scrollToBottom();
     }
     console.info('[Copilot Save] submitActiveForm result:', res);
     this.cdr.markForCheck();
+  }
+
+  /**
+   * Handles the user's conversational reply supplying missing field value(s) after a Save validation toast.
+   * Patches ONLY the missing field(s) in the currently open form (never calls triggerAddNew) and re-saves.
+   */
+  private async applyMissingFieldsRecoveryReply(userReply: string): Promise<void> {
+    const recovery = this.pendingMissingFieldsRecovery;
+    if (!recovery) return;
+
+    this.isStreaming = true;
+    this.cdr.markForCheck();
+
+    try {
+      const fieldsToPatch: Record<string, any> = {};
+      const cleanReply = userReply.trim();
+
+      if (recovery.missingFields.length === 1) {
+        const mf = recovery.missingFields[0];
+        let val = cleanReply;
+        // Strip leading field label if user wrote e.g. "طريقة الشراء مشتريات مباشرة"
+        const normLabel = normalizeArabicText(mf.label);
+        if (normLabel && normalizeArabicText(val).startsWith(normLabel)) {
+          val = val
+            .slice(mf.label.length)
+            .replace(/^[\s:=-]+/, '')
+            .trim() || cleanReply;
+        }
+        fieldsToPatch[mf.key] = val;
+      } else {
+        const currentSchemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
+        const targetSchemas =
+          recovery.missingFields.length > 0
+            ? recovery.missingFields
+            : currentSchemas.filter((s) => !s.disabled);
+
+        // Try AI leftover extraction scoped to the missing fields
+        try {
+          const leftoverRes = await this.copilotService.resolveErpLeftover({
+            user_message: cleanReply,
+            extracted_data: recovery.targetMessage.formFillData?.fields || {},
+            filled: {},
+            new_fields: targetSchemas.map((s) => ({
+              key: s.key,
+              label: s.label,
+              kind: s.kind,
+              disabled: false,
+              options: s.options
+            }))
+          });
+          if (leftoverRes?.fields && Object.keys(leftoverRes.fields).length > 0) {
+            Object.assign(fieldsToPatch, leftoverRes.fields);
+          }
+        } catch (err) {
+          console.warn('[Copilot SaveRecovery] resolveErpLeftover fallback error:', err);
+        }
+
+        // Direct fallback if single token or AI didn't map
+        if (Object.keys(fieldsToPatch).length === 0 && recovery.missingFields.length > 0) {
+          fieldsToPatch[recovery.missingFields[0].key] = cleanReply;
+        }
+      }
+
+      this.telemetry?.log('FILL', 'Applying conversational missing-field recovery patch (in-place)', {
+        fieldsToPatch,
+        userReply: cleanReply
+      });
+
+      const patchReport = await this.formDriver.applyProgressiveFill(
+        fieldsToPatch,
+        undefined,
+        this.elRef?.nativeElement,
+        this.copilotService,
+        cleanReply
+      );
+
+      // Merge patched results into targetMessage's formFillData & report
+      if (recovery.targetMessage.formFillData) {
+        recovery.targetMessage.formFillData.fields = {
+          ...(recovery.targetMessage.formFillData.fields || {}),
+          ...fieldsToPatch
+        };
+      }
+      recovery.targetMessage.formFillReport = patchReport;
+      this.pendingMissingFieldsRecovery = null;
+
+      this.messages.push({
+        sender: 'assistant',
+        text: `✅ تم استكمال البيانات في الفاتورة الحالية (${Object.values(fieldsToPatch).join('، ')})، وجارٍ إعادة الحفظ تلقائياً...`,
+        sources: [],
+        isStreaming: false
+      });
+      this.cdr.markForCheck();
+      this.scrollToBottom();
+
+      // Reset saveStatus so confirmSave executes fresh and clicks Save + span.dp-menu_text
+      recovery.targetMessage.saveStatus = undefined;
+      await this.confirmSave(recovery.targetMessage);
+
+      if (recovery.targetMessage.saveStatus === 'saved') {
+        this.messages.push({
+          sender: 'assistant',
+          text: recovery.targetMessage.saveMessage || '✅ تم استكمال النواقص وحفظ المستند بنجاح!',
+          sources: [],
+          isStreaming: false
+        });
+        this.scrollToBottom();
+      }
+    } catch (err) {
+      console.error('[Copilot SaveRecovery] Error during missing-field recovery:', err);
+      this.telemetry?.logError('FILL', 'applyMissingFieldsRecoveryReply error', err);
+    } finally {
+      this.isStreaming = false;
+      this.cdr.markForCheck();
+    }
   }
 
 

@@ -19,11 +19,21 @@ export interface ErpScreenInfo {
   screenKey?: string;
 }
 
+export interface ErpMissingFieldInfo {
+  key: string;
+  label: string;
+  kind: string;
+  options?: string[];
+  reason?: string;
+}
+
 export interface ErpSaveResult {
   success: boolean;
   docId?: string | number;
   errors?: string[];
   message?: string;
+  missingFields?: ErpMissingFieldInfo[];
+  subMenuClicked?: string;
 }
 
 export interface ErpFormFillPayload {

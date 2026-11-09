@@ -35,6 +35,7 @@ import {
   readCalculatedTotal,
 } from './form-driver/control-interactor';
 import { fillGridRows } from './form-driver/grid-driver';
+import { verifyPostFillAssertions } from './save-recovery/erp-save-verifier';
 
 // Re-export for backward compatibility with components & callers
 export { normalizeArabicText, convertEasternToWesternNumerals };
@@ -615,11 +616,14 @@ export class ErpFormDriverService {
       }
     }
 
+    const verifiedResults = verifyPostFillAssertions(results, excludeContainer);
+    const verifiedFilledCount = verifiedResults.filter((r) => r.status === 'filled').length;
+
     return {
-      success: filledCount > 0,
-      fieldsProcessed: results.length,
-      filledCount,
-      results,
+      success: verifiedFilledCount > 0,
+      fieldsProcessed: verifiedResults.length,
+      filledCount: verifiedFilledCount,
+      results: verifiedResults,
     };
   }
 }

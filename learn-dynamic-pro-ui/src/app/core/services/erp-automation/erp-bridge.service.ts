@@ -7,6 +7,7 @@ import {
   ErpActiveFormContext
 } from '../../models/erp-bridge.models';
 import { ErpTelemetryService } from './erp-telemetry.service';
+import { observeSaveToastAndValidation } from './save-recovery/erp-save-verifier';
 
 /**
  * Single safe access point to the host ERP's `window.DynamicERP` bridge.
@@ -156,55 +157,71 @@ export class ErpBridgeService {
 
   /**
    * Submits the active form and normalizes the response into a structured ErpSaveResult.
-   * Handles boolean, object { success, docId, errors }, or void return types safely.
+   * Automatically handles multi-option save menus (`span.dp-menu_text`) and captures
+   * live validation toasts from `#toast-container.dp-toast-top-end`.
    */
   async submitActiveForm(): Promise<ErpSaveResult> {
-    if (!this.isAvailable) {
+    if (!this.isAvailable && typeof document === 'undefined') {
       this.telemetry?.logBridge('submitActiveForm', undefined, false, 'Bridge not available');
       return { success: false, errors: ['جسر الـ ERP غير متاح في هذه البيئة.'] };
     }
-    if (typeof (window.DynamicERP as any)?.submitActiveForm !== 'function') {
+
+    const executePrimarySave = async (): Promise<ErpSaveResult> => {
+      if (this.isAvailable && typeof (window.DynamicERP as any)?.submitActiveForm === 'function') {
+        try {
+          const raw = await window.DynamicERP!.submitActiveForm();
+          if (raw && typeof raw === 'object') {
+            const obj = raw as any;
+            return {
+              success: obj.success !== false,
+              docId: obj.docId || obj.id,
+              errors: Array.isArray(obj.errors) ? obj.errors : undefined,
+              message: obj.message
+            };
+          }
+          if (raw === false) {
+            return { success: false, errors: ['فشل الحفظ في نظام الـ ERP.'] };
+          }
+          return { success: true };
+        } catch (err: any) {
+          console.warn('[ErpBridge] submitActiveForm threw error:', err);
+          return {
+            success: false,
+            errors: [err?.message || 'حدث خطأ أثناء تنفيذ الحفظ في نظام الـ ERP.']
+          };
+        }
+      }
+
       // 1. Try invoking save on the active Angular component instance in memory
       try {
         const comp = (window as any).DynamicERP?.getActiveComponentInstance?.();
         if (comp) {
-          if (typeof comp.save === 'function') {
+          const saveMethod =
+            typeof comp.save === 'function'
+              ? 'save'
+              : typeof comp.onSave === 'function'
+                ? 'onSave'
+                : null;
+          if (saveMethod) {
             this.telemetry?.log(
               'BRIDGE',
-              'submitActiveForm: Invoking activeComponent.save() in memory',
-              { method: 'save', compName: comp.constructor?.name },
+              `submitActiveForm: Invoking activeComponent.${saveMethod}() in memory`,
+              { method: saveMethod, compName: comp.constructor?.name },
               'INFO'
             );
-            const res = await comp.save();
-            const result: ErpSaveResult = {
+            const res = await comp[saveMethod]();
+            return {
               success: res !== false,
               docId: res?.docId || res?.id,
-              message: 'تم الحفظ عبر كائن المكون في الذاكرة بنجاح.'
+              message: 'تم إرسال أمر الحفظ عبر كائن المكون في الذاكرة.'
             };
-            this.telemetry?.logBridge('submitActiveForm', undefined, result);
-            return result;
-          } else if (typeof comp.onSave === 'function') {
-            this.telemetry?.log(
-              'BRIDGE',
-              'submitActiveForm: Invoking activeComponent.onSave() in memory',
-              { method: 'onSave', compName: comp.constructor?.name },
-              'INFO'
-            );
-            const res = await comp.onSave();
-            const result: ErpSaveResult = {
-              success: res !== false,
-              docId: res?.docId || res?.id,
-              message: 'تم الحفظ عبر كائن المكون في الذاكرة بنجاح.'
-            };
-            this.telemetry?.logBridge('submitActiveForm', undefined, result);
-            return result;
           }
         }
       } catch (err: any) {
         this.telemetry?.log('BRIDGE', `activeComponent save invocation failed: ${err?.message}`, err, 'WARN');
       }
 
-      // 2. Fallback to locating and clicking Save button in DOM
+      // 2. Fallback to locating and clicking Save button in DOM (including split-button / dp-menu_text)
       const saveBtn = this.findSaveButtonInDom();
       if (saveBtn) {
         this.telemetry?.log(
@@ -220,44 +237,50 @@ export class ErpBridgeService {
         saveBtn.click();
         return {
           success: true,
-          message: 'تم إرسال أمر الحفظ عبر زر الشاشة (DOM Fallback) بنجاح.'
+          message: 'تم إرسال أمر الحفظ عبر زر الشاشة بنجاح.'
         };
       }
 
-      this.telemetry?.logBridge('submitActiveForm', undefined, false, 'submitActiveForm not supported by host bridge');
       return {
         success: false,
-        message: 'الحفظ التلقائي غير مدعوم في هذه النسخة من النظام. يرجى مراجعة البيانات والضغط على زر الحفظ يدوياً.',
-        errors: ['الحفظ التلقائي غير مدعوم في هذه النسخة من النظام. يرجى مراجعة البيانات والضغط على زر الحفظ يدوياً.']
+        message: 'لم يتم العثور على زر الحفظ النشط في الشاشة الحالية.',
+        errors: ['لم يتم العثور على زر الحفظ النشط في الشاشة الحالية.']
       };
-    }
-    try {
-      const raw = await window.DynamicERP!.submitActiveForm();
-      if (raw && typeof raw === 'object') {
-        const obj = raw as any;
-        const result: ErpSaveResult = {
-          success: obj.success !== false,
-          docId: obj.docId || obj.id,
-          errors: Array.isArray(obj.errors) ? obj.errors : undefined,
-          message: obj.message
-        };
-        this.telemetry?.logBridge('submitActiveForm', undefined, result);
-        return result;
-      }
-      if (raw === false) {
-        this.telemetry?.logBridge('submitActiveForm', undefined, false, 'ERP returned false');
-        return { success: false, errors: ['فشل الحفظ في نظام الـ ERP.'] };
-      }
-      this.telemetry?.logBridge('submitActiveForm', undefined, true);
-      return { success: true };
-    } catch (err: any) {
-      console.warn('[ErpBridge] submitActiveForm failed:', err);
-      this.telemetry?.logBridge('submitActiveForm', undefined, null, err);
-      return {
+    };
+
+    const { actionResult, toasts, subMenuClicked } = await observeSaveToastAndValidation(
+      executePrimarySave,
+      950
+    );
+
+    const errorToasts = toasts.filter((t) => t.kind === 'error' || t.kind === 'warning');
+    const successToasts = toasts.filter((t) => t.kind === 'success');
+
+    let finalResult: ErpSaveResult = {
+      ...actionResult,
+      subMenuClicked
+    };
+
+    if (errorToasts.length > 0) {
+      const toastTexts = errorToasts.map((t) => t.text);
+      finalResult = {
         success: false,
-        errors: [err?.message || 'حدث خطأ أثناء تنفيذ الحفظ في نظام الـ ERP.']
+        errors: toastTexts,
+        message: toastTexts.join(' — '),
+        subMenuClicked
+      };
+    } else if (successToasts.length > 0) {
+      const topSuccess = successToasts[0];
+      finalResult = {
+        success: true,
+        docId: actionResult.docId || topSuccess.docId,
+        message: topSuccess.text || actionResult.message,
+        subMenuClicked
       };
     }
+
+    this.telemetry?.logBridge('submitActiveForm', { subMenuClicked, toastsCount: toasts.length }, finalResult);
+    return finalResult;
   }
 
   /**
@@ -280,8 +303,22 @@ export class ErpBridgeService {
         return btn;
       }
     }
-    const allButtons = Array.from(document.querySelectorAll('button, a.btn')) as HTMLElement[];
+
+    // Check if `<span class="dp-menu_text">حفظ</span>` is already visible in DOM
+    const menuSpans = Array.from(
+      document.querySelectorAll<HTMLElement>('span.dp-menu_text, span.dp-menu__text')
+    );
+    for (const sp of menuSpans) {
+      if (sp.closest('lms-ai-copilot, app-copilot-chat')) continue;
+      const text = (sp.textContent || '').trim();
+      if ((text === 'حفظ' || text.startsWith('حفظ')) && sp.offsetWidth > 0 && sp.offsetHeight > 0) {
+        return (sp.closest('button, li, a, [role="menuitem"]') as HTMLElement) || sp;
+      }
+    }
+
+    const allButtons = Array.from(document.querySelectorAll('button, a.btn, [role="button"]')) as HTMLElement[];
     for (const btn of allButtons) {
+      if (btn.closest('lms-ai-copilot, app-copilot-chat')) continue;
       if (btn.offsetWidth > 0 && btn.offsetHeight > 0 && !btn.hasAttribute('disabled')) {
         const text = (btn.textContent || '').trim();
         if (text === 'حفظ' || text.includes('حفظ المستند') || text.includes('حفظ الفاتورة')) {
