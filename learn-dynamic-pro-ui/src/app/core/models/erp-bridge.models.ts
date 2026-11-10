@@ -48,6 +48,22 @@ export interface ErpFormFillPayload {
   rows?: Array<Record<string, any>>;
 }
 
+export type ErpFormMode = 'ClosedOrList' | 'EmptyNew' | 'UnsavedDraft' | 'SavedOpen';
+
+export interface ErpFormStateSnapshot {
+  isOpen?: boolean;
+  /** Host-reported lifecycle mode (e.g. 'closed', 'list', 'new', 'draft', 'saved', 'edit') */
+  mode?: string;
+  isSaved?: boolean;
+  isNew?: boolean;
+  dirty?: boolean;
+  isDirty?: boolean;
+  docId?: string | number | null;
+  docNumber?: string | number | null;
+  screenKey?: string;
+  screenName?: string;
+}
+
 export interface ErpActiveFormContext {
   isOpen: boolean;
   screenKey?: string;
@@ -71,6 +87,8 @@ export interface DynamicErpBridge {
   fillFormData?(payload: ErpFormFillPayload): Promise<boolean | void> | boolean | void;
   /** Direct inspection of active component form status */
   getActiveFormContext?(): ErpActiveFormContext | null;
+  /** Structured host form lifecycle inspection (mode/dirty/docId) */
+  getFormState?(): ErpFormStateSnapshot | null;
 }
 
 declare global {

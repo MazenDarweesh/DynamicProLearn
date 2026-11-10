@@ -4,7 +4,8 @@ import {
   ErpScreenInfo,
   ErpSaveResult,
   ErpFormFillPayload,
-  ErpActiveFormContext
+  ErpActiveFormContext,
+  ErpFormStateSnapshot
 } from '../../models/erp-bridge.models';
 import { ErpTelemetryService } from './erp-telemetry.service';
 import {
@@ -34,6 +35,7 @@ export class ErpBridgeService {
 
   private lastActiveScreenCache: { time: number; val: ErpActiveScreen | null } | null = null;
   private lastFormContextCache: { time: number; val: ErpActiveFormContext | null } | null = null;
+  private lastFormStateCache: { time: number; val: ErpFormStateSnapshot | null } | null = null;
   /** Last logged signatures — polling loops must not flood the session log with identical entries. */
   private lastLoggedScreenSig = '';
   private lastLoggedFormCtxSig = '';
@@ -102,6 +104,7 @@ export class ErpBridgeService {
 
   /** Returns true if the bridge call completed without error and was not rejected by host. */
   async navigateToScreen(screenNameOrId: string | number): Promise<boolean> {
+    this.invalidateFormCaches();
     const normalizedArg =
       typeof screenNameOrId === 'string' && /^\d+$/.test(screenNameOrId.trim())
         ? Number(screenNameOrId.trim())
@@ -167,7 +170,15 @@ export class ErpBridgeService {
    * If host returns `false` (e.g. button not found or already in form), returns `false` to trigger fallbacks.
    */
   async triggerAddNew(): Promise<boolean> {
-    return this.invoke('triggerAddNew', () => window.DynamicERP!.triggerAddNew());
+    this.invalidateFormCaches();
+    const ok = await this.invoke('triggerAddNew', () => window.DynamicERP!.triggerAddNew());
+    this.invalidateFormCaches();
+    return ok;
+  }
+
+  private invalidateFormCaches(): void {
+    this.lastFormContextCache = null;
+    this.lastFormStateCache = null;
   }
 
   /**
@@ -339,6 +350,7 @@ export class ErpBridgeService {
       { subMenuClicked, toastsCount: toasts.length, outcome: finalResult.outcome, before },
       finalResult
     );
+    this.invalidateFormCaches();
     return finalResult;
   }
 
@@ -483,6 +495,28 @@ export class ErpBridgeService {
       }
       return ctx;
     } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Returns structured form lifecycle telemetry from the host (`getFormState()`),
+   * or `null` when the host bridge does not expose `getFormState`.
+   */
+  getFormState(forceRefresh = false): ErpFormStateSnapshot | null {
+    if (!this.isAvailable || typeof window.DynamicERP?.getFormState !== 'function') {
+      return null;
+    }
+    const now = Date.now();
+    if (!forceRefresh && this.lastFormStateCache && (now - this.lastFormStateCache.time < 100)) {
+      return this.lastFormStateCache.val;
+    }
+    try {
+      const state = window.DynamicERP.getFormState() ?? null;
+      this.lastFormStateCache = { time: now, val: state };
+      return state;
+    } catch (err) {
+      this.telemetry?.logBridge('getFormState', undefined, null, err);
       return null;
     }
   }

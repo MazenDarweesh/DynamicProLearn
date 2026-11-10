@@ -14,8 +14,17 @@ import {
   ErpTelemetryService,
   normalizeArabicText,
   detectMissingFieldsFromToastAndDom,
-  ErpMissingFieldInfo
+  ErpMissingFieldInfo,
+  ErpFormMode,
+  ErpFormDiffEntry
 } from '../../../core/services/erp-automation';
+import {
+  buildFormDiffEntries,
+  evaluateSaveGuard,
+  extractDocRef,
+  isEditExistingFormQuery,
+  resolveEditCurrentIntent
+} from './utils/erp-save-guard.helper';
 import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } from '../../../core/models/erp-form.models';
 import { AuthService } from '../../../core/services/platform-core/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
@@ -89,6 +98,22 @@ export interface ChatMessage {
   escalationGoal?: string;
   /** Whether the form entry was already prepared/opened fresh during the intent stream phase */
   formPrepared?: boolean;
+  /** Detected host form mode associated with this card */
+  targetFormMode?: ErpFormMode;
+  /** Open document identifier shown on SavedOpen edit cards */
+  targetDocRef?: string;
+  /** Forces manual confirmation on the edit card regardless of `autoSaveAfterFill` */
+  requiresExplicitUpdateConfirm?: boolean;
+  /** Set only when the user explicitly clicks Save on the edit card */
+  userConfirmedSavedUpdate?: boolean;
+  /** Field/row delta summary for edits against an already-saved document */
+  formDiff?: ErpFormDiffEntry[];
+  /** True when waiting for user confirmation before discarding an UnsavedDraft */
+  requiresDraftResetConfirm?: boolean;
+  /** User decision when an UnsavedDraft conflicts with a new-document command */
+  draftResetDecision?: 'pending' | 'reset_and_new' | 'keep_draft';
+  /** Visible error surfaced when deferred form preparation fails or times out */
+  formPrepError?: string;
 }
 
 @Component({
@@ -138,6 +163,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   private dragEndTimeout?: any;
   inputQuery = '';
   isStreaming = false;
+  isSavingInFlight = false;
+  formPrepareTimeoutMs = 2500;
   isClearingCache = false;
   clearCacheStatus: 'idle' | 'success' | 'error' = 'idle';
 
@@ -876,18 +903,19 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
       this.syncErpKey(effectiveTarget || currentActive);
 
-      // Ensure form entry is prepared/opened if currently on a list view or if not prepared during intent
-      if (!msg.formPrepared || !isSameScreen) {
-        await this.navigator.prepareFreshForm();
-        // When switching screens, wait for destination form fields to mount in DOM
+      // Ensure form entry is safely prepared AFTER structured action_intent is inspected
+      const prepStatus = await this.prepareFormForMessage(msg, undefined, true);
+      if (prepStatus !== 'ready') {
+        return;
+      }
+
+      if (!isSameScreen) {
         const schemaWaitStart = Date.now();
         while (Date.now() - schemaWaitStart < 1500) {
           const schema = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
           if (schema.length > 0) break;
           await new Promise((r) => setTimeout(r, 100));
         }
-      } else {
-        this.telemetry?.log('NAV', 'Form already prepared during intent phase — skipping redundant prepareFreshForm');
       }
 
       const report = await this.formDriver.applyProgressiveFill(
@@ -924,17 +952,22 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         this.copilotService.feedbackErpNavigation(msg.decisionId, 'applied');
       }
 
-      // 💾 Optional auto-save: triggered when the user checked "حفظ تلقائي بعد التعبئة"
+      // 💾 Optional auto-save: NEVER bypasses explicit Edit Card confirmation when editing a SavedOpen document
       const unresolvedFields = report.results.filter(r => r.status === 'not_found' || r.status === 'ambiguous');
       const hasUnresolved = unresolvedFields.length > 0;
       if (this.autoSaveAfterFill) {
-        if (report.success) {
+        if (msg.targetFormMode === 'SavedOpen' || msg.requiresExplicitUpdateConfirm) {
+          this.telemetry?.log('FILL', 'autoSaveAfterFill bypassed on SavedOpen: explicit Edit Card confirmation required', {
+            docRef: msg.targetDocRef,
+            diffCount: msg.formDiff?.length ?? 0
+          }, 'WARN');
+        } else if (report.success) {
           this.telemetry?.log('FILL', 'autoSaveAfterFill triggered: initiating confirmSave', {
             filledCount: report.filledCount,
             hasUnresolved,
             unresolvedCount: unresolvedFields.length
           });
-          await this.confirmSave(msg);
+          await this.confirmSave(msg, false);
         } else {
           this.telemetry?.log('FILL', 'autoSaveAfterFill skipped because form fill failed', {
             results: report.results
@@ -966,90 +999,311 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
 
+  isConfirmSaveDisabled(msg: ChatMessage): boolean {
+    if (this.isSavingInFlight || msg.saveStatus === 'saving' || msg.saveStatus === 'saved') {
+      return true;
+    }
+    if (msg.requiresExplicitUpdateConfirm && !msg.formFillApplied) {
+      return true;
+    }
+    return false;
+  }
+
+  /** Confirms discarding the active UnsavedDraft, opens a fresh form, and proceeds to fill `msg`. */
+  async confirmDraftResetAndApply(msg: ChatMessage): Promise<void> {
+    msg.draftResetDecision = 'reset_and_new';
+    msg.requiresDraftResetConfirm = false;
+    msg.formPrepError = undefined;
+    this.cdr.markForCheck();
+    await this.applyFormFill(msg);
+  }
+
+  /** Keeps the active UnsavedDraft intact without calling `triggerAddNew` or applying new fields. */
+  cancelDraftReset(msg: ChatMessage): void {
+    msg.draftResetDecision = 'keep_draft';
+    msg.requiresDraftResetConfirm = false;
+    msg.formPrepError = undefined;
+    this.pushUniqueAssistantNotice('✋ تم الإبقاء على المسودة الحالية كما هي دون فتح مستند جديد.');
+    this.telemetry?.log('NAV', 'User chose to keep UnsavedDraft — reset cancelled without triggerAddNew');
+    this.cdr.markForCheck();
+  }
+
+  /** Populates SavedOpen edit card metadata and before/after diff table from host context. */
+  private populateSavedOpenEditState(
+    msg: ChatMessage,
+    fillData: CopilotFormFillData,
+    schemas?: any[]
+  ): void {
+    const preCtx = this.bridge.getActiveFormContext(true);
+    const preState = this.bridge.getFormState(true);
+    const resolvedSchemas =
+      schemas && schemas.length > 0
+        ? schemas
+        : this.formDriver.collectFormSchema(this.elRef?.nativeElement);
+    msg.targetFormMode = 'SavedOpen';
+    msg.requiresExplicitUpdateConfirm = true;
+    msg.targetDocRef = msg.targetDocRef || extractDocRef(preState, preCtx);
+    if (!msg.formDiff || msg.formDiff.length === 0) {
+      msg.formDiff = buildFormDiffEntries(
+        preCtx,
+        fillData,
+        resolvedSchemas,
+        typeof document !== 'undefined' ? document : undefined,
+        this.elRef?.nativeElement
+      );
+    }
+  }
+
+  /** Clears SavedOpen edit metadata when transitioning cleanly to a brand-new form. */
+  private clearSavedEditMetadata(msg: ChatMessage): void {
+    msg.targetFormMode = undefined;
+    msg.targetDocRef = undefined;
+    msg.requiresExplicitUpdateConfirm = false;
+    msg.userConfirmedSavedUpdate = false;
+    msg.formDiff = undefined;
+  }
+
+  /** Appends an assistant notice unless the exact text was already pushed as the latest message. */
+  private pushUniqueAssistantNotice(text: string): void {
+    const lastMsg = this.messages[this.messages.length - 1];
+    if (lastMsg && lastMsg.sender === 'assistant' && lastMsg.text === text) {
+      return;
+    }
+    this.messages.push({
+      sender: 'assistant',
+      text,
+      sources: [],
+      isStreaming: false
+    });
+    this.scrollToBottom();
+  }
+
+  /**
+   * Prepares the ERP form after `fillData` arrives (with explicit draft confirmation and bounded timeout).
+   * Never performs a silent fill if opening a fresh document fails or times out.
+   */
+  private async prepareFormForMessage(
+    msg: ChatMessage,
+    schemas?: any[],
+    surfaceErrorToChat = true
+  ): Promise<'ready' | 'needs_draft_confirm' | 'kept_draft' | 'failed'> {
+    if (!msg.formFillData) {
+      return 'failed';
+    }
+
+    const canInspectMode = typeof document !== 'undefined' || this.bridge.isAvailable;
+    const currentMode: ErpFormMode = canInspectMode ? this.navigator.getFormMode(true) : 'EmptyNew';
+    const isEditCurrent = resolveEditCurrentIntent(msg.formFillData, msg.relatedUserQuery || '');
+
+    if (currentMode === 'UnsavedDraft' && !isEditCurrent) {
+      if (msg.draftResetDecision === 'keep_draft') {
+        msg.requiresDraftResetConfirm = false;
+        this.cdr.markForCheck();
+        return 'kept_draft';
+      }
+      if (msg.draftResetDecision !== 'reset_and_new') {
+        msg.requiresDraftResetConfirm = true;
+        msg.draftResetDecision = 'pending';
+        msg.formPrepared = false;
+        this.cdr.markForCheck();
+        return 'needs_draft_confirm';
+      }
+    }
+
+    if (isEditCurrent) {
+      if (currentMode === 'SavedOpen') {
+        this.populateSavedOpenEditState(msg, msg.formFillData, schemas);
+        msg.formPrepared = true;
+        msg.formPrepError = undefined;
+        this.cdr.markForCheck();
+        return 'ready';
+      }
+      if (currentMode === 'UnsavedDraft' || currentMode === 'EmptyNew') {
+        msg.formPrepared = true;
+        msg.formPrepError = undefined;
+        this.cdr.markForCheck();
+        return 'ready';
+      }
+    }
+
+    if (currentMode === 'EmptyNew') {
+      this.clearSavedEditMetadata(msg);
+      msg.formPrepared = true;
+      msg.formPrepError = undefined;
+      this.cdr.markForCheck();
+      return 'ready';
+    }
+
+    const prepOptions =
+      currentMode === 'UnsavedDraft'
+        ? { resetDraft: true }
+        : currentMode === 'SavedOpen'
+          ? { resetSaved: true }
+          : undefined;
+
+    let formOpened = false;
+    const timeoutMs = Math.max(50, this.formPrepareTimeoutMs);
+    let timerId: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const prepPromise = this.navigator.prepareFreshForm(timeoutMs, prepOptions);
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        timerId = setTimeout(() => resolve(false), timeoutMs + 50);
+      });
+      formOpened = await Promise.race([prepPromise, timeoutPromise]);
+    } catch (prepErr) {
+      console.warn('[Copilot Navigation] prepareFormForMessage error:', prepErr);
+      this.telemetry?.logError('NAV', 'prepareFormForMessage threw exception', prepErr);
+      formOpened = false;
+    } finally {
+      if (timerId !== undefined) {
+        clearTimeout(timerId);
+      }
+    }
+
+    if (!formOpened) {
+      const errMsg =
+        currentMode === 'SavedOpen'
+          ? `⚠️ تعذر فتح فاتورة جديدة بدلاً من المستند المحفوظ المفتوح خلال المهلة (${timeoutMs}ms). لم يتم تعبئة البيانات حفاظاً على المستند الحالي؛ يرجى الضغط على «إضافة جديد» يدوياً ثم إعادة المحاولة.`
+          : currentMode === 'UnsavedDraft'
+            ? `⚠️ تعذر فتح مستند جديد لتجاهل المسودة الحالية خلال المهلة (${timeoutMs}ms). لم يتم مسح المسودة أو تعبئة البيانات؛ يرجى فتح مستند جديد يدوياً ثم إعادة المحاولة.`
+            : `⚠️ تعذر فتح نموذج إدخال جديد في شاشة الـ ERP خلال المهلة (${timeoutMs}ms). لم يتم تنفيذ التعبئة الصامتة؛ يرجى فتح النموذج يدوياً ثم إعادة المحاولة.`;
+      msg.formPrepared = false;
+      msg.formPrepError = errMsg;
+      if (surfaceErrorToChat) {
+        this.pushUniqueAssistantNotice(errMsg);
+      }
+      this.telemetry?.log('NAV', 'Deferred prepareFreshForm failed or timed out — aborted without silent fill', {
+        currentMode,
+        timeoutMs,
+        actionIntent: msg.formFillData.action_intent
+      }, 'WARN');
+      this.cdr.markForCheck();
+      return 'failed';
+    }
+
+    this.clearSavedEditMetadata(msg);
+    msg.formPrepared = true;
+    msg.formPrepError = undefined;
+    msg.requiresDraftResetConfirm = false;
+    await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
+    this.cdr.markForCheck();
+    return 'ready';
+  }
+
   /**
    * Saves the currently open ERP form through the official bridge or DOM Save + `span.dp-menu_text`.
    * Observes `#toast-container.dp-toast-top-end` in real time; if validation errors occur,
    * identifies the missing fields and enters Conversational Slot-Filling Recovery mode.
    */
-  async confirmSave(msg: ChatMessage): Promise<void> {
-    if (msg.saveStatus === 'saving' || msg.saveStatus === 'saved') return;
-
-    msg.saveStatus = 'saving';
-    msg.saveMessage = undefined;
-    this.cdr.markForCheck();
-
-    if (!this.bridge.isAvailable && typeof document === 'undefined') {
-      msg.saveStatus = 'failed';
-      msg.saveMessage = 'جسر الـ ERP غير متاح هنا. اضغط زر الحفظ يدوياً داخل الشاشة.';
+  async confirmSave(msg: ChatMessage, userClickedSave = false): Promise<void> {
+    const formMode = this.navigator.getFormMode(true);
+    const formState = this.bridge.getFormState(true);
+    const guard = evaluateSaveGuard({
+      isSavingInFlight: this.isSavingInFlight,
+      msg,
+      userClickedSave,
+      formMode,
+      formState
+    });
+    if (!guard.allow) {
+      if (guard.reason === 'saved_not_dirty') {
+        msg.saveStatus = 'saved';
+        msg.saveMessage = guard.userMessage;
+      } else if (guard.reason === 'requires_edit_card_confirm') {
+        msg.requiresExplicitUpdateConfirm = true;
+        msg.targetFormMode = 'SavedOpen';
+        if (guard.userMessage && !msg.saveMessage) {
+          msg.saveMessage = guard.userMessage;
+        }
+      }
       this.cdr.markForCheck();
       return;
     }
 
-    const res = await this.bridge.submitActiveForm();
-    if (res.success) {
-      this.pendingMissingFieldsRecovery = null;
-      msg.saveStatus = 'saved';
-      msg.saveMessage = res.docId
-        ? `✅ تم الحفظ بنجاح في نظام الـ ERP! رقم المستند: #${res.docId}`
-        : (res.message || '✅ تم إرسال أمر الحفظ بنجاح إلى الـ ERP.');
-    } else {
-      msg.saveStatus = 'failed';
-      const rawErrors =
-        res.errors && res.errors.length > 0
-          ? res.errors
-          : res.message
-            ? [res.message]
-            : ['تعذر إتمام الحفظ لوجود بيانات إلزامية ناقصة'];
+    if (userClickedSave && (msg.requiresExplicitUpdateConfirm || formMode === 'SavedOpen')) {
+      msg.userConfirmedSavedUpdate = true;
+    }
 
-      const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
-      const missingFields = detectMissingFieldsFromToastAndDom(
-        rawErrors,
-        schemas,
-        this.elRef?.nativeElement
-      );
+    this.isSavingInFlight = true;
+    msg.saveStatus = 'saving';
+    msg.saveMessage = undefined;
+    this.cdr.markForCheck();
 
-      if (res.errors && res.errors.length > 0) {
-        msg.saveMessage = `⚠️ لم يتم الحفظ: ${res.errors.join('، ')}`;
-      } else {
-        msg.saveMessage = res.message || '⚠️ تعذر إرسال أمر الحفظ. راجع الحقول الناقصة أدناه.';
+    try {
+      if (!this.bridge.isAvailable && typeof document === 'undefined') {
+        msg.saveStatus = 'failed';
+        msg.saveMessage = 'جسر الـ ERP غير متاح هنا. اضغط زر الحفظ يدوياً داخل الشاشة.';
+        return;
       }
 
-      this.pendingMissingFieldsRecovery = {
-        targetMessage: msg,
-        missingFields,
-        rawErrors
-      };
+      const res = await this.bridge.submitActiveForm();
+      if (res.success) {
+        this.pendingMissingFieldsRecovery = null;
+        msg.saveStatus = 'saved';
+        msg.saveMessage = res.docId
+          ? `✅ تم الحفظ بنجاح في نظام الـ ERP! رقم المستند: #${res.docId}`
+          : (res.message || '✅ تم إرسال أمر الحفظ بنجاح إلى الـ ERP.');
+      } else {
+        msg.saveStatus = 'failed';
+        const rawErrors =
+          res.errors && res.errors.length > 0
+            ? res.errors
+            : res.message
+              ? [res.message]
+              : ['تعذر إتمام الحفظ لوجود بيانات إلزامية ناقصة'];
 
-      const fieldsBulletList =
-        missingFields.length > 0
-          ? missingFields
-              .map((mf) => {
-                const optsHint =
-                  mf.options && mf.options.length > 0
-                    ? ` *(الخيارات المتاحة: ${mf.options.slice(0, 8).join('، ')})*`
-                    : '';
-                return `- **${mf.label}**${optsHint}`;
-              })
-              .join('\n')
-          : `- يرجى كتابة اسم الحقل وقيمته المطلوبة بناءً على رسالة التنبيه أعلاه.`;
+        const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
+        const missingFields = detectMissingFieldsFromToastAndDom(
+          rawErrors,
+          schemas,
+          this.elRef?.nativeElement
+        );
 
-      const promptText =
-        `⚠️ **تنبيه من النظام عند محاولة الحفظ:**\n` +
-        `> «${rawErrors.join(' — ')}»\n\n` +
-        `لاستكمال حفظ الفاتورة المفتوحة حالياً **دون مسح البيانات المدخلة**، يرجى تزويدي بالقيمة المطلوبة لـ:\n` +
-        `${fieldsBulletList}\n\n` +
-        `💬 *اكتب القيمة هنا مباشرةً وسأقوم بملئها والضغط على حفظ تلقائياً.*`;
+        if (res.errors && res.errors.length > 0) {
+          msg.saveMessage = `⚠️ لم يتم الحفظ: ${res.errors.join('، ')}`;
+        } else {
+          msg.saveMessage = res.message || '⚠️ تعذر إرسال أمر الحفظ. راجع الحقول الناقصة أدناه.';
+        }
 
-      this.messages.push({
-        sender: 'assistant',
-        text: promptText,
-        sources: [],
-        isStreaming: false
-      });
-      this.scrollToBottom();
+        this.pendingMissingFieldsRecovery = {
+          targetMessage: msg,
+          missingFields,
+          rawErrors
+        };
+
+        const fieldsBulletList =
+          missingFields.length > 0
+            ? missingFields
+                .map((mf) => {
+                  const optsHint =
+                    mf.options && mf.options.length > 0
+                      ? ` *(الخيارات المتاحة: ${mf.options.slice(0, 8).join('، ')})*`
+                      : '';
+                  return `- **${mf.label}**${optsHint}`;
+                })
+                .join('\n')
+            : `- يرجى كتابة اسم الحقل وقيمته المطلوبة بناءً على رسالة التنبيه أعلاه.`;
+
+        const promptText =
+          `⚠️ **تنبيه من النظام عند محاولة الحفظ:**\n` +
+          `> «${rawErrors.join(' — ')}»\n\n` +
+          `لاستكمال حفظ الفاتورة المفتوحة حالياً **دون مسح البيانات المدخلة**، يرجى تزويدي بالقيمة المطلوبة لـ:\n` +
+          `${fieldsBulletList}\n\n` +
+          `💬 *اكتب القيمة هنا مباشرةً وسأقوم بملئها والضغط على حفظ تلقائياً.*`;
+
+        this.messages.push({
+          sender: 'assistant',
+          text: promptText,
+          sources: [],
+          isStreaming: false
+        });
+        this.scrollToBottom();
+      }
+      console.info('[Copilot Save] submitActiveForm result:', res);
+    } finally {
+      this.isSavingInFlight = false;
+      this.cdr.markForCheck();
     }
-    console.info('[Copilot Save] submitActiveForm result:', res);
-    this.cdr.markForCheck();
   }
 
   /**
@@ -1169,7 +1423,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
       // Reset saveStatus so confirmSave executes fresh and clicks Save + span.dp-menu_text
       recovery.targetMessage.saveStatus = undefined;
-      await this.confirmSave(recovery.targetMessage);
+      await this.confirmSave(recovery.targetMessage, !!recovery.targetMessage.userConfirmedSavedUpdate);
 
       if (recovery.targetMessage.saveStatus === 'saved') {
         this.messages.push({
@@ -1288,15 +1542,24 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       const activeName = activeRaw.toLowerCase();
       const activePid = activeScreen?.pageId != null ? String(activeScreen.pageId) : '';
       const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activePid || activeRaw) || this.navigator.isScreenActive(activeName));
-      const { isAlreadyOnMatchingScreen, isExplicitNavRequest } = evaluateActiveScreenMatch(
+      const { isAlreadyOnMatchingScreen, isExplicitNavRequest, isSetupOrConfigScreen } = evaluateActiveScreenMatch(
         query,
         activeScreen,
         isDomActive
       );
+      const initialFormMode =
+        typeof document !== 'undefined' || this.bridge.isAvailable
+          ? this.navigator.getFormMode(true)
+          : 'EmptyNew';
+      const isEditingActiveSavedDoc =
+        initialFormMode === 'SavedOpen' &&
+        isEditExistingFormQuery(query) &&
+        !isSetupOrConfigScreen &&
+        !isExplicitNavRequest;
 
-      if (isAlreadyOnMatchingScreen && !isExplicitNavRequest) {
+      if ((isAlreadyOnMatchingScreen && !isExplicitNavRequest) || isEditingActiveSavedDoc) {
         console.info(
-          `%c[Copilot Navigation] Active screen '${activeName}' already matches query domain and is active in DOM. Staying on current screen!`,
+          `%c[Copilot Navigation] Active screen '${activeName}' ${isEditingActiveSavedDoc ? 'holds SavedOpen document for edit' : 'already matches query domain and is active in DOM'}. Staying on current screen!`,
           'color:#10b981;font-weight:bold'
         );
         skipNavCheck = true;
@@ -1306,7 +1569,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       let navRes: any = null;
       if (!skipNavCheck && typeof document !== 'undefined') {
         try {
-          navRes = await this.navigator.resolveAndNavigate(query);
+          navRes = await this.navigator.resolveAndNavigate(query, { deferFormPrepOnOpenForm: true });
           resolvedIntent = navRes?.rawResolution?.intent;
           resolvedDecisionId = navRes?.rawResolution?.decision_id;
 
@@ -1362,13 +1625,19 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         }
       }
 
-      // S1 Lifecycle Order: If user intent is an action/entry, ensure fresh entry form is prepared/opened first
-      // CRITICAL: Only prepare fresh form if we are genuinely on the target screen (already matching or navigated successfully)
+      // S1 Lifecycle Order: If user intent is an action/entry, open ClosedOrList form early for DOM schema.
+      // CRITICAL: Defer prepareFreshForm() on SavedOpen / UnsavedDraft until `fillData.action_intent` arrives!
       const isOnTargetScreen = skipNavCheck || !!(navRes && navRes.success);
-      const isEntryIntent = resolvedIntent === 'action' || (!resolvedIntent && /سجل|اضف|أضف|انشئ|أنشئ|فاتورة|سداد|قيد/i.test(query));
-      if (isEntryIntent && isOnTargetScreen && typeof document !== 'undefined') {
+      const isEntryIntent = resolvedIntent === 'action' || (!resolvedIntent && /سجل|اضف|أضف|انشئ|أنشئ|فاتورة|سداد|قيد|عدل|تعديل|غير|امسح/i.test(query));
+      const streamFormMode =
+        typeof document !== 'undefined' || this.bridge.isAvailable
+          ? this.navigator.getFormMode(true)
+          : 'EmptyNew';
+      const deferFormPrepUntilFillData =
+        streamFormMode === 'SavedOpen' || streamFormMode === 'UnsavedDraft';
+      if (isEntryIntent && isOnTargetScreen && !deferFormPrepUntilFillData && typeof document !== 'undefined') {
         try {
-          const formOpened = await this.navigator.prepareFreshForm(2000);
+          const formOpened = await this.navigator.prepareFreshForm(this.formPrepareTimeoutMs);
           if (formOpened) {
             formPreparedDuringStream = true;
             await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
@@ -1474,12 +1743,30 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
           } else if (active?.pageName && (!fillData.pageId || String(active.pageId) === String(fillData.pageId))) {
             fillData.screenKey = active.pageName.trim();
           }
-          this.messages[assistantMsgIndex].formFillData = fillData;
-          this.messages[assistantMsgIndex].canEscalateToVisionAgent = false;
-          this.messages[assistantMsgIndex].escalationGoal = undefined;
+          const assistantMsg = this.messages[assistantMsgIndex];
+          assistantMsg.formFillData = fillData;
+          assistantMsg.canEscalateToVisionAgent = false;
+          assistantMsg.escalationGoal = undefined;
+          const modeOnExtract =
+            typeof document !== 'undefined' || this.bridge.isAvailable
+              ? this.navigator.getFormMode(true)
+              : 'EmptyNew';
+          const isEditCurrent = resolveEditCurrentIntent(fillData, query);
+          if (modeOnExtract === 'SavedOpen' && isEditCurrent) {
+            this.populateSavedOpenEditState(assistantMsg, fillData, formSchema);
+            assistantMsg.formPrepared = true;
+          } else if (modeOnExtract === 'UnsavedDraft' && !isEditCurrent) {
+            assistantMsg.requiresDraftResetConfirm = true;
+            assistantMsg.draftResetDecision = 'pending';
+            assistantMsg.formPrepared = false;
+          } else if ((modeOnExtract === 'SavedOpen' || modeOnExtract === 'ClosedOrList') && !isEditCurrent) {
+            this.clearSavedEditMetadata(assistantMsg);
+            assistantMsg.formPrepared = false;
+          }
           this.telemetry?.log('AI_EXTRACT', `AI extracted form fill proposal for '${fillData.screenKey || this.erpKey}'`, {
             screenKey: fillData.screenKey || this.erpKey,
             pageId: fillData.pageId,
+            actionIntent: fillData.action_intent,
             fields: fillData.fields,
             rows: fillData.rows
           });
@@ -1489,6 +1776,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       formSchema,
       resolvedIntent
     );
+
+    const completedMsg = this.messages[assistantMsgIndex];
+    if (completedMsg?.formFillData && this.isValidFormFill(completedMsg.formFillData)) {
+      await this.prepareFormForMessage(completedMsg, formSchema, true);
+    }
   }
 
   /**

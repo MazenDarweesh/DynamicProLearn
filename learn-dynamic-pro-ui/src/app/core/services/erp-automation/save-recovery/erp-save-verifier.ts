@@ -42,19 +42,19 @@ export function triggerFullClick(el: HTMLElement): void {
     el.focus({ preventScroll: true });
   } catch {}
 
-  // 1. Authoritative Native .click() on the targeted clickable element (single invocation, no bubbling loop)
   const clickableTarget =
     (el.closest('button, a, [role="menuitem"], .dp-menu__item') as HTMLElement) || el;
-  try {
-    clickableTarget.click();
-  } catch {}
 
-  // 2. Standard pointer + mouse events dispatch on clickableTarget
-  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup', 'click'] as const) {
+  // Dispatch pre-click pointer/mouse sequence once, then rely strictly on native .click()
+  // so Angular/DOM click handlers never fire twice on a single save trigger.
+  for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup'] as const) {
     clickableTarget.dispatchEvent(
       new MouseEvent(type, { bubbles: true, cancelable: true, view: window, buttons: 1 })
     );
   }
+  try {
+    clickableTarget.click();
+  } catch {}
 }
 
 /** The primary split-button that owns the Save drop-down (its own label must never be mistaken for a menu item). */

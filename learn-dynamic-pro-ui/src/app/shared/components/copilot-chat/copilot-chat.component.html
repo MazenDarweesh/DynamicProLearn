@@ -153,7 +153,9 @@
             </div>
 
             <!-- In-DOM Action Card: Auto-Fill Suggestion -->
-            <div *ngIf="hasFormFillData(msg) && !msg.isStreaming && msg.formFillData as ffd" class="form-fill-card animate-fade-in">
+            <div *ngIf="hasFormFillData(msg) && !msg.isStreaming && msg.formFillData as ffd"
+                 class="form-fill-card animate-fade-in"
+                 [class.form-fill-card-edit]="msg.targetFormMode === 'SavedOpen'">
               
               <!-- ── Case A: Batch Mode (Multiple Invoices / Documents) ── -->
               <ng-container *ngIf="ffd.batch_mode && ffd.batch_items && ffd.batch_items.length > 0">
@@ -274,17 +276,43 @@
                 </div>
               </ng-container>
 
-              <!-- ── Case B: Single Document Mode (Standard) ── -->
+              <!-- ── Case B: Single Document Mode (Standard / Edit Card) ── -->
               <ng-container *ngIf="!ffd.batch_mode">
                 <div class="form-fill-header">
                   <div class="form-fill-title-wrap">
-                    <span class="form-fill-icon">🪄</span>
-                    <span class="form-fill-title">اقتراح تعبئة الشاشة بالذكاء الاصطناعي</span>
+                    <span class="form-fill-icon">{{ msg.targetFormMode === 'SavedOpen' ? '✏️' : '🪄' }}</span>
+                    <span class="form-fill-title">
+                      {{ msg.targetFormMode === 'SavedOpen'
+                        ? ('تعديل مستند محفوظ' + (msg.targetDocRef ? ' (#' + msg.targetDocRef + ')' : ''))
+                        : 'اقتراح تعبئة الشاشة بالذكاء الاصطناعي' }}
+                    </span>
                   </div>
-                  <span class="form-fill-badge">جاهز للتنفيذ</span>
+                  <span class="form-fill-badge" [class.form-fill-badge-edit]="msg.targetFormMode === 'SavedOpen'">
+                    {{ msg.targetFormMode === 'SavedOpen' ? 'يتطلب تأكيد التعديل' : 'جاهز للتنفيذ' }}
+                  </span>
                 </div>
 
                 <div class="form-fill-body">
+                  <div *ngIf="msg.formDiff && msg.formDiff.length > 0" class="form-fill-diff-box">
+                    <div class="form-fill-diff-title">🔍 جدول الفرق (قبل ⬅ بعد التعديل):</div>
+                    <table class="form-fill-diff-table">
+                      <thead>
+                        <tr>
+                          <th>الحقل</th>
+                          <th>الحالي</th>
+                          <th>الجديد</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let d of msg.formDiff">
+                          <td class="diff-label">{{ d.label }}</td>
+                          <td class="diff-before">{{ d.before }}</td>
+                          <td class="diff-after" [class.diff-cleared]="d.kind === 'cleared'">{{ d.after }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
                   <ng-container *ngIf="ffd.missing_required && ffd.missing_required.length > 0">
                     <div class="form-fill-missing-alert" style="margin-bottom: 8px; padding: 6px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; font-size: 11px; color: #92400e; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
                       <span>⚠️</span>
@@ -315,16 +343,45 @@
                   </ng-container>
                 </div>
 
+                <div *ngIf="msg.requiresDraftResetConfirm && msg.draftResetDecision === 'pending'" class="form-fill-draft-confirm">
+                  <div class="draft-confirm-text">
+                    ⚠️ توجد مسودة غير محفوظة مفتوحة حالياً. هل تريد فتح فاتورة جديدة وتجاهل المسودة؟
+                  </div>
+                  <div class="draft-confirm-actions">
+                    <button type="button" class="btn-confirm-draft-reset"
+                            [disabled]="msg.isApplyingFormFill"
+                            (click)="confirmDraftResetAndApply(msg)">
+                      🗑️ فتح جديدة وتجاهل المسودة
+                    </button>
+                    <button type="button" class="btn-cancel-draft-reset"
+                            [disabled]="msg.isApplyingFormFill"
+                            (click)="cancelDraftReset(msg)">
+                      ✋ الإبقاء على المسودة الحالية
+                    </button>
+                  </div>
+                </div>
+
+                <div *ngIf="msg.draftResetDecision === 'keep_draft'" class="edit-autosave-note" style="margin-top: 6px;">
+                  ✋ تم الإبقاء على المسودة الحالية دون مسح أو فتح مستند جديد.
+                </div>
+
+                <div *ngIf="msg.formPrepError" class="save-result-msg save-result-err" style="margin-top: 6px;">
+                  {{ msg.formPrepError }}
+                </div>
+
                 <div class="form-fill-footer">
                   <label *ngIf="!msg.formFillApplied" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
                     <input type="checkbox" [(ngModel)]="autoSaveAfterFill" name="autoSaveAfterFill">
                     <span>💾 حفظ تلقائي بعد التعبئة</span>
                   </label>
+                  <span *ngIf="!msg.formFillApplied && autoSaveAfterFill && msg.targetFormMode === 'SavedOpen'" class="edit-autosave-note">
+                    ⚠️ الحفظ التلقائي متوقف لهذا المستند المحفوظ
+                  </span>
                   <button *ngIf="!msg.formFillApplied" type="button" class="btn-apply-form-fill"
-                          [disabled]="msg.isApplyingFormFill"
+                          [disabled]="msg.isApplyingFormFill || (msg.requiresDraftResetConfirm && msg.draftResetDecision === 'pending') || msg.draftResetDecision === 'keep_draft'"
                           (click)="applyFormFill(msg)">
                     <span class="btn-icon" [class.animate-spin]="msg.isApplyingFormFill">{{ msg.isApplyingFormFill ? '⏳' : '✨' }}</span>
-                    <span>{{ msg.isApplyingFormFill ? 'جارٍ ملء الشاشة...' : 'تعبئة شاشة الـ ERP الآن' }}</span>
+                    <span>{{ msg.isApplyingFormFill ? 'جارٍ ملء الشاشة...' : (msg.targetFormMode === 'SavedOpen' ? 'تطبيق التعديل على الشاشة' : 'تعبئة شاشة الـ ERP الآن') }}</span>
                   </button>
                   <button *ngIf="!msg.formFillApplied" type="button" class="btn-vision-fallback"
                           (click)="runVisionAgent(msg.relatedUserQuery || 'تعبئة هذه الفاتورة')"
@@ -336,17 +393,22 @@
 
                 <!-- Save confirmation card (shown after the fields were filled) -->
                 <div *ngIf="msg.formFillApplied" class="form-fill-save-card">
-                  <div class="form-fill-applied-badge">
-                    <span>✅</span>
-                    <span>تم ملء الحقول في الصفحة. راجع البيانات ثم أكّد الحفظ.</span>
+                  <div class="form-fill-applied-badge" [class.form-fill-edit-alert]="msg.targetFormMode === 'SavedOpen'">
+                    <span>{{ msg.targetFormMode === 'SavedOpen' ? '⚠️' : '✅' }}</span>
+                    <span>
+                      {{ msg.targetFormMode === 'SavedOpen'
+                        ? 'تم تطبيق التعديل على مستند محفوظ (# ' + (msg.targetDocRef || 'الحالي') + '). راجع جدول الفرق أعلاه وأكّد الحفظ من كارت التعديل هذا.'
+                        : 'تم ملء الحقول في الصفحة. راجع البيانات ثم أكّد الحفظ.' }}
+                    </span>
                   </div>
 
                   <div *ngIf="msg.saveStatus !== 'saved'" class="save-actions">
                     <button type="button" class="btn-confirm-save"
-                            [disabled]="msg.saveStatus === 'saving'"
-                            (click)="confirmSave(msg)">
+                            [class.btn-confirm-save-edit]="msg.targetFormMode === 'SavedOpen'"
+                            [disabled]="isConfirmSaveDisabled(msg)"
+                            (click)="confirmSave(msg, true)">
                       <span class="btn-icon">💾</span>
-                      <span>{{ msg.saveStatus === 'saving' ? 'جارٍ الحفظ...' : (msg.saveStatus === 'failed' ? 'إعادة محاولة الحفظ' : 'تأكيد وحفظ الآن') }}</span>
+                      <span>{{ msg.saveStatus === 'saving' ? 'جارٍ الحفظ...' : (msg.saveStatus === 'failed' ? 'إعادة محاولة الحفظ' : (msg.targetFormMode === 'SavedOpen' ? 'تأكيد حفظ التعديلات الآن' : 'تأكيد وحفظ الآن')) }}</span>
                     </button>
                     <span class="save-hint">أو راجع الحقول في الشاشة واحفظ بنفسك.</span>
                   </div>

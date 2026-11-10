@@ -148,3 +148,15 @@ export interface GridFillOptions {
   copilotService?: any;
 }
 
+/** Field- or row-level change summary shown before confirming updates to an already-saved document. */
+export interface ErpFormDiffEntry {
+  key: string;
+  label: string;
+  before: string;
+  after: string;
+  scope: 'header' | 'row';
+  rowIndex?: number;
+  kind: 'added' | 'changed' | 'cleared';
+}
+
+

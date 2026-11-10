@@ -3,6 +3,7 @@ import { NavCandidateIn, NavResolution, NavScored, ControlIn } from '../../model
 import { normalizeArabicText } from './form-driver/arabic-normalizer';
 import { CopilotService } from '../ai-copilot/copilot.service';
 import { ErpBridgeService } from './erp-bridge.service';
+import { ErpFormMode } from '../../models/erp-bridge.models';
 import {
   checkIsScreenActive,
   isNavElementVisible,
@@ -10,7 +11,12 @@ import {
   scanDomVisibleControls,
   simulateNavClick,
 } from './navigator/nav-candidate-scanner';
-import { checkIsFormAlreadyOpen, triggerDomAddNewButton } from './navigator/form-opener';
+import {
+  checkIsFormAlreadyOpen,
+  getFormModeFromBridgeAndDom,
+  isEditExistingFormQuery,
+  triggerDomAddNewButton,
+} from './navigator/form-opener';
 
 @Injectable({
   providedIn: 'root',
@@ -134,17 +140,32 @@ export class ErpNavigatorService {
     return scanDomVisibleControls(container);
   }
 
-  async prepareFreshForm(maxWaitMs = 2500): Promise<boolean> {
-    if (this.isFormAlreadyOpen()) {
+  async prepareFreshForm(
+    maxWaitMs = 2500,
+    options?: { resetSaved?: boolean; resetDraft?: boolean }
+  ): Promise<boolean> {
+    const initialMode = this.getFormMode(true);
+    if (initialMode === 'EmptyNew') {
+      return true;
+    }
+    if (initialMode === 'UnsavedDraft' && !options?.resetDraft) {
+      return true;
+    }
+    if (initialMode === 'SavedOpen' && options?.resetSaved === false) {
       return true;
     }
 
+    const requireEmptyNew =
+      initialMode === 'SavedOpen' ||
+      (initialMode === 'UnsavedDraft' && options?.resetDraft === true);
     const start = Date.now();
+    const remainingMs = () => Math.max(50, maxWaitMs - (Date.now() - start));
+
     if (this.bridge.isAvailable) {
       try {
         const opened = await this.bridge.triggerAddNew();
         if (opened) {
-          const ready = await this.waitForFormContainer(1200);
+          const ready = await this.waitForFreshForm(requireEmptyNew, Math.min(1200, remainingMs()));
           if (ready) return true;
         }
       } catch (err) {
@@ -153,38 +174,55 @@ export class ErpNavigatorService {
     }
 
     while (Date.now() - start < maxWaitMs) {
-      if (this.isFormAlreadyOpen()) return true;
+      const currentMode = this.getFormMode(true);
+      if (currentMode === 'EmptyNew' || (!requireEmptyNew && currentMode !== 'ClosedOrList')) {
+        return true;
+      }
       const clicked = triggerDomAddNewButton();
       if (clicked) {
-        const ready = await this.waitForFormContainer(1500);
+        const ready = await this.waitForFreshForm(requireEmptyNew, Math.min(1500, remainingMs()));
         if (ready) return true;
       }
-      await this.delay(100);
+      await this.delay(Math.min(100, remainingMs()));
     }
 
-    return this.isFormAlreadyOpen();
+    const finalMode = this.getFormMode(true);
+    return requireEmptyNew ? finalMode === 'EmptyNew' : finalMode !== 'ClosedOrList';
+  }
+
+  getFormMode(forceRefresh = false): ErpFormMode {
+    return getFormModeFromBridgeAndDom(this.bridge, forceRefresh);
   }
 
   isFormAlreadyOpen(): boolean {
-    return checkIsFormAlreadyOpen(this.bridge);
+    return this.getFormMode() !== 'ClosedOrList';
   }
 
   async waitForFormContainer(timeoutMs = 1200): Promise<boolean> {
+    return this.waitForFreshForm(false, timeoutMs);
+  }
+
+  private async waitForFreshForm(requireEmptyNew: boolean, timeoutMs = 1200): Promise<boolean> {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
-      if (this.isFormAlreadyOpen()) {
+      const mode = this.getFormMode(true);
+      if (requireEmptyNew ? mode === 'EmptyNew' : mode !== 'ClosedOrList') {
         return true;
       }
       await this.delay(50);
     }
-    return this.isFormAlreadyOpen();
+    const mode = this.getFormMode(true);
+    return requireEmptyNew ? mode === 'EmptyNew' : mode !== 'ClosedOrList';
   }
 
   scanVisibleCandidates(): NavCandidateIn[] {
     return scanDomAndBridgeCandidates(this.bridge, this.candidateElementsMap);
   }
 
-  async resolveAndNavigate(userMessage: string): Promise<{
+  async resolveAndNavigate(
+    userMessage: string,
+    options?: { deferFormPrepOnOpenForm?: boolean }
+  ): Promise<{
     success: boolean;
     decision: 'go' | 'ask' | 'clarify';
     chosen?: NavScored;
@@ -270,7 +308,14 @@ export class ErpNavigatorService {
         }
 
         if (res.intent === 'action') {
-          await this.prepareFreshForm();
+          const currentMode = this.getFormMode(true);
+          const isOpenNonEmpty = currentMode === 'SavedOpen' || currentMode === 'UnsavedDraft';
+          if (
+            !(options?.deferFormPrepOnOpenForm && isOpenNonEmpty) &&
+            !(currentMode === 'SavedOpen' && isEditExistingFormQuery(userMessage))
+          ) {
+            await this.prepareFreshForm();
+          }
         }
 
         const matchedCandidate = candidates.find((c) => c.id === top.id);

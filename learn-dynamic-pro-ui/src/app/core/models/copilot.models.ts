@@ -17,6 +17,8 @@ export interface CopilotSource {
 
 export interface CopilotFormFillData {
   intent?: string;
+  /** Semantic document intent produced by the Extractor (`new` creates blank doc, `edit_current` updates active doc). */
+  action_intent?: 'new' | 'edit_current';
   fields?: Record<string, any>;
   rows?: Record<string, any>[];
   screenKey?: string;
