@@ -1,5 +1,6 @@
 import {
   buildFormDiffEntries,
+  detectUnsupportedEditCommand,
   evaluateSaveGuard,
   extractDocRef,
   isEditExistingFormQuery,
@@ -115,6 +116,28 @@ describe('erp-save-guard.helper', () => {
     expect(
       resolveEditCurrentIntent(undefined, 'سجل فاتورة مشتريات جديدة')
     ).toBeFalse();
+  });
+
+  it('detectUnsupportedEditCommand flags unexecutable header-grid transfer edits as unsupported while allowing normal edits', () => {
+    const moveRes = detectUnsupportedEditCommand(
+      { action_intent: 'edit_current', fields: { ProjectID: 'بجوار المنتج' }, rows: [] },
+      'عدل الفاتورة السابقة وسجل المشروع تحت بجوار المنتج'
+    );
+    expect(moveRes.unsupported).toBeTrue();
+    expect(moveRes.userMessage).toContain('غير مدعوم حالياً');
+
+    const clearMoveRes = detectUnsupportedEditCommand(
+      { action_intent: 'edit_current', fields: { ProjectID: null }, rows: [] },
+      'احذف  المشروع من فوق وخليه تحت مع المنتج فقط'
+    );
+    expect(clearMoveRes.unsupported).toBeTrue();
+    expect(clearMoveRes.userMessage).toContain('غير مدعوم حالياً');
+
+    const validEditRes = detectUnsupportedEditCommand(
+      { action_intent: 'edit_current', fields: { StoreID: 'مخزن خامات' }, rows: [] },
+      'خلي المخزن مخزن خامات'
+    );
+    expect(validEditRes.unsupported).toBeFalse();
   });
 });
 

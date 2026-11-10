@@ -30,6 +30,67 @@ export function resolveEditCurrentIntent(
   return isEditExistingFormQuery(query);
 }
 
+export interface UnsupportedEditCheckResult {
+  unsupported: boolean;
+  reason?: 'header_grid_transfer_unsupported';
+  userMessage?: string;
+}
+
+const UNSUPPORTED_HEADER_GRID_TRANSFER_PATTERNS: RegExp[] = [
+  /(?:من\s*(?:فوق|الراس|الهيدر|الاعلي)|فوق)\s*.*(?:تحت|الجدول|الصفوف|السطور|مع\s*المنتج|بجوار\s*المنتج)/i,
+  /(?:من\s*(?:تحت|الجدول|الصفوف|السطور)|تحت)\s*.*(?:لفوق|الى\s*فوق|الى\s*الراس|للهيدر|في\s*الهيدر)/i,
+  /(?:احذف|شيل|امسح|نقل|انقل|حول)\s*.*(?:من\s*فوق|للجدول|الى\s*الجدول|تحت\s*مع\s*المنتج|بجوار\s*المنتج|بين\s*الهيدر\s*والجدول)/i,
+  /تحت\s*(?:بجوار|مع)\s*المنتج|بين\s*الهيدر\s*والجدول/i,
+];
+
+const UNSUPPORTED_PLACEHOLDER_LEAK_RX =
+  /بجوار\s*المنتج|مع\s*المنتج\s*فقط|مطلوب\s*نقله|الى\s*السطر|تحت\s*مع|من\s*فوق/i;
+
+/**
+ * Detects `edit_current` requests that ask to move or redistribute fields between
+ * the form header and the line-item grid, which cannot be reliably automated yet.
+ */
+export function detectUnsupportedEditCommand(
+  fillData: Pick<CopilotFormFillData, 'action_intent' | 'fields' | 'rows'> | undefined,
+  query: string
+): UnsupportedEditCheckResult {
+  if (!resolveEditCurrentIntent(fillData, query)) {
+    return { unsupported: false };
+  }
+
+  const normQuery = normalizeArabicText(query || '');
+  const hasTransferPhrasing = UNSUPPORTED_HEADER_GRID_TRANSFER_PATTERNS.some((rx) => rx.test(normQuery));
+
+  const fields = fillData?.fields || {};
+  const rows = fillData?.rows || [];
+  const hasLeakedPlaceholder =
+    Object.values(fields).some((v) => UNSUPPORTED_PLACEHOLDER_LEAK_RX.test(normalizeArabicText(String(v ?? '')))) ||
+    rows.some(
+      (r) =>
+        r &&
+        typeof r === 'object' &&
+        Object.values(r).some((v) => UNSUPPORTED_PLACEHOLDER_LEAK_RX.test(normalizeArabicText(String(v ?? ''))))
+    );
+
+  const hasClearedHeader = Object.values(fields).some(
+    (v) => v === null || String(v ?? '').trim().toUpperCase() === '$CLEAR'
+  );
+  const mentionsGridTarget = /(?:تحت|الجدول|الصفوف|السطور|مع\s*المنتج|بجوار\s*المنتج)/i.test(normQuery);
+  const hasUnactionableHeaderClearToEmptyRows =
+    hasClearedHeader && rows.length === 0 && mentionsGridTarget;
+
+  if (hasTransferPhrasing || hasLeakedPlaceholder || hasUnactionableHeaderClearToEmptyRows) {
+    return {
+      unsupported: true,
+      reason: 'header_grid_transfer_unsupported',
+      userMessage:
+        '⚠️ نقل أو ترحيل الحقول بين الهيدر والجدول غير مدعوم حالياً؛ يرجى تعديل موضع الحقل يدوياً على الشاشة. لم يتم تطبيق أي تعبئة تلقائية حفاظاً على بيانات الفاتورة.',
+    };
+  }
+
+  return { unsupported: false };
+}
+
 export interface SaveGuardMessageState {
   saveStatus?: 'saving' | 'saved' | 'failed';
   targetFormMode?: ErpFormMode;

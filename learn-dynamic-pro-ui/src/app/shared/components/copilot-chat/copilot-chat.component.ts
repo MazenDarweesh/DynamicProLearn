@@ -20,6 +20,7 @@ import {
 } from '../../../core/services/erp-automation';
 import {
   buildFormDiffEntries,
+  detectUnsupportedEditCommand,
   evaluateSaveGuard,
   extractDocRef,
   isEditExistingFormQuery,
@@ -114,6 +115,8 @@ export interface ChatMessage {
   draftResetDecision?: 'pending' | 'reset_and_new' | 'keep_draft';
   /** Visible error surfaced when deferred form preparation fails or times out */
   formPrepError?: string;
+  /** Visible explanation when an `edit_current` command asks for an unsupported structural edit */
+  unsupportedEditReason?: string;
 }
 
 @Component({
@@ -1078,6 +1081,34 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     this.scrollToBottom();
   }
 
+  /** Checks whether `msg` requests an unsupported header/grid transfer edit and blocks auto-fill cleanly. */
+  private blockIfUnsupportedEdit(msg: ChatMessage, surfaceToChat = true): boolean {
+    const check = detectUnsupportedEditCommand(msg.formFillData, msg.relatedUserQuery || '');
+    if (!check.unsupported) {
+      msg.unsupportedEditReason = undefined;
+      return false;
+    }
+    const errText =
+      check.userMessage ||
+      '⚠️ هذا التعديل غير مدعوم حالياً؛ يرجى تنفيذه يدوياً داخل الشاشة.';
+    msg.unsupportedEditReason = errText;
+    msg.formPrepared = false;
+    msg.requiresDraftResetConfirm = false;
+    msg.draftResetDecision = undefined;
+    this.clearSavedEditMetadata(msg);
+    if (surfaceToChat) {
+      this.pushUniqueAssistantNotice(errText);
+    }
+    this.telemetry?.log(
+      'FILL',
+      'Blocked unsupported edit_current command without applying form fill',
+      { reason: check.reason, actionIntent: msg.formFillData?.action_intent },
+      'WARN'
+    );
+    this.cdr.markForCheck();
+    return true;
+  }
+
   /**
    * Prepares the ERP form after `fillData` arrives (with explicit draft confirmation and bounded timeout).
    * Never performs a silent fill if opening a fresh document fails or times out.
@@ -1088,6 +1119,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     surfaceErrorToChat = true
   ): Promise<'ready' | 'needs_draft_confirm' | 'kept_draft' | 'failed'> {
     if (!msg.formFillData) {
+      return 'failed';
+    }
+
+    if (this.blockIfUnsupportedEdit(msg, surfaceErrorToChat)) {
       return 'failed';
     }
 
@@ -1196,6 +1231,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
    * identifies the missing fields and enters Conversational Slot-Filling Recovery mode.
    */
   async confirmSave(msg: ChatMessage, userClickedSave = false): Promise<void> {
+    if (msg.unsupportedEditReason) {
+      this.cdr.markForCheck();
+      return;
+    }
     const formMode = this.navigator.getFormMode(true);
     const formState = this.bridge.getFormState(true);
     const guard = evaluateSaveGuard({
@@ -1733,7 +1772,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       visibleFields,
       this.erpKey,
       (fillData: CopilotFormFillData) => {
-        if (fillData && this.isValidFormFill(fillData)) {
+        if (!fillData) return;
+        const assistantMsg = this.messages[assistantMsgIndex];
+        const unsupportedCheck = detectUnsupportedEditCommand(fillData, query);
+        if (this.isValidFormFill(fillData) || unsupportedCheck.unsupported) {
           const active = this.bridge.getActiveScreen();
           if (!fillData.pageId && active?.pageId) {
             fillData.pageId = active.pageId;
@@ -1743,25 +1785,26 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
           } else if (active?.pageName && (!fillData.pageId || String(active.pageId) === String(fillData.pageId))) {
             fillData.screenKey = active.pageName.trim();
           }
-          const assistantMsg = this.messages[assistantMsgIndex];
           assistantMsg.formFillData = fillData;
           assistantMsg.canEscalateToVisionAgent = false;
           assistantMsg.escalationGoal = undefined;
-          const modeOnExtract =
-            typeof document !== 'undefined' || this.bridge.isAvailable
-              ? this.navigator.getFormMode(true)
-              : 'EmptyNew';
-          const isEditCurrent = resolveEditCurrentIntent(fillData, query);
-          if (modeOnExtract === 'SavedOpen' && isEditCurrent) {
-            this.populateSavedOpenEditState(assistantMsg, fillData, formSchema);
-            assistantMsg.formPrepared = true;
-          } else if (modeOnExtract === 'UnsavedDraft' && !isEditCurrent) {
-            assistantMsg.requiresDraftResetConfirm = true;
-            assistantMsg.draftResetDecision = 'pending';
-            assistantMsg.formPrepared = false;
-          } else if ((modeOnExtract === 'SavedOpen' || modeOnExtract === 'ClosedOrList') && !isEditCurrent) {
-            this.clearSavedEditMetadata(assistantMsg);
-            assistantMsg.formPrepared = false;
+          if (!this.blockIfUnsupportedEdit(assistantMsg, false)) {
+            const modeOnExtract =
+              typeof document !== 'undefined' || this.bridge.isAvailable
+                ? this.navigator.getFormMode(true)
+                : 'EmptyNew';
+            const isEditCurrent = resolveEditCurrentIntent(fillData, query);
+            if (modeOnExtract === 'SavedOpen' && isEditCurrent) {
+              this.populateSavedOpenEditState(assistantMsg, fillData, formSchema);
+              assistantMsg.formPrepared = true;
+            } else if (modeOnExtract === 'UnsavedDraft' && !isEditCurrent) {
+              assistantMsg.requiresDraftResetConfirm = true;
+              assistantMsg.draftResetDecision = 'pending';
+              assistantMsg.formPrepared = false;
+            } else if ((modeOnExtract === 'SavedOpen' || modeOnExtract === 'ClosedOrList') && !isEditCurrent) {
+              this.clearSavedEditMetadata(assistantMsg);
+              assistantMsg.formPrepared = false;
+            }
           }
           this.telemetry?.log('AI_EXTRACT', `AI extracted form fill proposal for '${fillData.screenKey || this.erpKey}'`, {
             screenKey: fillData.screenKey || this.erpKey,
@@ -1778,8 +1821,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     );
 
     const completedMsg = this.messages[assistantMsgIndex];
-    if (completedMsg?.formFillData && this.isValidFormFill(completedMsg.formFillData)) {
+    if (completedMsg?.formFillData && (this.isValidFormFill(completedMsg.formFillData) || completedMsg.unsupportedEditReason)) {
       await this.prepareFormForMessage(completedMsg, formSchema, true);
+    } else if (completedMsg && this.isActionMode) {
+      this.blockIfUnsupportedEdit(completedMsg, true);
     }
   }
 

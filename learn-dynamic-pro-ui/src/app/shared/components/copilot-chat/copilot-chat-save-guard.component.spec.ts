@@ -472,5 +472,58 @@ describe('CopilotChatComponent - Save Guards & SavedOpen Edit Card', () => {
     expect(component.messages.some((m) => m.text.includes('تعذر فتح فاتورة جديدة'))).toBeTrue();
     expect(fixture.nativeElement.querySelector('.save-result-err')?.textContent).toContain('تعذر فتح فاتورة جديدة');
   });
+
+  it('shows clear "غير مدعوم حالياً" message and skips wrong form fill on unexecutable edit_current header-grid transfer', async () => {
+    component.isActionMode = true;
+    mockMode = 'SavedOpen';
+    mockHostState = { isOpen: true, mode: 'saved', dirty: false, docId: 13757, docNumber: 231 };
+
+    mockCopilotService.streamSearch.and.callFake(
+      async (
+        _q: string,
+        _lessonId: any,
+        _onSources: any,
+        _onToken: any,
+        onDone: any,
+        _onErr: any,
+        _skipCache: any,
+        _filters: any,
+        _threadId: any,
+        _visibleFields: any,
+        _erpKey: any,
+        onFormFill: any
+      ) => {
+        onFormFill({
+          intent: 'form_fill',
+          action_intent: 'edit_current',
+          screenKey: 'Purchases',
+          pageId: 289,
+          fields: { ProjectID: null },
+          rows: [],
+        });
+        onDone({ thread_id: 't-unsupported' });
+      }
+    );
+
+    component.inputQuery = 'احذف  المشروع من فوق وخليه تحت مع المنتج فقط';
+    await component.sendMessage();
+    fixture.detectChanges();
+
+    const streamedCard = component.messages.find((m) => m.sender === 'assistant' && m.formFillData);
+    expect(streamedCard).toBeDefined();
+    expect(streamedCard?.unsupportedEditReason).toContain('غير مدعوم حالياً');
+    expect(mockFormDriver.applyProgressiveFill).not.toHaveBeenCalled();
+    expect(mockNavigator.prepareFreshForm).not.toHaveBeenCalled();
+    expect(mockBridge.submitActiveForm).not.toHaveBeenCalled();
+    expect(component.messages.some((m) => m.text.includes('غير مدعوم حالياً'))).toBeTrue();
+
+    const el: HTMLElement = fixture.nativeElement;
+    expect(el.querySelector('.form-fill-unsupported-edit')?.textContent).toContain('غير مدعوم حالياً');
+    expect(el.querySelector('.btn-apply-form-fill')).toBeNull();
+
+    // Even direct applyFormFill invocation refuses to apply wrong data
+    await component.applyFormFill(streamedCard!);
+    expect(mockFormDriver.applyProgressiveFill).not.toHaveBeenCalled();
+  });
 });
 

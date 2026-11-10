@@ -153,7 +153,7 @@
             </div>
 
             <!-- In-DOM Action Card: Auto-Fill Suggestion -->
-            <div *ngIf="hasFormFillData(msg) && !msg.isStreaming && msg.formFillData as ffd"
+            <div *ngIf="(hasFormFillData(msg) || !!msg.unsupportedEditReason) && !msg.isStreaming && msg.formFillData as ffd"
                  class="form-fill-card animate-fade-in"
                  [class.form-fill-card-edit]="msg.targetFormMode === 'SavedOpen'">
               
@@ -287,8 +287,8 @@
                         : 'اقتراح تعبئة الشاشة بالذكاء الاصطناعي' }}
                     </span>
                   </div>
-                  <span class="form-fill-badge" [class.form-fill-badge-edit]="msg.targetFormMode === 'SavedOpen'">
-                    {{ msg.targetFormMode === 'SavedOpen' ? 'يتطلب تأكيد التعديل' : 'جاهز للتنفيذ' }}
+                  <span class="form-fill-badge" [class.form-fill-badge-edit]="msg.targetFormMode === 'SavedOpen' || !!msg.unsupportedEditReason">
+                    {{ msg.unsupportedEditReason ? 'غير مدعوم حالياً' : (msg.targetFormMode === 'SavedOpen' ? 'يتطلب تأكيد التعديل' : 'جاهز للتنفيذ') }}
                   </span>
                 </div>
 
@@ -365,19 +365,23 @@
                   ✋ تم الإبقاء على المسودة الحالية دون مسح أو فتح مستند جديد.
                 </div>
 
-                <div *ngIf="msg.formPrepError" class="save-result-msg save-result-err" style="margin-top: 6px;">
+                <div *ngIf="msg.unsupportedEditReason" class="form-fill-unsupported-edit save-result-msg save-result-err" style="margin-top: 6px;">
+                  {{ msg.unsupportedEditReason }}
+                </div>
+
+                <div *ngIf="msg.formPrepError && msg.formPrepError !== msg.unsupportedEditReason" class="save-result-msg save-result-err" style="margin-top: 6px;">
                   {{ msg.formPrepError }}
                 </div>
 
                 <div class="form-fill-footer">
-                  <label *ngIf="!msg.formFillApplied" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
+                  <label *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
                     <input type="checkbox" [(ngModel)]="autoSaveAfterFill" name="autoSaveAfterFill">
                     <span>💾 حفظ تلقائي بعد التعبئة</span>
                   </label>
-                  <span *ngIf="!msg.formFillApplied && autoSaveAfterFill && msg.targetFormMode === 'SavedOpen'" class="edit-autosave-note">
+                  <span *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && autoSaveAfterFill && msg.targetFormMode === 'SavedOpen'" class="edit-autosave-note">
                     ⚠️ الحفظ التلقائي متوقف لهذا المستند المحفوظ
                   </span>
-                  <button *ngIf="!msg.formFillApplied" type="button" class="btn-apply-form-fill"
+                  <button *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason" type="button" class="btn-apply-form-fill"
                           [disabled]="msg.isApplyingFormFill || (msg.requiresDraftResetConfirm && msg.draftResetDecision === 'pending') || msg.draftResetDecision === 'keep_draft'"
                           (click)="applyFormFill(msg)">
                     <span class="btn-icon" [class.animate-spin]="msg.isApplyingFormFill">{{ msg.isApplyingFormFill ? '⏳' : '✨' }}</span>
