@@ -369,19 +369,67 @@
                   {{ msg.unsupportedEditReason }}
                 </div>
 
-                <div *ngIf="msg.formPrepError && msg.formPrepError !== msg.unsupportedEditReason" class="save-result-msg save-result-err" style="margin-top: 6px;">
+                <div *ngIf="msg.formPrepError && msg.formPrepError !== msg.unsupportedEditReason && msg.formPrepError !== msg.v250PartialFailure?.message" class="save-result-msg save-result-err" style="margin-top: 6px;">
                   {{ msg.formPrepError }}
                 </div>
 
+                <!-- Wave 1 v2.5.0 Entity Resolution Ambiguity / Missing Card -->
+                <div *ngIf="msg.v250ResolutionIssues && msg.v250ResolutionIssues.length > 0 && !msg.formFillApplied && !msg.v250PartialFailure" class="v250-resolution-card">
+                  <div class="v250-res-header">🔍 يلزم حسم البيانات التالية قبل البدء في تعبئة الفاتورة:</div>
+                  <div *ngFor="let issue of msg.v250ResolutionIssues"
+                       class="v250-issue-item"
+                       [class.v250-issue-err]="issue.status !== 'ambiguous'">
+                    <div class="v250-issue-msg">{{ issue.message }}</div>
+
+                    <div *ngIf="issue.fieldCandidates && issue.fieldCandidates.length > 0" class="v250-chips-row">
+                      <button *ngFor="let fc of issue.fieldCandidates"
+                              type="button"
+                              class="v250-option-chip"
+                              [class.v250-chip-selected]="isV250SchemaOptionSelected(msg, issue, fc.key)"
+                              [disabled]="msg.isApplyingFormFill"
+                              (click)="selectV250SchemaFieldOption(msg, issue, fc)">
+                        <span>{{ fc.label }}</span>
+                        <code>({{ fc.key }})</code>
+                      </button>
+                    </div>
+
+                    <div *ngIf="issue.candidates && issue.candidates.length > 0" class="v250-chips-row">
+                      <button *ngFor="let cand of issue.candidates"
+                              type="button"
+                              class="v250-option-chip"
+                              [class.v250-chip-selected]="isV250LookupOptionSelected(msg, issue, cand.id)"
+                              [disabled]="msg.isApplyingFormFill"
+                              (click)="selectV250AmbiguityOption(msg, issue, cand)">
+                        <span>{{ cand.label }}</span>
+                        <span class="v250-chip-id">#{{ cand.id }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Wave 1 v2.5.0 Partial Mid-Way Failure Card (Save strictly disabled + Restart) -->
+                <div *ngIf="msg.v250PartialFailure" class="v250-partial-failure-card">
+                  <div class="v250-failure-title">⛔ تعذر إكمال تعبئة فاتورة المشتريات</div>
+                  <div class="v250-failure-msg">{{ msg.v250PartialFailure.message }}</div>
+                  <div class="v250-failure-actions">
+                    <button type="button"
+                            class="btn-v250-restart"
+                            (click)="restartV250FormFill(msg)">
+                      🔄 ابدأ من جديد
+                    </button>
+                    <span class="v250-save-locked-hint">🔒 زر الحفظ معطّل لمنع حفظ فاتورة ناقصة.</span>
+                  </div>
+                </div>
+
                 <div class="form-fill-footer">
-                  <label *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
+                  <label *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && !msg.v250PartialFailure && !shouldUsePurchasesV250(msg)" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
                     <input type="checkbox" [(ngModel)]="autoSaveAfterFill" name="autoSaveAfterFill">
                     <span>💾 حفظ تلقائي بعد التعبئة</span>
                   </label>
                   <span *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && autoSaveAfterFill && msg.targetFormMode === 'SavedOpen'" class="edit-autosave-note">
                     ⚠️ الحفظ التلقائي متوقف لهذا المستند المحفوظ
                   </span>
-                  <button *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason" type="button" class="btn-apply-form-fill"
+                  <button *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && !msg.v250PartialFailure" type="button" class="btn-apply-form-fill"
                           [disabled]="msg.isApplyingFormFill || (msg.requiresDraftResetConfirm && msg.draftResetDecision === 'pending') || msg.draftResetDecision === 'keep_draft'"
                           (click)="applyFormFill(msg)">
                     <span class="btn-icon" [class.animate-spin]="msg.isApplyingFormFill">{{ msg.isApplyingFormFill ? '⏳' : '✨' }}</span>
@@ -406,6 +454,53 @@
                     </span>
                   </div>
 
+                  <!-- Wave 1 v2.5.0 Actual Host State Preview (read from getActiveFormContext + getTableRows) -->
+                  <div *ngIf="msg.usedV250Pipeline && msg.v250Preview" class="v250-actual-preview-card">
+                    <div class="v250-preview-title">👁️ معاينة الحالة الفعلية من شاشة الـ ERP</div>
+                    <div class="v250-preview-headers" *ngIf="msg.v250Preview.actualHeaders.length > 0">
+                      <div *ngFor="let h of msg.v250Preview.actualHeaders"
+                           class="v250-preview-hdr-row"
+                           [class.v250-hdr-mismatch]="!h.matches">
+                        <strong>{{ h.labelAr }}:</strong>
+                        <span>{{ h.plannedLabel }} (#{{ h.plannedId }})</span>
+                        <span *ngIf="h.actualValue != null" class="v250-actual-val">← الفعلي: {{ h.actualValue }}</span>
+                      </div>
+                    </div>
+
+                    <div *ngIf="msg.v250Preview.exchangeRateInfo" class="v250-exchange-info">
+                      <span>💱 سعر الصرف المحسوب من الـ ERP: <strong>{{ msg.v250Preview.exchangeRateInfo.hostComputedRate ?? 'غير مقروء' }}</strong></span>
+                      <span *ngIf="msg.v250Preview.exchangeRateInfo.userSpecifiedRate != null">
+                        | السعر المطلوب: <strong>{{ msg.v250Preview.exchangeRateInfo.userSpecifiedRate }}</strong>
+                      </span>
+                    </div>
+
+                    <div class="v250-preview-rows-summary">
+                      <strong>📦 الصفوف الفعلية بالجدول ({{ msg.v250Preview.actualRows.length }}):</strong>
+                      <div *ngFor="let ar of msg.v250Preview.actualRows; let rIdx = index" class="v250-actual-row-line">
+                        <span>#{{ rIdx + 1 }}</span>
+                        <span>{{ ar['ProductName'] || ar['ProName'] || ('Product #' + (ar['ProductID'] ?? ar['ProID'] ?? '?')) }}</span>
+                        <span>× {{ ar['Qty'] ?? ar['Quntity'] ?? ar['Quantity'] ?? '?' }}</span>
+                        <span *ngIf="(ar['Price'] ?? ar['UnitPrice']) != null">&#64; {{ ar['Price'] ?? ar['UnitPrice'] }}</span>
+                        <span *ngIf="(ar['Total'] ?? ar['NetTotal'] ?? ar['RowTotal']) != null">= {{ ar['Total'] ?? ar['NetTotal'] ?? ar['RowTotal'] }}</span>
+                      </div>
+                      <div *ngIf="msg.v250Preview.actualTotal != null" class="v250-preview-total">
+                        الإجمالي الفعلي: <strong>{{ msg.v250Preview.actualTotal }}</strong>
+                        <span *ngIf="msg.v250Preview.plannedTotal != null"> (المخطط: {{ msg.v250Preview.plannedTotal }})</span>
+                      </div>
+                    </div>
+
+                    <div *ngIf="msg.v250Preview.warnings.length > 0" class="v250-preview-warnings">
+                      <div *ngFor="let w of msg.v250Preview.warnings" class="v250-warning-line">{{ w }}</div>
+                      <label class="v250-warning-ack-label">
+                        <input type="checkbox"
+                               [ngModel]="msg.v250WarningsAcknowledged"
+                               (ngModelChange)="onV250WarningsChanged(msg, $event)"
+                               [ngModelOptions]="{ standalone: true }">
+                        <span>أؤكد مراجعة هذه التنبيهات والقيم الفعلية وأطلب المتابعة للحفظ</span>
+                      </label>
+                    </div>
+                  </div>
+
                   <div *ngIf="msg.saveStatus !== 'saved'" class="save-actions">
                     <button type="button" class="btn-confirm-save"
                             [class.btn-confirm-save-edit]="msg.targetFormMode === 'SavedOpen'"
@@ -421,6 +516,11 @@
                        [class.save-result-ok]="msg.saveStatus === 'saved'"
                        [class.save-result-err]="msg.saveStatus === 'failed'">
                     {{ msg.saveMessage }}
+                  </div>
+                  <div *ngIf="msg.saveStatus === 'saved' && msg.v250SavedDoc" class="v250-saved-details">
+                    <span *ngIf="msg.v250SavedDoc.PONumber != null">رقم الفاتورة (PONumber): <strong>{{ msg.v250SavedDoc.PONumber }}</strong></span>
+                    <span *ngIf="msg.v250SavedDoc.POID != null">معرف المستند (POID): <strong>{{ msg.v250SavedDoc.POID }}</strong></span>
+                    <span *ngIf="msg.v250SavedDoc.mode">الوضع: <code>{{ msg.v250SavedDoc.mode }}</code></span>
                   </div>
                 </div>
 

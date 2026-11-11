@@ -1478,6 +1478,184 @@
   background: #f1f5f9;
 }
 
+/* ── Wave 1 v2.5.0 Resolver, Failure & Preview Cards ───────────────── */
+.v250-resolution-card,
+.v250-partial-failure-card,
+.v250-actual-preview-card {
+  margin-top: 8px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  font-size: 11.5px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.v250-resolution-card {
+  border: 1px solid #fbbf24;
+  background: #fffbeb;
+  color: #78350f;
+}
+
+.v250-res-header,
+.v250-preview-title,
+.v250-failure-title {
+  font-weight: 700;
+  font-size: 12px;
+}
+
+.v250-issue-item {
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid #fde68a;
+}
+
+.v250-issue-item.v250-issue-err {
+  border-color: #fca5a5;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.v250-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.v250-option-chip {
+  padding: 4px 9px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.v250-option-chip:hover:not(:disabled) {
+  background: #f8fafc;
+  border-color: #3b82f6;
+}
+
+.v250-option-chip.v250-chip-selected {
+  background: #ecfdf5;
+  border-color: #10b981;
+  color: #065f46;
+}
+
+.v250-chip-id {
+  opacity: 0.7;
+  font-size: 10.5px;
+}
+
+.v250-partial-failure-card {
+  border: 1px solid #f87171;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.v250-failure-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-v250-restart {
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: none;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 11.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btn-v250-restart:hover {
+  background: #b91c1c;
+}
+
+.v250-save-locked-hint {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.v250-actual-preview-card {
+  border: 1px solid #bfdbfe;
+  background: #f8fafc;
+  color: #0f172a;
+  margin-bottom: 8px;
+}
+
+.v250-preview-headers,
+.v250-preview-rows-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.v250-preview-hdr-row,
+.v250-actual-row-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 3px 6px;
+  background: #ffffff;
+  border-radius: 4px;
+  border: 1px solid #e2e8f0;
+}
+
+.v250-hdr-mismatch {
+  border-color: #f59e0b;
+  background: #fffbeb;
+}
+
+.v250-exchange-info {
+  padding: 5px 7px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 5px;
+}
+
+.v250-preview-warnings {
+  padding: 7px 9px;
+  background: #fffbeb;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  color: #92400e;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.v250-warning-ack-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.v250-saved-details {
+  margin-top: 5px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 11px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 /* ── Host ERP DOM Animation for Highlighted Inputs ──────────────────── */
 :host-context(body) .ai-autofill-highlight,
 ::ng-deep .ai-autofill-highlight {

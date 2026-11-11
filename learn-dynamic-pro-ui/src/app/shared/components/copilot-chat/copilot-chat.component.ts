@@ -16,7 +16,15 @@ import {
   detectMissingFieldsFromToastAndDom,
   ErpMissingFieldInfo,
   ErpFormMode,
-  ErpFormDiffEntry
+  ErpFormDiffEntry,
+  ErpLookupOption,
+  EntityResolutionIssue,
+  PurchasesV250ExecutorService,
+  PurchasesV250PartialFailure,
+  PurchasesV250PreviewState,
+  PurchasesWave1HeaderField,
+  SchemaFieldCandidate,
+  isPurchasesTargetScreen
 } from '../../../core/services/erp-automation';
 import {
   buildFormDiffEntries,
@@ -117,6 +125,26 @@ export interface ChatMessage {
   formPrepError?: string;
   /** Visible explanation when an `edit_current` command asks for an unsupported structural edit */
   unsupportedEditReason?: string;
+  /** Wave 1 v2.5.0 pipeline active flag for this message */
+  usedV250Pipeline?: boolean;
+  /** User-selected lookup IDs resolving ambiguous Wave 1 header fields */
+  v250PreselectedLookupIds?: Partial<Record<PurchasesWave1HeaderField, string | number>>;
+  /** User-selected product IDs resolving ambiguous Wave 1 row items (by rowIndex) */
+  v250PreselectedRowItemIds?: Record<number, string | number>;
+  /** User-selected schema technical keys resolving duplicate Arabic labels (e.g. StoreID vs SystemStore) */
+  v250ResolvedSchemaFields?: Record<string, string>;
+  /** Blocking resolution issues surfaced cleanly without invoking LLM again */
+  v250ResolutionIssues?: EntityResolutionIssue[];
+  /** Mid-way execution failure details when any host step returns `ok: false` */
+  v250PartialFailure?: PurchasesV250PartialFailure;
+  /** Actual-state preview snapshot read back from the ERP host after filling */
+  v250Preview?: PurchasesV250PreviewState;
+  /** Mandatory acknowledgement checkbox state when `v250Preview.warnings` is non-empty */
+  v250WarningsAcknowledged?: boolean;
+  /** Expected PO identifiers passed only for `SavedOpen` updates */
+  v250SavedDocExpected?: { expectedPOID?: string | number; expectedPONumber?: string | number };
+  /** Saved document response identifiers returned by `saveDocument` */
+  v250SavedDoc?: { POID?: string | number; PONumber?: string | number; mode?: string };
 }
 
 @Component({
@@ -131,6 +159,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   private formDriver = inject(ErpFormDriverService);
   private navigator = inject(ErpNavigatorService);
   private bridge = inject(ErpBridgeService);
+  private purchasesV250Executor = inject(PurchasesV250ExecutorService);
   private telemetry = inject(ErpTelemetryService, { optional: true });
   batchStepper = inject(ErpBatchStepperService);
   /** Optional: when on, saves right after a clean (fully filled) form fill. Off by default. */
@@ -906,6 +935,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
       this.syncErpKey(effectiveTarget || currentActive);
 
+      if (this.shouldUsePurchasesV250(msg)) {
+        await this.executePurchasesV250Flow(msg, effectiveTarget || currentActive);
+        return;
+      }
+
       // Ensure form entry is safely prepared AFTER structured action_intent is inspected
       const prepStatus = await this.prepareFormForMessage(msg, undefined, true);
       if (prepStatus !== 'ready') {
@@ -1002,8 +1036,243 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
 
+  /** Returns true when `DynamicERP` advertises `contractVersion >= 2.5.0` and the target is Purchases (`Page 289`). */
+  shouldUsePurchasesV250(msg: ChatMessage): boolean {
+    if (!msg.formFillData || msg.formFillData.batch_mode) return false;
+    if (!this.bridge.supportsContractV250?.()) return false;
+    const activeScreen = this.bridge.getActiveScreen();
+    return isPurchasesTargetScreen(
+      msg.formFillData.screenKey || this.erpKey,
+      msg.formFillData.pageId,
+      activeScreen
+    );
+  }
+
+  /** Wave 1 Purchases (`Page 289`, `contractVersion >= 2.5.0`) deterministic resolver + execution path. */
+  private async executePurchasesV250Flow(msg: ChatMessage, targetScreenKey: string): Promise<void> {
+    if (!msg.formFillData) return;
+    if (this.blockIfUnsupportedEdit(msg, true)) {
+      return;
+    }
+
+    msg.usedV250Pipeline = true;
+    msg.v250PartialFailure = undefined;
+    msg.v250Preview = undefined;
+    msg.v250WarningsAcknowledged = false;
+    msg.v250SavedDoc = undefined;
+    msg.v250SavedDocExpected = undefined;
+    msg.v250ResolutionIssues = undefined;
+    msg.saveStatus = undefined;
+    msg.saveMessage = undefined;
+    msg.formPrepError = undefined;
+
+    const isEditCurrent = resolveEditCurrentIntent(msg.formFillData, msg.relatedUserQuery || '');
+    const schemas = this.formDriver.collectFormSchema(this.elRef?.nativeElement);
+
+    const execResult = await this.purchasesV250Executor.execute({
+      fields: msg.formFillData.fields,
+      rows: msg.formFillData.rows,
+      schema: schemas,
+      isEditCurrent,
+      draftResetDecision: msg.draftResetDecision,
+      preselectedLookupIds: msg.v250PreselectedLookupIds,
+      preselectedRowItemIds: msg.v250PreselectedRowItemIds,
+      resolvedSchemaFields: msg.v250ResolvedSchemaFields,
+      prepareFormFn: async () => {
+        const status = await this.prepareFormForMessage(msg, schemas, false);
+        return {
+          status,
+          errorMessage: msg.formPrepError || msg.unsupportedEditReason
+        };
+      }
+    });
+
+    if (execResult.status === 'needs_draft_confirm') {
+      msg.requiresDraftResetConfirm = true;
+      msg.draftResetDecision = 'pending';
+      msg.formPrepared = false;
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (execResult.status === 'kept_draft') {
+      msg.requiresDraftResetConfirm = false;
+      msg.draftResetDecision = 'keep_draft';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (execResult.status === 'prep_failed') {
+      msg.formFillApplied = false;
+      msg.formPrepError = execResult.errorMessage || msg.formPrepError || '⚠️ تعذر فتح نموذج فاتورة المشتريات.';
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (execResult.status === 'needs_resolution') {
+      msg.formFillApplied = false;
+      msg.v250ResolutionIssues = execResult.resolution?.blockingIssues || [];
+      this.telemetry?.logSessionEnd({
+        success: false,
+        fieldsFilled: 0,
+        fieldsProcessed: Object.keys(msg.formFillData.fields || {}).length,
+        rowsFilled: msg.formFillData.rows?.length || 0,
+        unresolvedCount: msg.v250ResolutionIssues.length,
+        screenKey: targetScreenKey || this.erpKey
+      });
+      this.cdr.markForCheck();
+      return;
+    }
+
+    if (execResult.status === 'partial_failure') {
+      msg.formFillApplied = false;
+      msg.v250PartialFailure = execResult.failure;
+      msg.formPrepError = execResult.failure?.message || execResult.errorMessage;
+      this.cdr.markForCheck();
+      return;
+    }
+
+    // ready_for_preview: preview built strictly from host getActiveFormContext / getTableRows; never auto-save
+    msg.v250Preview = execResult.preview;
+    msg.v250WarningsAcknowledged = (execResult.preview?.warnings?.length ?? 0) === 0;
+    msg.formFillApplied = true;
+    msg.formPrepared = true;
+
+    if (execResult.preview?.isSavedOpenEdit) {
+      msg.targetFormMode = 'SavedOpen';
+      msg.requiresExplicitUpdateConfirm = true;
+      if (execResult.preview.expectedPOID != null || execResult.preview.expectedPONumber != null) {
+        msg.v250SavedDocExpected = {
+          expectedPOID: execResult.preview.expectedPOID,
+          expectedPONumber: execResult.preview.expectedPONumber
+        };
+        msg.targetDocRef = String(execResult.preview.expectedPONumber ?? execResult.preview.expectedPOID);
+      }
+    } else {
+      this.clearSavedEditMetadata(msg);
+      msg.v250SavedDocExpected = undefined;
+    }
+
+    if (msg.decisionId && this.copilotService) {
+      this.copilotService.feedbackErpNavigation(msg.decisionId, 'applied');
+    }
+
+    this.telemetry?.logSessionEnd({
+      success: true,
+      fieldsFilled: execResult.appliedHeaders?.length || 0,
+      fieldsProcessed: execResult.resolution?.metricsSummary.resolved || 0,
+      rowsFilled: execResult.appliedRows?.length || 0,
+      unresolvedCount: 0,
+      screenKey: targetScreenKey || this.erpKey
+    });
+    this.cdr.markForCheck();
+  }
+
+  private isV250IssueSelected(msg: ChatMessage, issue: EntityResolutionIssue): boolean {
+    if (issue.scope === 'schema') {
+      return !!msg.v250ResolvedSchemaFields?.[issue.fieldKey];
+    }
+    if (issue.status !== 'ambiguous') {
+      return false;
+    }
+    if (issue.scope === 'header') {
+      return msg.v250PreselectedLookupIds?.[issue.fieldKey as PurchasesWave1HeaderField] != null;
+    }
+    if (issue.scope === 'row' && issue.rowIndex != null) {
+      return msg.v250PreselectedRowItemIds?.[issue.rowIndex] != null;
+    }
+    return false;
+  }
+
+  isV250LookupOptionSelected(msg: ChatMessage, issue: EntityResolutionIssue, optionId: string | number): boolean {
+    if (issue.scope === 'header') {
+      return String(msg.v250PreselectedLookupIds?.[issue.fieldKey as PurchasesWave1HeaderField] ?? '') === String(optionId);
+    }
+    if (issue.scope === 'row' && issue.rowIndex != null) {
+      return String(msg.v250PreselectedRowItemIds?.[issue.rowIndex] ?? '') === String(optionId);
+    }
+    return false;
+  }
+
+  isV250SchemaOptionSelected(msg: ChatMessage, issue: EntityResolutionIssue, schemaKey: string): boolean {
+    return msg.v250ResolvedSchemaFields?.[issue.fieldKey] === schemaKey;
+  }
+
+  /** Selects a lookup candidate locally (0 LLM calls) and re-runs Wave 1 execution when all ambiguities are picked. */
+  async selectV250AmbiguityOption(
+    msg: ChatMessage,
+    issue: EntityResolutionIssue,
+    candidate: ErpLookupOption
+  ): Promise<void> {
+    if (msg.isApplyingFormFill) return;
+    if (issue.scope === 'header') {
+      msg.v250PreselectedLookupIds = {
+        ...(msg.v250PreselectedLookupIds || {}),
+        [issue.fieldKey as PurchasesWave1HeaderField]: candidate.id
+      };
+    } else if (issue.scope === 'row' && issue.rowIndex != null) {
+      msg.v250PreselectedRowItemIds = {
+        ...(msg.v250PreselectedRowItemIds || {}),
+        [issue.rowIndex]: candidate.id
+      };
+    }
+    this.cdr.markForCheck();
+
+    const issues = msg.v250ResolutionIssues || [];
+    if (issues.length > 0 && issues.every((item) => this.isV250IssueSelected(msg, item))) {
+      await this.applyFormFill(msg);
+    }
+  }
+
+  /** Resolves a duplicate Arabic field label (e.g. `StoreID` vs `SystemStore`) locally without LLM re-call. */
+  async selectV250SchemaFieldOption(
+    msg: ChatMessage,
+    issue: EntityResolutionIssue,
+    fieldCandidate: SchemaFieldCandidate
+  ): Promise<void> {
+    if (msg.isApplyingFormFill) return;
+    msg.v250ResolvedSchemaFields = {
+      ...(msg.v250ResolvedSchemaFields || {}),
+      [issue.fieldKey]: fieldCandidate.key
+    };
+    this.cdr.markForCheck();
+
+    const issues = msg.v250ResolutionIssues || [];
+    if (issues.length > 0 && issues.every((item) => this.isV250IssueSelected(msg, item))) {
+      await this.applyFormFill(msg);
+    }
+  }
+
+  /** Clears a partially filled form via `clearTableRows + triggerAddNew` when a mid-way step fails. */
+  async restartV250FormFill(msg: ChatMessage): Promise<void> {
+    if (msg.isApplyingFormFill) return;
+    const resetRes = await this.purchasesV250Executor.resetHalfFilledForm();
+    msg.v250PartialFailure = undefined;
+    msg.formFillApplied = false;
+    msg.v250Preview = undefined;
+    msg.v250WarningsAcknowledged = false;
+    msg.saveStatus = undefined;
+    msg.saveMessage = undefined;
+    msg.formPrepError = resetRes.ok ? undefined : resetRes.errorMessage;
+    if (resetRes.ok) {
+      this.pushUniqueAssistantNotice('🧹 تم تفريغ الجدول وفتح فاتورة جديدة. يمكنك الآن إعادة تعبئة البيانات من البداية.');
+    }
+    this.cdr.markForCheck();
+  }
+
+  onV250WarningsChanged(msg: ChatMessage, acknowledged: boolean): void {
+    msg.v250WarningsAcknowledged = !!acknowledged;
+    this.cdr.markForCheck();
+  }
+
   isConfirmSaveDisabled(msg: ChatMessage): boolean {
     if (this.isSavingInFlight || msg.saveStatus === 'saving' || msg.saveStatus === 'saved') {
+      return true;
+    }
+    if (msg.v250PartialFailure) {
+      return true;
+    }
+    if (msg.usedV250Pipeline && msg.v250Preview && msg.v250Preview.warnings.length > 0 && !msg.v250WarningsAcknowledged) {
       return true;
     }
     if (msg.requiresExplicitUpdateConfirm && !msg.formFillApplied) {
@@ -1231,7 +1500,22 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
    * identifies the missing fields and enters Conversational Slot-Filling Recovery mode.
    */
   async confirmSave(msg: ChatMessage, userClickedSave = false): Promise<void> {
-    if (msg.unsupportedEditReason) {
+    if (msg.unsupportedEditReason || msg.v250PartialFailure) {
+      this.cdr.markForCheck();
+      return;
+    }
+    if (msg.usedV250Pipeline && !userClickedSave) {
+      this.cdr.markForCheck();
+      return;
+    }
+    if (
+      msg.usedV250Pipeline &&
+      msg.v250Preview &&
+      msg.v250Preview.warnings.length > 0 &&
+      !msg.v250WarningsAcknowledged
+    ) {
+      msg.saveStatus = 'failed';
+      msg.saveMessage = '⚠️ يرجى مراجعة التنبيهات الظاهرة في المعاينة وتأكيد الإقرار قبل الحفظ.';
       this.cdr.markForCheck();
       return;
     }
@@ -1272,6 +1556,43 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       if (!this.bridge.isAvailable && typeof document === 'undefined') {
         msg.saveStatus = 'failed';
         msg.saveMessage = 'جسر الـ ERP غير متاح هنا. اضغط زر الحفظ يدوياً داخل الشاشة.';
+        return;
+      }
+
+      if (msg.usedV250Pipeline) {
+        const isSavedOpenEdit = msg.targetFormMode === 'SavedOpen';
+        const docRes = isSavedOpenEdit
+          ? await this.bridge.saveDocument(
+              msg.v250SavedDocExpected
+                ? {
+                    expectedPOID: msg.v250SavedDocExpected.expectedPOID,
+                    expectedPONumber: msg.v250SavedDocExpected.expectedPONumber
+                  }
+                : undefined
+            )
+          : await this.bridge.saveDocument();
+
+        if (docRes.ok) {
+          this.pendingMissingFieldsRecovery = null;
+          msg.saveStatus = 'saved';
+          msg.v250SavedDoc = {
+            POID: docRes.POID,
+            PONumber: docRes.PONumber,
+            mode: docRes.mode
+          };
+          msg.saveMessage =
+            docRes.PONumber != null
+              ? `✅ تم حفظ فاتورة المشتريات بنجاح — رقم الفاتورة: #${docRes.PONumber}`
+              : docRes.POID != null
+                ? `✅ تم حفظ فاتورة المشتريات بنجاح — معرف المستند: #${docRes.POID}`
+                : '✅ تم حفظ فاتورة المشتريات بنجاح في نظام الـ ERP.';
+        } else {
+          msg.saveStatus = 'failed';
+          msg.saveMessage =
+            docRes.errors && docRes.errors.length > 0
+              ? `⚠️ لم يتم الحفظ: ${docRes.errors.join('، ')}`
+              : '⚠️ تعذر إتمام الحفظ عبر saveDocument.';
+        }
         return;
       }
 
@@ -1822,7 +2143,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
     const completedMsg = this.messages[assistantMsgIndex];
     if (completedMsg?.formFillData && (this.isValidFormFill(completedMsg.formFillData) || completedMsg.unsupportedEditReason)) {
-      await this.prepareFormForMessage(completedMsg, formSchema, true);
+      if (this.shouldUsePurchasesV250(completedMsg)) {
+        this.blockIfUnsupportedEdit(completedMsg, true);
+      } else {
+        await this.prepareFormForMessage(completedMsg, formSchema, true);
+      }
     } else if (completedMsg && this.isActionMode) {
       this.blockIfUnsupportedEdit(completedMsg, true);
     }

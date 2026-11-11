@@ -189,6 +189,8 @@ export interface DynamicErpBridge {
   ): Promise<ErpSelectLookupResult> | ErpSelectLookupResult;
   /** Host bridge v2.5.0 structured line-item insertion. */
   addTableRow?(row: ErpTableRowPayload): Promise<ErpAddTableRowResult | boolean | void> | ErpAddTableRowResult | boolean | void;
+  /** Host bridge table row reader returning currently bound rows on the active screen. */
+  getTableRows?(): Promise<Array<Record<string, unknown>>> | Array<Record<string, unknown>>;
   /** Host bridge v2.5.0 document persistence with POID/PONumber output. */
   saveDocument?(
     options?: ErpSaveDocumentOptions

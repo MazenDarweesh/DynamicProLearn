@@ -289,6 +289,30 @@ describe('ErpBridgeService v2.5.0 Contract & Strict Lookup Transport (Step 1)', 
       expect(res.ok).toBeFalse();
       expect(res.errors).toEqual(['HTTP 500 PO Save']);
     });
+
+    it('reads rows directly via getTableRows() and falls back to getActiveFormContext().rows when absent or throwing', async () => {
+      const bridgeRows = [{ ProductID: 10, Qty: 2, Price: 150 }];
+      (window as any).DynamicERP = buildFullV250Bridge({
+        getTableRows: async () => bridgeRows
+      });
+      expect(await service.getTableRows()).toEqual(bridgeRows);
+
+      const contextRows = [{ ProductID: 20, Qty: 4, Price: 75 }];
+      (window as any).DynamicERP = buildFullV250Bridge({
+        getTableRows: undefined,
+        getActiveFormContext: () => ({ isOpen: true, rows: contextRows, dataObject: {} })
+      });
+      expect(await service.getTableRows()).toEqual(contextRows);
+
+      (window as any).DynamicERP = buildFullV250Bridge({
+        getTableRows: async () => {
+          throw new Error('bridge read failed');
+        },
+        getActiveFormContext: () => ({ isOpen: true, rows: contextRows, dataObject: {} })
+      });
+      expect(await service.getTableRows()).toEqual(contextRows);
+      expect(telemetrySpy.logBridge).toHaveBeenCalled();
+    });
   });
 });
 

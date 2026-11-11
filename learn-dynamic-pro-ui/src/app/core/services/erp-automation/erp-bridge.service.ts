@@ -866,6 +866,28 @@ export class ErpBridgeService {
     }
   }
 
+  /** Reads live line-item rows via `window.DynamicERP.getTableRows()` with `getActiveFormContext()` fallback. */
+  async getTableRows(): Promise<Array<Record<string, unknown>>> {
+    if (!this.isAvailable) {
+      return [];
+    }
+    if (typeof window.DynamicERP?.getTableRows === 'function') {
+      try {
+        const raw = await window.DynamicERP.getTableRows();
+        if (Array.isArray(raw)) {
+          this.telemetry?.logBridge('getTableRows', undefined, { count: raw.length, source: 'bridge' });
+          return raw;
+        }
+        this.telemetry?.logBridge('getTableRows', undefined, { invalid: true, source: 'bridge' });
+      } catch (err: any) {
+        const errMsg = err?.message || 'getTableRows host error';
+        this.telemetry?.logBridge('getTableRows', undefined, { error: errMsg }, err);
+      }
+    }
+    const ctx = this.getActiveFormContext(true);
+    return Array.isArray(ctx?.rows) ? [...ctx.rows] : [];
+  }
+
   /** Safe wrapper around v2.5.0 `saveDocument({ expectedPOID?, expectedPONumber? })`. */
   async saveDocument(options?: ErpSaveDocumentOptions): Promise<ErpSaveDocumentResult> {
     if (!this.isAvailable || typeof window.DynamicERP?.saveDocument !== 'function') {
