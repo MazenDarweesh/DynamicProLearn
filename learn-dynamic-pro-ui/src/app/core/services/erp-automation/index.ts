@@ -3,6 +3,7 @@ export * from './erp-navigator.service';
 export * from './erp-telemetry.service';
 export * from './erp-batch-stepper.service';
 export * from './erp-form-driver.service';
+export * from './entity-resolver';
 export * from './form-driver';
 export * from './save-recovery/erp-save-verifier';
 export type * from '../../models/erp-bridge.models';
