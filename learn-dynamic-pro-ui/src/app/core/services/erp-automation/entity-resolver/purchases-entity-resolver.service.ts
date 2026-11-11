@@ -168,6 +168,15 @@ function hasNegationMismatch(termNorm: string, optionNorm: string): boolean {
 }
 
 /**
+ * `contains` tier boundary rule: the term must begin at a word start inside the label (optionally after the
+ * Arabic definite article `ال`), so `"حله"` matches `"حله جلاكسي"` but never the middle of `"المرحله"`.
+ */
+function containsAtWordStart(optionNorm: string, termNorm: string): boolean {
+  const padded = ` ${optionNorm}`;
+  return padded.includes(` ${termNorm}`) || padded.includes(` ال${termNorm}`);
+}
+
+/**
  * Core strict matcher:
  * - Unique normalized exact/near-exact match -> `resolved`
  * - Optional closed-set synonym group match (unique with zero competing partials) -> `resolved` (`synonym`)
@@ -268,7 +277,7 @@ export function matchLookupOptionsStrict(
 
   const termWords = termNorm.split(' ').filter(Boolean);
   const containsContiguous = eligible
-    .filter((x) => !synonymIds.has(String(x.opt.id)) && !startsWithIds.has(String(x.opt.id)) && x.norm.includes(termNorm))
+    .filter((x) => !synonymIds.has(String(x.opt.id)) && !startsWithIds.has(String(x.opt.id)) && containsAtWordStart(x.norm, termNorm))
     .sort((a, b) => a.norm.length - b.norm.length || a.opt.label.localeCompare(b.opt.label, 'ar'));
 
   const containsContiguousIds = new Set(containsContiguous.map((x) => String(x.opt.id)));
@@ -280,7 +289,7 @@ export function matchLookupOptionsStrict(
               !synonymIds.has(String(x.opt.id)) &&
               !startsWithIds.has(String(x.opt.id)) &&
               !containsContiguousIds.has(String(x.opt.id)) &&
-              termWords.every((w) => x.norm.includes(w))
+              termWords.every((w) => containsAtWordStart(x.norm, w))
           )
           .sort((a, b) => a.norm.length - b.norm.length || a.opt.label.localeCompare(b.opt.label, 'ar'))
       : [];

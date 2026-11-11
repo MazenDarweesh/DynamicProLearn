@@ -230,6 +230,22 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
     expect(res.metricsSummary.itemAmbiguityRate).toBe(1);
   });
 
+  it('applies word-start boundary to the contains tier (never matches inside a word) while still allowing the "ال" article', () => {
+    const items: ErpLookupOption[] = [
+      { id: 1, label: 'حلة جلاكسي', raw: {} },
+      { id: 2, label: 'ارشيف المرحله الثالثه بمخازن الوثائق', raw: {} },
+      { id: 3, label: 'طقم حلة استنالس', raw: {} },
+      { id: 4, label: 'المخزن الرئيسي', raw: {} }
+    ];
+
+    const pot = matchLookupOptionsStrict('حلة', items, { scope: 'row' });
+    expect(pot.status).toBe('ambiguous');
+    expect(pot.candidates.map((c) => c.id)).toEqual([1, 3]);
+
+    const withArticle = matchLookupOptionsStrict('مخزن', items, { scope: 'row' });
+    expect(withArticle.candidates.map((c) => c.id)).toEqual([4]);
+  });
+
   it('rejects purely numeric item queries (quantities like 10, ٢٠, 5.5) BEFORE matching product names or ProIDs, while allowing text+digit items', async () => {
     expect(isPureNumericItemTerm(10)).toBeTrue();
     expect(isPureNumericItemTerm('10')).toBeTrue();
