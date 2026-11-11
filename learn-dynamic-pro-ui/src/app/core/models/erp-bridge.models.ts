@@ -37,6 +37,8 @@ export interface ErpSaveResult {
    */
   outcome?: 'saved' | 'failed' | 'unconfirmed';
   docId?: string | number;
+  poId?: string | number;
+  poNumber?: string | number;
   errors?: string[];
   message?: string;
   missingFields?: ErpMissingFieldInfo[];
@@ -74,6 +76,91 @@ export interface ErpActiveFormContext {
   rows?: Array<Record<string, any>> | null;
 }
 
+export interface ErpBridgeCapabilities {
+  /** Host contract version used for v2.5.0 feature detection (never read `version`). */
+  contractVersion?: string;
+  version?: string;
+  supportedScreens?: number[];
+  [key: string]: unknown;
+}
+
+export interface ErpRawLookupResponse {
+  status: 'ok' | 'loaded' | 'not_loaded' | 'empty' | string;
+  data: unknown;
+  count?: number;
+}
+
+export interface ErpLookupFieldSpec {
+  field: string;
+  labelAr: string;
+  scope: 'header' | 'row';
+  droModel: string;
+  valueKey: string;
+  textKey: string;
+}
+
+export interface ErpLookupOption {
+  id: string | number;
+  label: string;
+  raw: Record<string, unknown>;
+}
+
+export type StrictLookupFetchStatus =
+  | 'ok'
+  | 'unsupported'
+  | 'not_loaded'
+  | 'empty'
+  | 'invalid_row_schema'
+  | 'error';
+
+export interface StrictLookupFetchResult {
+  status: StrictLookupFetchStatus;
+  options: ErpLookupOption[];
+  totalCount: number;
+  invalidRows: number;
+  attempts: number;
+  errorMessage?: string;
+}
+
+export interface ErpSelectLookupResult {
+  ok: boolean;
+  reason?: string;
+}
+
+export interface ErpTableRowPayload {
+  ProductID: string | number;
+  Qty: number;
+  Price?: number;
+  UnitID?: string | number;
+  StoreID?: string | number;
+  Note?: string;
+}
+
+export interface ErpClearTableRowsResult {
+  ok: boolean;
+  count: number;
+  reason?: string;
+}
+
+export interface ErpAddTableRowResult {
+  ok: boolean;
+  reason?: string;
+  raw?: unknown;
+}
+
+export interface ErpSaveDocumentOptions {
+  expectedPOID?: string | number;
+  expectedPONumber?: string | number;
+}
+
+export interface ErpSaveDocumentResult {
+  ok: boolean;
+  POID?: string | number;
+  PONumber?: string | number;
+  mode?: string;
+  errors?: string[];
+}
+
 export interface DynamicErpBridge {
   getActiveScreen(): ErpActiveScreen | null | undefined;
   navigateToScreen(screenNameOrId: string | number): Promise<unknown> | unknown;
@@ -89,6 +176,23 @@ export interface DynamicErpBridge {
   getActiveFormContext?(): ErpActiveFormContext | null;
   /** Structured host form lifecycle inspection (mode/dirty/docId) */
   getFormState?(): ErpFormStateSnapshot | null;
+  /** Host bridge v2.5.0 capability handshake (feature detection reads `contractVersion` only). */
+  getCapabilities?(): ErpBridgeCapabilities | null;
+  /** Host bridge v2.5.0 lookup dataset fetcher (`{ status, data, count }`). */
+  fetchLookupData?(droModel: string): Promise<ErpRawLookupResponse> | ErpRawLookupResponse;
+  /** Host bridge v2.5.0 table row reset action. */
+  clearTableRows?(): Promise<ErpClearTableRowsResult> | ErpClearTableRowsResult;
+  /** Host bridge v2.5.0 deterministic lookup selection by ID. */
+  selectLookup?(
+    fieldKey: string,
+    id: string | number
+  ): Promise<ErpSelectLookupResult> | ErpSelectLookupResult;
+  /** Host bridge v2.5.0 structured line-item insertion. */
+  addTableRow?(row: ErpTableRowPayload): Promise<ErpAddTableRowResult | boolean | void> | ErpAddTableRowResult | boolean | void;
+  /** Host bridge v2.5.0 document persistence with POID/PONumber output. */
+  saveDocument?(
+    options?: ErpSaveDocumentOptions
+  ): Promise<ErpSaveDocumentResult> | ErpSaveDocumentResult;
 }
 
 declare global {
