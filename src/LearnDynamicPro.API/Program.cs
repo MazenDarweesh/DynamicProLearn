@@ -201,6 +201,10 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+app.MapMethods("/", new[] { "GET", "HEAD" }, () => Results.Ok(new { status = "ok", service = "LearnDynamicPro.API" }))
+    .AllowAnonymous();
+app.MapMethods("/api/health", new[] { "GET", "HEAD" }, () => Results.Ok(new { status = "ok", service = "LearnDynamicPro.API" }))
+    .AllowAnonymous();
 app.MapFallbackToFile("index.html");
 
 app.Run();

@@ -68,8 +68,8 @@
           <span>إعادة الاتصال</span> 🔄
         </button>
       </div>
-      <!-- Smart Top Filter Bar (Rendered only after authentication settles) -->
-      <app-copilot-top-filter-bar *ngIf="!isAuthenticating" [activeLessonId]="activeLessonId" [erpKey]="erpKey"
+      <!-- Smart Top Filter Bar (Rendered only when authenticated and handshake settles) -->
+      <app-copilot-top-filter-bar *ngIf="!isAuthenticating && authService.isAuthenticated()" [activeLessonId]="activeLessonId" [erpKey]="erpKey"
         [isCollapsed]="isFilterBarCollapsed" (filterChange)="onFilterChange($event)"
         (toggleCollapse)="onFilterCollapseChange($event)">
       </app-copilot-top-filter-bar>

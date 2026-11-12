@@ -42,6 +42,7 @@ export class CopilotService {
   private agentStreamService = inject(CopilotAgentStreamService);
 
   private filterData$?: Observable<StudentCopilotFilterData>;
+  private filterAuthToken: string | null = null;
 
   setBaseUrls(aiUrl?: string, backendUrl?: string): void {
     this.networkService.setBaseUrls(aiUrl, backendUrl);
@@ -80,8 +81,16 @@ export class CopilotService {
    * Cached with shareReplay(1) so subsequent calls do not repeat the HTTP request.
    */
   getCopilotFilters(forceRefresh = false): Observable<StudentCopilotFilterData> {
-    if (!this.filterData$ || forceRefresh) {
+    if (!this.authService.isAuthenticated()) {
       this.filterData$ = undefined;
+      this.filterAuthToken = null;
+      return of({ modules: [], levels: [], types: [] });
+    }
+
+    const currentToken = this.authService.token();
+    if (!this.filterData$ || forceRefresh || this.filterAuthToken !== currentToken) {
+      this.filterData$ = undefined;
+      this.filterAuthToken = currentToken;
       const backendUrl = this.networkService.backendBaseUrl;
       const url = backendUrl ? `${backendUrl}/api/student/copilot-filters` : '/api/student/copilot-filters';
       this.filterData$ = this.http.get<StudentCopilotFilterData>(url, {
@@ -90,7 +99,11 @@ export class CopilotService {
           'X-Copilot-Silent': 'true'
         }
       }).pipe(
-        catchError(() => of({ modules: [], levels: [], types: [] })),
+        catchError(() => {
+          this.filterData$ = undefined;
+          this.filterAuthToken = null;
+          return of({ modules: [], levels: [], types: [] });
+        }),
         shareReplay(1)
       );
     }

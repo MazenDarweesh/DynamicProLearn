@@ -170,6 +170,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   authService = inject(AuthService);
 
   @ViewChild('scrollContainer') private scrollContainer!: ElementRef;
+  @ViewChild(CopilotTopFilterBarComponent) private topFilterBar?: CopilotTopFilterBarComponent;
 
   @Input() erpKey?: string;
   @Input() activeScreenKey?: string;
@@ -396,6 +397,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       this.authService.login(this.token);
       this.isAuthenticating = false;
       this.authError = null;
+      this.topFilterBar?.loadFilters(true);
     } else if (this.u && this.p && !this.authService.isAuthenticated()) {
       this.performErpLogin(this.u, this.p, this.erpKey || null);
     }
@@ -414,6 +416,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         }
         this.isAuthenticating = false;
         this.authError = null;
+        this.topFilterBar?.loadFilters(true);
         this.cdr.markForCheck();
       },
       error: (err) => {
