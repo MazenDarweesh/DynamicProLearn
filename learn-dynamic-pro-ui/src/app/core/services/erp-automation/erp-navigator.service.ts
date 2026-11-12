@@ -329,7 +329,7 @@ export class ErpNavigatorService {
           rawResolution: res,
         };
       } else if (res.decision === 'ask') {
-        const askOptions = res.candidates.slice(0, 3).map((opt) => {
+        const askOptions = res.candidates.slice(0, 5).map((opt) => {
           const matched = candidates.find((c) => c.id === opt.id);
           return matched && !opt.label ? { ...opt, label: matched.label } : opt;
         });
@@ -340,10 +340,18 @@ export class ErpNavigatorService {
           rawResolution: res,
         };
       } else {
+        const localAskOptions =
+          res.intent === 'navigate' && candidates.length > 0
+            ? this.buildLocalClarifyOptions(userMessage, candidates, 5)
+            : [];
         return {
           success: false,
           decision: 'clarify',
-          message: 'يرجى توضيح اسم الشاشة أو العملية المطلوبة (مثال: فاتورة مشتريات، تسجيل عميل).',
+          askOptions: localAskOptions.length > 0 ? localAskOptions : undefined,
+          message:
+            localAskOptions.length > 0
+              ? 'طلبك يحتمل أكثر من شاشة، أي شاشة تقصد فتحها؟'
+              : 'يرجى توضيح اسم الشاشة أو العملية المطلوبة (مثال: فواتير المشتريات، فواتير المبيعات).',
           rawResolution: res,
         };
       }
@@ -359,5 +367,97 @@ export class ErpNavigatorService {
 
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * Builds local clarification chip candidates prioritized by main operational modules
+   * and core allowlisted screens (never by numeric ID cutoff) when backend nav resolves 'clarify'.
+   */
+  private buildLocalClarifyOptions(
+    query: string,
+    candidates: NavCandidateIn[],
+    maxOptions: number = 5
+  ): NavScored[] {
+    const stopWords = new Set(['افتح', 'اذهب', 'انتقل', 'شاشه', 'شاشة', 'صفحه', 'صفحة', 'عايز', 'محتاج', 'ممكن', 'الي', 'الى', 'من', 'في', 'علي', 'على']);
+    const primaryModules = new Set([
+      normalizeArabicText('الموردين و المشتريات'),
+      normalizeArabicText('العملاء  و المبيعات'),
+      normalizeArabicText('العملاء و المبيعات'),
+      normalizeArabicText('الحسابات العامه'),
+      normalizeArabicText('المخازن'),
+      normalizeArabicText('المرتبات'),
+      normalizeArabicText('التصنيع'),
+    ]);
+    const secondaryModules = new Set([
+      normalizeArabicText('الفاتورة الالكترونية'),
+      normalizeArabicText('الادارة العليا'),
+      normalizeArabicText('تقارير تكملية'),
+      normalizeArabicText('اعدادات'),
+      normalizeArabicText('اعدادات المرتبات'),
+      normalizeArabicText('الانظمة المتخصصة'),
+      normalizeArabicText('المراجعة والترحيل'),
+    ]);
+    const coreAllowlist = new Set([
+      normalizeArabicText('فواتير المشتريات'),
+      normalizeArabicText('فواتير المبيعات'),
+      normalizeArabicText('المشتريات'),
+      normalizeArabicText('بيانات الموردين'),
+      normalizeArabicText('بيانات العملاء'),
+      normalizeArabicText('قيود اليومية'),
+      normalizeArabicText('حركات المخازن'),
+      normalizeArabicText('تحويلات المخازن'),
+    ]);
+    const secondaryKw = ['المرحله', 'فلاحين', 'البان', 'مصمم', 'تفاصيل', 'تقرير', 'استعلام', 'اعدادات', 'الكترونيه'].map((w) => normalizeArabicText(w));
+
+    const qNorm = normalizeArabicText(query);
+    const qTokens = qNorm
+      .split(/\s+/)
+      .filter((t) => t.length >= 3 && !stopWords.has(t))
+      .map((t) => (t.startsWith('ال') && t.length >= 5 ? t.slice(2) : t));
+    if (qTokens.length === 0) return [];
+
+    const stemMap: Record<string, string[]> = {
+      فواتير: ['فاتور', 'فواتير'],
+      مبيعات: ['مبيع', 'بيع', 'مبيعات'],
+      مشتريات: ['مشتري', 'شراء', 'مشتريات'],
+    };
+
+    const scored: { opt: NavScored; tier: number }[] = [];
+    for (const c of candidates) {
+      const labelNorm = normalizeArabicText(c.label || '');
+      const pathNorms = (c.path || []).map((p) => normalizeArabicText(p));
+      const fullNorm = `${labelNorm} ${pathNorms.join(' ')}`;
+
+      let matchCount = 0;
+      for (const tok of qTokens) {
+        const variants = stemMap[tok] || [tok];
+        if (variants.some((v) => fullNorm.includes(v))) {
+          matchCount++;
+        }
+      }
+      if (matchCount === 0) continue;
+
+      const isPrimaryMod = pathNorms.some((p) => primaryModules.has(p));
+      const isSecondaryMod = pathNorms.some((p) => secondaryModules.has(p));
+      const isCore = coreAllowlist.has(labelNorm);
+      const hasSecondaryKw = secondaryKw.some((kw) => kw && labelNorm.includes(kw));
+      const userAskedSecondary = secondaryKw.some((kw) => kw && labelNorm.includes(kw) && qNorm.includes(kw));
+
+      let tier = 1;
+      if ((isSecondaryMod || hasSecondaryKw) && !userAskedSecondary) tier = 0;
+      else if (isPrimaryMod && isCore) tier = 3;
+      else if (isPrimaryMod || isCore) tier = 2;
+
+      const conf = Number(Math.min(0.82, 0.50 + matchCount * 0.1 + tier * 0.05).toFixed(2));
+      scored.push({
+        tier,
+        opt: { id: c.id, label: c.label, confidence: conf, reason: 'ترشيح محلي حسب الوحدة الأساسية' },
+      });
+    }
+
+    return scored
+      .sort((a, b) => b.tier - a.tier || b.opt.confidence - a.opt.confidence)
+      .slice(0, maxOptions)
+      .map((s) => s.opt);
   }
 }

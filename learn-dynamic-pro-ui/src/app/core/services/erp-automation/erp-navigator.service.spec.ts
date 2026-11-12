@@ -241,5 +241,43 @@ describe('ErpNavigatorService & getFormMode()', () => {
     expect(draftRes.success).toBeTrue();
     expect(triggerAddNewSpy).not.toHaveBeenCalled();
   });
+
+  it('surfaces local primary-module askOptions (no id < 1000 heuristic) when backend clarify returns on navigate intent', async () => {
+    (window as any).DynamicERP = {
+      listScreens: () => [
+        { pageId: 101, pageName: 'الفواتير المرحلة', moduleName: 'الفاتورة الالكترونية' },
+        { pageId: 7001, pageName: 'فواتير المشتريات', moduleName: 'الموردين و المشتريات' },
+        { pageId: 7002, pageName: 'فواتير المبيعات', moduleName: 'العملاء  و المبيعات' },
+      ],
+    };
+    const fakeCopilot = {
+      resolveErpNavigation: jasmine.createSpy('resolveErpNavigation').and.resolveTo({
+        decision: 'clarify',
+        intent: 'navigate',
+        source: 'ai',
+        candidates: [],
+      }),
+    };
+    spyOn((navigator as any).injector, 'get').and.returnValue(fakeCopilot);
+
+    const res = await navigator.resolveAndNavigate('عايز افتح شاشة الفواتير');
+    expect(res.success).toBeFalse();
+    expect(res.decision).toBe('clarify');
+    expect(res.askOptions?.length).toBeGreaterThanOrEqual(2);
+    const ids = (res.askOptions || []).map((o) => o.id);
+    expect(ids[0]).toMatch(/^700[12]$/);
+    expect(ids.slice(0, 2)).toContain('7001');
+    expect(ids.slice(0, 2)).toContain('7002');
+  });
+
+  it('returns explicit non-empty message when bridge is available but listScreens returns empty', async () => {
+    (window as any).DynamicERP = {
+      listScreens: () => [],
+    };
+    const res = await navigator.resolveAndNavigate('عايز افتح شاشة الفواتير');
+    expect(res.success).toBeFalse();
+    expect(res.decision).toBe('clarify');
+    expect(res.message).toContain('لم يتم العثور على أي شاشات متاحة');
+  });
 });
 

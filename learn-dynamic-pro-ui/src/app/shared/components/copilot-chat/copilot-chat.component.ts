@@ -2228,6 +2228,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     return (matched?.title || matched?.pageName || '').trim() || key;
   }
 
+  private isNavigationScreenQuery(query: string): boolean {
+    const q = (query || '').trim();
+    return /^(?:عايز\s+|ممكن\s+|ابغى\s+|اريد\s+|أريد\s+)?(?:افتح|اذهب|انتقل|وديني|روح)|شاش[ةه]|صفح[ةه]/i.test(q);
+  }
+
   /** Core stream method — shared by sendMessage() and retryMessage() */
   private async streamQuery(query: string, skipCache: boolean = false, skipNavCheck: boolean = false) {
     this.isStreaming = true;
@@ -2324,6 +2329,29 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
               this.scrollToBottom();
               return;
             }
+          } else if (
+            navRes?.decision === 'clarify' &&
+            (resolvedIntent === 'navigate' || (this.bridge.isAvailable && !navRes?.rawResolution && this.isNavigationScreenQuery(query)))
+          ) {
+            const fallbackOptions = navRes.askOptions;
+            this.messages.push({
+              sender: 'assistant',
+              text: fallbackOptions?.length
+                ? 'طلبك يحتمل أكثر من شاشة، أي شاشة تقصد فتحها؟'
+                : (navRes.message || 'يرجى تحديد اسم الشاشة بدقة (مثال: فواتير المشتريات، فواتير المبيعات).'),
+              sources: [],
+              isStreaming: false,
+              askOptions: fallbackOptions?.length ? fallbackOptions : undefined,
+              relatedUserQuery: query,
+              decisionId: resolvedDecisionId,
+              filters: { ...this.activeFilter },
+              lessonId: this.activeFilter.lessonId,
+              lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
+            });
+            this.isStreaming = false;
+            this.cdr.markForCheck();
+            this.scrollToBottom();
+            return;
           }
         } catch (navErr) {
           console.warn('[Copilot Navigation] resolveAndNavigate error:', navErr);
@@ -2364,7 +2392,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       // In Unified Action & Vision Mode, if the user wants to execute an action or navigate,
       // and the in-page DOM could neither navigate nor find visible form fields, automatically
       // hand off to the Vision Agent (CDP + Set-of-Mark VLM) seamlessly!
-      const isNavUnresolved = resolvedIntent === 'navigate' && (!navRes || !navRes.success) && !pendingAskOptions;
+      const isNavUnresolved = !this.bridge.isAvailable && resolvedIntent === 'navigate' && (!navRes || !navRes.success) && !pendingAskOptions;
       if (shouldOfferVisionEscalation || isNavUnresolved) {
         console.info('%c[Copilot Unified Hybrid] DOM path could not reach target screen/fields — seamlessly invoking Vision Agent...', 'color:#7c3aed;font-weight:bold');
         this.isStreaming = false;

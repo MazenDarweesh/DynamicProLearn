@@ -676,5 +676,77 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
     expect(streamSpy).toHaveBeenCalledWith('سجل فاتورة مشتريات جديدة من حسين', true);
     expect(mockCopilotService.streamSearch).not.toHaveBeenCalled();
   });
+
+  it('never calls runVisionAgent when bridge is available and nav resolves clarify on ambiguous navigate', async () => {
+    activePageId = 0;
+    activePageName = 'Dashboard';
+    mockNavigator.isScreenActive.and.returnValue(false);
+    component.isActionMode = true;
+    const visionSpy = spyOn<any>(component, 'runVisionAgent').and.resolveTo();
+    mockNavigator.resolveAndNavigate.and.resolveTo({
+      success: false,
+      decision: 'clarify',
+      askOptions: [
+        { id: '244', label: 'فواتير المبيعات', confidence: 0.78, reason: 'ترشيح محلي' },
+        { id: '289', label: 'فواتير المشتريات', confidence: 0.76, reason: 'ترشيح محلي' }
+      ],
+      rawResolution: { decision: 'clarify', intent: 'navigate', source: 'ai', candidates: [] }
+    } as any);
+
+    await (component as any).streamQuery('عايز افتح شاشة الفواتير');
+
+    expect(visionSpy).not.toHaveBeenCalled();
+    expect(mockCopilotService.streamSearch).not.toHaveBeenCalled();
+    const lastMsg = component.messages[component.messages.length - 1];
+    expect(lastMsg.askOptions?.length).toBe(2);
+  });
+
+  it('displays explicit Arabic message instead of silence or Vision when bridge listScreens returns empty', async () => {
+    activePageId = 0;
+    activePageName = 'Dashboard';
+    mockNavigator.isScreenActive.and.returnValue(false);
+    mockBridge.listScreens.and.returnValue([]);
+    component.isActionMode = true;
+    const visionSpy = spyOn<any>(component, 'runVisionAgent').and.resolveTo();
+    mockNavigator.resolveAndNavigate.and.resolveTo({
+      success: false,
+      decision: 'clarify',
+      message: 'لم يتم العثور على أي شاشات متاحة في واجهة النظام حالياً.'
+    } as any);
+
+    await (component as any).streamQuery('عايز افتح شاشة الفواتير');
+
+    expect(visionSpy).not.toHaveBeenCalled();
+    expect(mockCopilotService.streamSearch).not.toHaveBeenCalled();
+    const lastMsg = component.messages[component.messages.length - 1];
+    expect(lastMsg.text).toContain('لم يتم العثور على أي شاشات متاحة');
+  });
+
+  it('anti-regression: clear navigate go (افتح فواتير المبيعات) navigates directly without extra questions', async () => {
+    activePageId = 0;
+    activePageName = 'Dashboard';
+    mockNavigator.isScreenActive.and.returnValue(false);
+    component.isActionMode = true;
+    const visionSpy = spyOn<any>(component, 'runVisionAgent').and.resolveTo();
+    mockNavigator.resolveAndNavigate.and.resolveTo({
+      success: true,
+      decision: 'go',
+      chosen: { id: '244', label: 'فواتير المبيعات', confidence: 0.96, reason: 'فواتير المبيعات' },
+      rawResolution: {
+        decision: 'go',
+        intent: 'navigate',
+        source: 'ai',
+        candidates: [{ id: '244', confidence: 0.96, reason: 'فواتير المبيعات' }]
+      }
+    } as any);
+
+    await (component as any).streamQuery('افتح فواتير المبيعات');
+
+    expect(visionSpy).not.toHaveBeenCalled();
+    const lastMsg = component.messages[component.messages.length - 1];
+    expect(lastMsg.askOptions).toBeUndefined();
+    expect(lastMsg.text).toContain('تم الانتقال إلى شاشة');
+    expect(lastMsg.text).toContain('فواتير المبيعات');
+  });
 });
 
