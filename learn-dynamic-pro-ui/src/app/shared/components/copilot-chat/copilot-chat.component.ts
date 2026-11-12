@@ -2510,6 +2510,16 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     const userQuery = msg.relatedUserQuery;
     if (!userQuery) return;
 
+    // For failed/incomplete ERP extraction retries in Action Mode, run full streamQuery(skipCache=true)
+    // so live form schemas, ERP key, and `form_fill` SSE callbacks are preserved.
+    if (
+      msg.provenance === 'ERP_EXTRACTION_FAILED' ||
+      (this.isActionMode && (msg.provenance === 'ERP_ACTION_GUIDE' || !!msg.formFillData))
+    ) {
+      await this.streamQuery(userQuery, true);
+      return;
+    }
+
     // Reset assistant message in-place (clean slate for new answer)
     msg.text = '';
     msg.sources = [];

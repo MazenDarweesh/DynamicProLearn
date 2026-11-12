@@ -660,5 +660,21 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
     expect(component.pendingV250Resolution?.issues.length).toBe(1);
     expect(component.messages.some((m) => m.sender === 'assistant' && m.text.includes('تم تحديد «المخزن»'))).toBeTrue();
   });
+
+  it('retryMessage delegates ERP_EXTRACTION_FAILED retries through streamQuery with skipCache=true', async () => {
+    const streamSpy = spyOn<any>(component, 'streamQuery').and.resolveTo();
+    component.isActionMode = true;
+    component.messages.push({
+      sender: 'assistant',
+      text: '⚠️ تعذر استخراج بيانات النموذج حالياً...',
+      provenance: 'ERP_EXTRACTION_FAILED',
+      relatedUserQuery: 'سجل فاتورة مشتريات جديدة من حسين'
+    });
+
+    await component.retryMessage(component.messages.length - 1);
+
+    expect(streamSpy).toHaveBeenCalledWith('سجل فاتورة مشتريات جديدة من حسين', true);
+    expect(mockCopilotService.streamSearch).not.toHaveBeenCalled();
+  });
 });
 
