@@ -313,6 +313,38 @@ describe('ErpBridgeService v2.5.0 Contract & Strict Lookup Transport (Step 1)', 
       expect(await service.getTableRows()).toEqual(contextRows);
       expect(telemetrySpy.logBridge).toHaveBeenCalled();
     });
+
+    it('forwards setFieldValue(fieldKey, value) cleanly and handles failure, exception, or missing host method', async () => {
+      const dateVal = new Date('2026-11-11T00:00:00Z');
+      const setSpy = jasmine.createSpy('setFieldValue').and.resolveTo({ ok: true, key: 'PODate', value: dateVal });
+      (window as any).DynamicERP = buildFullV250Bridge({ setFieldValue: setSpy });
+
+      const okRes = await service.setFieldValue('PODate', dateVal);
+      expect(setSpy).toHaveBeenCalledWith('PODate', dateVal);
+      expect(okRes).toEqual({ ok: true, key: 'PODate', value: dateVal, reason: undefined });
+      expect(telemetrySpy.logBridge).toHaveBeenCalledWith('setFieldValue', { fieldKey: 'PODate', value: dateVal }, okRes);
+
+      (window as any).DynamicERP = buildFullV250Bridge({
+        setFieldValue: async () => ({ ok: false, key: 'PODate', value: dateVal, reason: 'حقل للقراءة فقط' })
+      });
+      const failRes = await service.setFieldValue('PODate', dateVal);
+      expect(failRes).toEqual({ ok: false, key: 'PODate', value: dateVal, reason: 'حقل للقراءة فقط' });
+
+      (window as any).DynamicERP = buildFullV250Bridge({
+        setFieldValue: async () => {
+          throw new Error('setFieldValue crash');
+        }
+      });
+      const errRes = await service.setFieldValue('PODate', dateVal);
+      expect(errRes).toEqual({ ok: false, key: 'PODate', value: dateVal, reason: 'setFieldValue crash' });
+
+      const noMethodBridge = buildFullV250Bridge();
+      delete (noMethodBridge as any).setFieldValue;
+      (window as any).DynamicERP = noMethodBridge;
+      const missingRes = await service.setFieldValue('PODate', dateVal);
+      expect(missingRes.ok).toBeFalse();
+      expect(missingRes.reason).toContain('setFieldValue');
+    });
   });
 });
 

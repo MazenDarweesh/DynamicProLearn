@@ -153,6 +153,13 @@ export interface ErpSaveDocumentOptions {
   expectedPONumber?: string | number;
 }
 
+export interface ErpSetFieldValueResult {
+  ok: boolean;
+  key?: string;
+  value?: unknown;
+  reason?: string;
+}
+
 export interface ErpSaveDocumentResult {
   ok: boolean;
   POID?: string | number;
@@ -187,6 +194,11 @@ export interface DynamicErpBridge {
     fieldKey: string,
     id: string | number
   ): Promise<ErpSelectLookupResult> | ErpSelectLookupResult;
+  /** Host bridge v2.5.0 structured field setter (`{ ok, key?, value?, reason? }`). */
+  setFieldValue?(
+    fieldKey: string,
+    value: unknown
+  ): Promise<ErpSetFieldValueResult | boolean | void> | ErpSetFieldValueResult | boolean | void;
   /** Host bridge v2.5.0 structured line-item insertion. */
   addTableRow?(row: ErpTableRowPayload): Promise<ErpAddTableRowResult | boolean | void> | ErpAddTableRowResult | boolean | void;
   /** Host bridge table row reader returning currently bound rows on the active screen. */

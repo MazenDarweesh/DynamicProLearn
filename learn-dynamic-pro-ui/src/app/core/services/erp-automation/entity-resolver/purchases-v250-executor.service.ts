@@ -328,6 +328,38 @@ export class PurchasesV250ExecutorService {
     const appliedHeaders: PurchasesV250AppliedHeaderEntry[] = [];
     const appliedRows: PurchasesV250PlannedRow[] = [];
 
+    // 5b. Defensive PODate fallback in creation mode after triggerAddNew:
+    // if host dataObject.PODate is missing/empty, populate today's Date via setFieldValue.
+    if (!params.isEditCurrent) {
+      const ctxAfterPrep = this.bridge.getActiveFormContext(true);
+      const poDateLookup = readCaseInsensitiveKey(ctxAfterPrep?.dataObject, ['PODate']);
+      const isPoDateEmpty =
+        !poDateLookup.found ||
+        poDateLookup.value == null ||
+        String(poDateLookup.value).trim() === '';
+      if (isPoDateEmpty && typeof this.bridge.setFieldValue === 'function') {
+        const defaultDate = new Date();
+        const dateRes = await this.bridge.setFieldValue('PODate', defaultDate);
+        if (dateRes.ok !== true) {
+          return this.buildPartialFailureResult({
+            failedStep: 'setFieldValue:PODate',
+            failedStepLabelAr: 'تهيئة تاريخ الفاتورة الافتراضي',
+            reason: dateRes.reason,
+            completedSteps,
+            appliedHeaders,
+            appliedRows,
+            resolution,
+            isEditCurrent: params.isEditCurrent,
+            initialFormMode
+          });
+        }
+        completedSteps.push('setFieldValue:PODate');
+        this.telemetry?.log('FILL', 'Applied defensive PODate fallback via setFieldValue', {
+          date: defaultDate.toISOString()
+        });
+      }
+    }
+
     // 6. clearTableRows BEFORE header fields (skipped on header-only edit_current with zero rows)
     const shouldClearTableRows = !params.isEditCurrent || resolution.rowResolutions.length > 0;
     if (shouldClearTableRows) {

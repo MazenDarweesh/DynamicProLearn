@@ -11,6 +11,7 @@ import {
   ErpLookupOption,
   StrictLookupFetchResult,
   ErpSelectLookupResult,
+  ErpSetFieldValueResult,
   ErpTableRowPayload,
   ErpClearTableRowsResult,
   ErpAddTableRowResult,
@@ -841,6 +842,29 @@ export class ErpBridgeService {
       this.invalidateFormCaches();
       this.telemetry?.logBridge('selectLookup', { fieldKey, id }, { ok: false }, err);
       return { ok: false, reason: err?.message || `فشل selectLookup للحقل ${fieldKey}.` };
+    }
+  }
+
+  /** Safe wrapper around v2.5.0 `setFieldValue(fieldKey, value) -> { ok, key?, value?, reason? }`. */
+  async setFieldValue(fieldKey: string, value: unknown): Promise<ErpSetFieldValueResult> {
+    if (!this.isAvailable || typeof window.DynamicERP?.setFieldValue !== 'function') {
+      return { ok: false, key: fieldKey, value, reason: 'setFieldValue غير متاح في جسر الـ ERP.' };
+    }
+    this.invalidateFormCaches();
+    try {
+      const raw = await window.DynamicERP.setFieldValue(fieldKey, value);
+      this.invalidateFormCaches();
+      const obj = raw && typeof raw === 'object' ? (raw as unknown as Record<string, unknown>) : null;
+      const ok = obj ? obj['ok'] === true : raw === true;
+      const reason = obj && typeof obj['reason'] === 'string' ? obj['reason'] : undefined;
+      const normalized: ErpSetFieldValueResult = { ok, key: fieldKey, value, reason };
+      this.telemetry?.logBridge('setFieldValue', { fieldKey, value }, normalized);
+      return normalized;
+    } catch (err: any) {
+      this.invalidateFormCaches();
+      const errMsg = err?.message || `فشل setFieldValue للحقل ${fieldKey}.`;
+      this.telemetry?.logBridge('setFieldValue', { fieldKey, value }, { ok: false }, err);
+      return { ok: false, key: fieldKey, value, reason: errMsg };
     }
   }
 

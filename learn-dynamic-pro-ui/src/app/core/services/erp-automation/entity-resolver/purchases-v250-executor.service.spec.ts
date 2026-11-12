@@ -53,6 +53,7 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
         'fetchLookupRowsStrict',
         'clearTableRows',
         'selectLookup',
+        'setFieldValue',
         'addTableRow',
         'getTableRows',
         'getActiveFormContext',
@@ -64,6 +65,7 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
       ],
       { isAvailable: true }
     );
+    mockBridge.setFieldValue.and.resolveTo({ ok: true, key: 'PODate' });
 
     mockBridge.supportsContractV250.and.returnValue(true);
     mockBridge.fetchLookupRowsStrict.and.callFake(
@@ -97,6 +99,7 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
         isOpen: true,
         screenName: 'Purchases',
         dataObject: {
+          PODate: '2026-11-11T00:00:00Z',
           POSetting: 1,
           CurrancyID: 2,
           SupplierID: 15,
@@ -406,6 +409,107 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
     expect(resetOk).toEqual({ ok: true, errorMessage: undefined });
     expect(mockBridge.clearTableRows).toHaveBeenCalledTimes(1);
     expect(mockBridge.triggerAddNew).toHaveBeenCalledTimes(1);
+  });
+
+  describe('defensive PODate fallback after prepareFreshForm', () => {
+    it('writes PODate via setFieldValue before clearTableRows when PODate is null/undefined/empty in creation mode', async () => {
+      currentMode = 'ClosedOrList';
+      const order: string[] = [];
+      let ctxCall = 0;
+      mockBridge.getActiveFormContext.and.callFake(() => {
+        ctxCall++;
+        return {
+          isOpen: true,
+          screenName: 'Purchases',
+          dataObject: {
+            PODate: ctxCall === 1 ? null : new Date('2026-11-11T00:00:00Z'),
+            POSetting: 1,
+            CurrancyID: 2,
+            SupplierID: 15,
+            StoreID: 5,
+            ExchangePrice: 48.5,
+            Total: 4000
+          },
+          rows: [{ ProductID: 101, Qty: 10, Price: 400, Total: 4000 }]
+        };
+      });
+      mockBridge.setFieldValue.and.callFake(async (fieldKey: string, value: unknown) => {
+        order.push(`setFieldValue:${fieldKey}`);
+        return { ok: true, key: fieldKey, value };
+      });
+      mockBridge.clearTableRows.and.callFake(async () => {
+        order.push('clearTableRows');
+        return { ok: true, count: 0 };
+      });
+      mockBridge.selectLookup.and.callFake(async (fieldKey: string) => {
+        order.push(`selectLookup:${fieldKey}`);
+        return { ok: true };
+      });
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'دولار',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 400 }],
+        prepareFormFn: async () => {
+          order.push('prepareForm');
+          currentMode = 'EmptyNew';
+          return { status: 'ready' };
+        },
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(mockBridge.setFieldValue).toHaveBeenCalledOnceWith('PODate', jasmine.any(Date));
+      expect(order.slice(0, 3)).toEqual(['prepareForm', 'setFieldValue:PODate', 'clearTableRows']);
+    });
+
+    it('does NOT call setFieldValue when PODate is already populated after prepareFreshForm', async () => {
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'دولار',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 400 }],
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(mockBridge.setFieldValue).not.toHaveBeenCalled();
+    });
+
+    it('halts with partial_failure before clearTableRows when PODate fallback setFieldValue returns ok:false', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: { PODate: '' },
+        rows: []
+      });
+      mockBridge.setFieldValue.and.resolveTo({ ok: false, key: 'PODate', reason: 'readonly date' });
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'دولار',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 400 }],
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('partial_failure');
+      expect(result.failure?.failedStep).toBe('setFieldValue:PODate');
+      expect(result.failure?.reason).toContain('readonly date');
+      expect(mockBridge.clearTableRows).not.toHaveBeenCalled();
+    });
   });
 });
 
