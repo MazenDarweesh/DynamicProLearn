@@ -600,5 +600,65 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
     await component.confirmSave(msg, true);
     expect(mockBridge.saveDocument).toHaveBeenCalledTimes(1);
   });
+
+  it('re-evaluates immediately after picking a Store chip when remaining blockers have no chips (> 10 products)', async () => {
+    const bigProductList = Array.from({ length: 12 }, (_, idx) => ({
+      id: 200 + idx,
+      label: `صنف خاص ${idx + 1}`,
+      raw: {}
+    }));
+    mockBridge.fetchLookupRowsStrict.and.callFake(async (spec: ErpLookupFieldSpec): Promise<StrictLookupFetchResult> => {
+      if (spec.droModel === 'Product') {
+        return {
+          status: 'ok',
+          totalCount: bigProductList.length,
+          options: bigProductList,
+          invalidRows: 0,
+          attempts: 1
+        };
+      }
+      const list = (lookupCatalog[spec.droModel] || []).map((o) => ({ ...o, raw: {} }));
+      return {
+        status: 'ok',
+        totalCount: list.length,
+        options: list,
+        invalidRows: 0,
+        attempts: 1
+      };
+    });
+
+    const msg: ChatMessage = {
+      sender: 'assistant',
+      text: 'فاتورة مختلطة',
+      relatedUserQuery: 'سجل فاتورة مشتريات',
+      formFillData: {
+        screenKey: 'PURCHASE_INVOICE',
+        pageId: 289,
+        action_intent: 'new',
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'جنيه مصري',
+          SupplierID: 'حسين للتوريدات',
+          StoreID: 'مخزن عبيط'
+        },
+        rows: [{ 'اسم المنتج': 'منتج مجهول', Qty: 5 }]
+      }
+    };
+    component.messages.push(msg);
+
+    await component.applyFormFill(msg);
+    expect(msg.v250ResolutionIssues?.length).toBe(2);
+    const storeIssue = msg.v250ResolutionIssues!.find((i) => i.fieldKey === 'StoreID')!;
+    expect(storeIssue.candidates.length).toBe(2);
+
+    // Click Store chip even though row item still lacks chips -> immediately shrinks blockers to row item only
+    await component.selectV250AmbiguityOption(msg, storeIssue, { id: 6, label: 'مخزن الخامات', raw: {} });
+
+    expect(msg.formFillData?.fields?.['StoreID']).toBe('مخزن الخامات');
+    expect(msg.v250ResolutionIssues?.length).toBe(1);
+    expect(msg.v250ResolutionIssues?.[0].scope).toBe('row');
+    expect(component.pendingV250Resolution?.issues.length).toBe(1);
+    expect(component.messages.some((m) => m.sender === 'assistant' && m.text.includes('تم تحديد «المخزن»'))).toBeTrue();
+  });
 });
 

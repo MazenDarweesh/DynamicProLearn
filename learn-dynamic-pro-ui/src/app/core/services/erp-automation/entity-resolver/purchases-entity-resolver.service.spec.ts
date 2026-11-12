@@ -460,5 +460,31 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
     expect(res.rowResolutions[1].reason).toBe('numeric_item_rejected');
     expect(res.rowResolutions[1].candidates).toEqual([]);
   });
+
+  it('strips generic leading descriptor prefixes ("صنف " / "منتج ") as safe row fallback while keeping literal full matches intact', () => {
+    const productOptions = [
+      { id: 36962, label: 'سن', raw: {} },
+      { id: 36963, label: 'رمل', raw: {} },
+      { id: 36964, label: 'صنف ممتاز', raw: {} }
+    ];
+
+    const sanOutcome = matchLookupOptionsStrict('صنف سن', productOptions, { scope: 'row' });
+    expect(sanOutcome.status).toBe('resolved');
+    expect(sanOutcome.matchTier).toBe('exact');
+    expect(sanOutcome.resolvedOption?.id).toBe(36962);
+
+    const ramlOutcome = matchLookupOptionsStrict('المنتج رمل', productOptions, { scope: 'row' });
+    expect(ramlOutcome.status).toBe('resolved');
+    expect(ramlOutcome.resolvedOption?.id).toBe(36963);
+
+    // Literal item name starting with "صنف" still resolves directly without mangling
+    const literalOutcome = matchLookupOptionsStrict('صنف ممتاز', productOptions, { scope: 'row' });
+    expect(literalOutcome.status).toBe('resolved');
+    expect(literalOutcome.resolvedOption?.id).toBe(36964);
+
+    // Header scope does not strip "صنف" arbitrarily
+    const headerOutcome = matchLookupOptionsStrict('صنف سن', productOptions, { scope: 'header' });
+    expect(headerOutcome.status).toBe('not_found');
+  });
 });
 

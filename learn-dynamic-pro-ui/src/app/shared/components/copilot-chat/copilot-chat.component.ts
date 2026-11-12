@@ -1215,6 +1215,59 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     return m2 && m2[1]?.trim() ? m2[1].trim() : clean;
   }
 
+  private persistV250IssueValue(
+    targetMsg: ChatMessage,
+    issue: EntityResolutionIssue,
+    matchedOption?: ErpLookupOption,
+    fallbackText?: string
+  ): void {
+    const formData = targetMsg.formFillData;
+    if (!formData) return;
+
+    if (issue.scope === 'header') {
+      const headerField = issue.fieldKey as PurchasesWave1HeaderField;
+      const nextFields: Record<string, unknown> = { ...(formData.fields || {}) };
+      for (const existingKey of Object.keys(nextFields)) {
+        if (mapKeyToWave1HeaderField(existingKey) === headerField) {
+          delete nextFields[existingKey];
+        }
+      }
+      const nextPreselected = { ...(targetMsg.v250PreselectedLookupIds || {}) };
+      if (matchedOption) {
+        nextPreselected[headerField] = matchedOption.id;
+        nextFields[headerField] = matchedOption.label;
+      } else {
+        delete nextPreselected[headerField];
+        if (fallbackText !== undefined) {
+          nextFields[headerField] = fallbackText;
+        }
+      }
+      formData.fields = nextFields;
+      targetMsg.v250PreselectedLookupIds = nextPreselected;
+      return;
+    }
+
+    if (issue.scope === 'row' && issue.rowIndex != null && Array.isArray(formData.rows) && formData.rows[issue.rowIndex]) {
+      const nextRow: Record<string, unknown> = { ...formData.rows[issue.rowIndex] };
+      const itemExtracted = extractRowItemQuery(nextRow);
+      const itemKey = itemExtracted?.itemKey || 'Product';
+      const nextRowPreselected = { ...(targetMsg.v250PreselectedRowItemIds || {}) };
+      if (matchedOption) {
+        nextRowPreselected[issue.rowIndex] = matchedOption.id;
+        nextRow[itemKey] = matchedOption.label;
+      } else {
+        delete nextRowPreselected[issue.rowIndex];
+        if (fallbackText !== undefined) {
+          nextRow[itemKey] = fallbackText;
+        }
+      }
+      const nextRows = [...formData.rows];
+      nextRows[issue.rowIndex] = nextRow;
+      formData.rows = nextRows;
+      targetMsg.v250PreselectedRowItemIds = nextRowPreselected;
+    }
+  }
+
   private patchV250IssueFromReply(
     targetMsg: ChatMessage,
     issue: EntityResolutionIssue,
@@ -1260,44 +1313,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
     }
 
-    if (issue.scope === 'header') {
-      const headerField = issue.fieldKey as PurchasesWave1HeaderField;
-      const nextFields: Record<string, unknown> = { ...(formData.fields || {}) };
-      for (const existingKey of Object.keys(nextFields)) {
-        if (mapKeyToWave1HeaderField(existingKey) === headerField) {
-          delete nextFields[existingKey];
-        }
-      }
-      const nextPreselected = { ...(targetMsg.v250PreselectedLookupIds || {}) };
-      if (matchedOption) {
-        nextPreselected[headerField] = matchedOption.id;
-        nextFields[headerField] = matchedOption.label;
-      } else {
-        delete nextPreselected[headerField];
-        nextFields[headerField] = patchValue;
-      }
-      formData.fields = nextFields;
-      targetMsg.v250PreselectedLookupIds = nextPreselected;
-      return;
-    }
-
-    if (issue.scope === 'row' && issue.rowIndex != null && Array.isArray(formData.rows) && formData.rows[issue.rowIndex]) {
-      const nextRow: Record<string, unknown> = { ...formData.rows[issue.rowIndex] };
-      const itemExtracted = extractRowItemQuery(nextRow);
-      const itemKey = itemExtracted?.itemKey || 'Product';
-      const nextRowPreselected = { ...(targetMsg.v250PreselectedRowItemIds || {}) };
-      if (matchedOption) {
-        nextRowPreselected[issue.rowIndex] = matchedOption.id;
-        nextRow[itemKey] = matchedOption.label;
-      } else {
-        delete nextRowPreselected[issue.rowIndex];
-        nextRow[itemKey] = patchValue;
-      }
-      const nextRows = [...formData.rows];
-      nextRows[issue.rowIndex] = nextRow;
-      formData.rows = nextRows;
-      targetMsg.v250PreselectedRowItemIds = nextRowPreselected;
-    }
+    this.persistV250IssueValue(targetMsg, issue, matchedOption, patchValue);
   }
 
   /** Wave 1 Purchases (`Page 289`, `contractVersion >= 2.5.0`) deterministic resolver + execution path. */
@@ -1468,30 +1484,47 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     return msg.v250ResolvedSchemaFields?.[issue.fieldKey] === schemaKey;
   }
 
-  /** Selects a lookup candidate locally (0 LLM calls) and re-runs Wave 1 execution when all ambiguities are picked. */
+  private hasSelectableCandidates(issue: EntityResolutionIssue): boolean {
+    if (issue.scope === 'schema') {
+      return (issue.fieldCandidates?.length ?? 0) > 0;
+    }
+    return (issue.candidates?.length ?? 0) > 0;
+  }
+
+  private async reEvaluateAfterChipPick(
+    msg: ChatMessage,
+    resolvedLabelAr: string,
+    chosenDisplay: string
+  ): Promise<void> {
+    const issues = msg.v250ResolutionIssues || [];
+    const hasRemainingChipIssues = issues.some(
+      (item) => this.hasSelectableCandidates(item) && !this.isV250IssueSelected(msg, item)
+    );
+    if (issues.length === 0 || hasRemainingChipIssues) {
+      return;
+    }
+
+    await this.applyFormFill(msg);
+
+    const remaining = this.pendingV250Resolution?.targetMessage === msg ? (this.pendingV250Resolution.issues || []) : [];
+    if (remaining.length > 0) {
+      this.pushUniqueAssistantNotice(
+        `✅ تم تحديد «${resolvedLabelAr}» (${chosenDisplay}). ${remaining[0].message}`
+      );
+      this.cdr.markForCheck();
+    }
+  }
+
+  /** Selects a lookup candidate locally (0 LLM calls) and re-runs Wave 1 execution when no chippable issues remain. */
   async selectV250AmbiguityOption(
     msg: ChatMessage,
     issue: EntityResolutionIssue,
     candidate: ErpLookupOption
   ): Promise<void> {
     if (msg.isApplyingFormFill) return;
-    if (issue.scope === 'header') {
-      msg.v250PreselectedLookupIds = {
-        ...(msg.v250PreselectedLookupIds || {}),
-        [issue.fieldKey as PurchasesWave1HeaderField]: candidate.id
-      };
-    } else if (issue.scope === 'row' && issue.rowIndex != null) {
-      msg.v250PreselectedRowItemIds = {
-        ...(msg.v250PreselectedRowItemIds || {}),
-        [issue.rowIndex]: candidate.id
-      };
-    }
+    this.persistV250IssueValue(msg, issue, candidate);
     this.cdr.markForCheck();
-
-    const issues = msg.v250ResolutionIssues || [];
-    if (issues.length > 0 && issues.every((item) => this.isV250IssueSelected(msg, item))) {
-      await this.applyFormFill(msg);
-    }
+    await this.reEvaluateAfterChipPick(msg, issue.labelAr, candidate.label);
   }
 
   /** Resolves a duplicate Arabic field label (e.g. `StoreID` vs `SystemStore`) locally without LLM re-call. */
@@ -1506,11 +1539,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       [issue.fieldKey]: fieldCandidate.key
     };
     this.cdr.markForCheck();
-
-    const issues = msg.v250ResolutionIssues || [];
-    if (issues.length > 0 && issues.every((item) => this.isV250IssueSelected(msg, item))) {
-      await this.applyFormFill(msg);
-    }
+    await this.reEvaluateAfterChipPick(msg, issue.labelAr, `${fieldCandidate.label} (${fieldCandidate.key})`);
   }
 
   /** Clears a partially filled form via `clearTableRows + triggerAddNew` when a mid-way step fails. */

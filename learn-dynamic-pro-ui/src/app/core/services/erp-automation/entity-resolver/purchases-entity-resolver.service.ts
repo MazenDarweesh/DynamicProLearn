@@ -176,70 +176,23 @@ function containsAtWordStart(optionNorm: string, termNorm: string): boolean {
   return padded.includes(` ${termNorm}`) || padded.includes(` ال${termNorm}`);
 }
 
+const ROW_DESCRIPTOR_PREFIX_RE = /^(?:صنف|الصنف|منتج|المنتج|بند|البند)\s+/;
+
 /**
- * Core strict matcher:
- * - Unique normalized exact/near-exact match -> `resolved`
- * - Optional closed-set synonym group match (unique with zero competing partials) -> `resolved` (`synonym`)
- * - Duplicate exact matches -> `ambiguous`
- * - Items (`scope === 'row'`) reject pure numbers before matching, then rank `exact -> startsWith -> contains`
- * - ANY non-exact match (even a single partial candidate) -> `ambiguous` (requires user confirmation)
- * - Zero matches -> `not_found`
+ * Strips a leading generic item descriptor noun (`صنف`, `منتج`, `بند`) for fallback matching
+ * when the LLM includes phrasing like `"صنف سن"` instead of `"سن"`.
  */
-export function matchLookupOptionsStrict(
-  rawTerm: unknown,
-  options: readonly ErpLookupOption[],
+export function stripLeadingRowDescriptorPrefix(termNorm: string): string {
+  return termNorm.replace(ROW_DESCRIPTOR_PREFIX_RE, '').trim();
+}
+
+function evaluateNormalizedTerm(
+  termNorm: string,
+  indexed: ReadonlyArray<{ opt: ErpLookupOption; norm: string }>,
   opts: {
-    scope: 'header' | 'row';
-    preselectedId?: string | number;
     synonymGroups?: readonly (readonly string[])[];
   }
 ): EntityMatchOutcome {
-  if (
-    opts.preselectedId !== undefined &&
-    opts.preselectedId !== null &&
-    String(opts.preselectedId).trim() !== ''
-  ) {
-    const selected = options.find((o) => String(o.id) === String(opts.preselectedId));
-    if (selected) {
-      return {
-        status: 'resolved',
-        matchTier: 'user_selected',
-        resolvedOption: selected,
-        candidates: []
-      };
-    }
-    return {
-      status: 'not_found',
-      matchTier: 'none',
-      candidates: [],
-      reason: 'preselected_option_missing'
-    };
-  }
-
-  const termStr = rawTerm == null ? '' : String(rawTerm).trim();
-  if (!termStr) {
-    return { status: 'not_found', matchTier: 'none', candidates: [] };
-  }
-
-  if (opts.scope === 'row' && isPureNumericItemTerm(rawTerm)) {
-    return {
-      status: 'not_found',
-      matchTier: 'none',
-      candidates: [],
-      reason: 'numeric_item_rejected'
-    };
-  }
-
-  const termNorm = normalizeEntityForExact(termStr);
-  if (!termNorm) {
-    return { status: 'not_found', matchTier: 'none', candidates: [] };
-  }
-
-  const indexed = options.map((opt) => ({
-    opt,
-    norm: normalizeEntityForExact(opt.label)
-  }));
-
   const exactMatches = indexed.filter((x) => x.norm === termNorm);
   if (exactMatches.length === 1) {
     return {
@@ -316,6 +269,84 @@ export function matchLookupOptionsStrict(
   }
 
   return { status: 'not_found', matchTier: 'none', candidates: [] };
+}
+
+/**
+ * Core strict matcher:
+ * - Unique normalized exact/near-exact match -> `resolved`
+ * - Optional closed-set synonym group match (unique with zero competing partials) -> `resolved` (`synonym`)
+ * - Duplicate exact matches -> `ambiguous`
+ * - Items (`scope === 'row'`) reject pure numbers before matching, then rank `exact -> startsWith -> contains`
+ *   (with a safe fallback stripping a leading generic descriptor noun like `صنف`/`منتج` only after full-string `not_found`)
+ * - ANY non-exact match (even a single partial candidate) -> `ambiguous` (requires user confirmation)
+ * - Zero matches -> `not_found`
+ */
+export function matchLookupOptionsStrict(
+  rawTerm: unknown,
+  options: readonly ErpLookupOption[],
+  opts: {
+    scope: 'header' | 'row';
+    preselectedId?: string | number;
+    synonymGroups?: readonly (readonly string[])[];
+  }
+): EntityMatchOutcome {
+  if (
+    opts.preselectedId !== undefined &&
+    opts.preselectedId !== null &&
+    String(opts.preselectedId).trim() !== ''
+  ) {
+    const selected = options.find((o) => String(o.id) === String(opts.preselectedId));
+    if (selected) {
+      return {
+        status: 'resolved',
+        matchTier: 'user_selected',
+        resolvedOption: selected,
+        candidates: []
+      };
+    }
+    return {
+      status: 'not_found',
+      matchTier: 'none',
+      candidates: [],
+      reason: 'preselected_option_missing'
+    };
+  }
+
+  const termStr = rawTerm == null ? '' : String(rawTerm).trim();
+  if (!termStr) {
+    return { status: 'not_found', matchTier: 'none', candidates: [] };
+  }
+
+  if (opts.scope === 'row' && isPureNumericItemTerm(rawTerm)) {
+    return {
+      status: 'not_found',
+      matchTier: 'none',
+      candidates: [],
+      reason: 'numeric_item_rejected'
+    };
+  }
+
+  const termNorm = normalizeEntityForExact(termStr);
+  if (!termNorm) {
+    return { status: 'not_found', matchTier: 'none', candidates: [] };
+  }
+
+  const indexed = options.map((opt) => ({
+    opt,
+    norm: normalizeEntityForExact(opt.label)
+  }));
+
+  const primaryOutcome = evaluateNormalizedTerm(termNorm, indexed, opts);
+  if (primaryOutcome.status !== 'not_found' || opts.scope !== 'row') {
+    return primaryOutcome;
+  }
+
+  const strippedTerm = stripLeadingRowDescriptorPrefix(termNorm);
+  if (strippedTerm && strippedTerm !== termNorm) {
+    return evaluateNormalizedTerm(strippedTerm, indexed, opts);
+  }
+
+  return primaryOutcome;
 }
 
 /**
