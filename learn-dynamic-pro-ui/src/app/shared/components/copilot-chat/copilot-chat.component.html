@@ -486,6 +486,9 @@
                       <div *ngIf="msg.v250Preview.actualTotal != null" class="v250-preview-total">
                         الإجمالي الفعلي: <strong>{{ msg.v250Preview.actualTotal }}</strong>
                         <span *ngIf="msg.v250Preview.plannedTotal != null"> (المخطط: {{ msg.v250Preview.plannedTotal }})</span>
+                        <span *ngIf="msg.v250Preview.actualOrderTotal != null && msg.v250Preview.actualOrderTotal !== msg.v250Preview.actualTotal">
+                          | TotalOrder (محلي): <strong>{{ msg.v250Preview.actualOrderTotal }}</strong>
+                        </span>
                       </div>
                     </div>
 

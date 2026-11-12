@@ -511,5 +511,132 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
       expect(mockBridge.clearTableRows).not.toHaveBeenCalled();
     });
   });
+
+  describe('currency-aware preview totals (TotalCurrancy vs TotalOrder = TotalCurrancy * exchangeRate)', () => {
+    it('computes EGP preview totals cleanly with zero warnings when rate is 1 (TotalCurrancy == Total == 500)', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-12T00:00:00Z',
+          POSetting: 1,
+          CurrancyID: 1,
+          SupplierID: 15,
+          StoreID: 5,
+          CurrancyEX: 1,
+          ExchangePrice: 1,
+          TotalCurrancy: 500,
+          Total: 500
+        },
+        rows: [{ ProductID: 101, Qty: 5, CostCurrancy: 100, Price: 100, Total: 500, TotalCurrancy: 500 }]
+      });
+      mockBridge.getTableRows.and.resolveTo([
+        { ProductID: 101, Qty: 5, CostCurrancy: 100, Price: 100, Total: 500, TotalCurrancy: 500 }
+      ]);
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'مصري',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 5, Price: 100 }],
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(result.preview?.plannedTotal).toBe(500);
+      expect(result.preview?.actualTotal).toBe(500);
+      expect(result.preview?.plannedOrderTotal).toBe(500);
+      expect(result.preview?.actualOrderTotal).toBe(500);
+      expect(result.preview?.warnings).toEqual([]);
+    });
+
+    it('compares USD preview against TotalCurrancy (200) and verifies TotalOrder = 200 * 40 (8000) without false warnings (INV-03 case)', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-12T00:00:00Z',
+          POSetting: 1,
+          CurrancyID: 2,
+          SupplierID: 15,
+          StoreID: 5,
+          CurrancyEX: 40,
+          ExchangePrice: 40,
+          TotalCurrancy: 200,
+          Total: 8000
+        },
+        rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 20, Price: 20, Total: 200, TotalCurrancy: 200 }]
+      });
+      mockBridge.getTableRows.and.resolveTo([
+        { ProductID: 101, Qty: 10, CostCurrancy: 20, Price: 20, Total: 200, TotalCurrancy: 200 }
+      ]);
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'دولار',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 20 }],
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(result.preview?.plannedTotal).toBe(200);
+      expect(result.preview?.actualTotal).toBe(200);
+      expect(result.preview?.plannedOrderTotal).toBe(8000);
+      expect(result.preview?.actualOrderTotal).toBe(8000);
+      expect(result.preview?.exchangeRateInfo?.hostComputedRate).toBe(40);
+      expect(result.preview?.warnings).toEqual([]);
+    });
+
+    it('warns specifically on TotalOrder mismatch when host TotalCurrancy matches (200) but TotalOrder deviates from 200 * 40', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-12T00:00:00Z',
+          POSetting: 1,
+          CurrancyID: 2,
+          SupplierID: 15,
+          StoreID: 5,
+          CurrancyEX: 40,
+          TotalCurrancy: 200,
+          Total: 7500
+        },
+        rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 20, Price: 20, Total: 200 }]
+      });
+      mockBridge.getTableRows.and.resolveTo([
+        { ProductID: 101, Qty: 10, CostCurrancy: 20, Price: 20, Total: 200 }
+      ]);
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'دولار',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 20 }],
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(result.preview?.actualTotal).toBe(200);
+      expect(result.preview?.plannedOrderTotal).toBe(8000);
+      expect(result.preview?.actualOrderTotal).toBe(7500);
+      expect(result.preview?.warnings.length).toBe(1);
+      expect(result.preview?.warnings[0]).toContain('TotalOrder');
+      expect(result.preview?.warnings[0]).toContain('7500');
+      expect(result.preview?.warnings[0]).toContain('8000');
+    });
+  });
 });
 

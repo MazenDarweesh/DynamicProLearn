@@ -32,11 +32,12 @@ const EXPLICIT_EXCHANGE_RATE_KEYS = [
 ] as const;
 
 const HOST_EXCHANGE_RATE_KEYS = ['ExchangePrice', 'CurrancyEX', 'ExchangeRate'] as const;
-const HOST_TOTAL_KEYS = ['Total', 'NetTotal', 'TotalCurrancy', 'FinalTotal', 'GrandTotal'] as const;
-const ROW_TOTAL_KEYS = ['Total', 'NetTotal', 'RowTotal', 'TotalCurrancy', 'FinalTotal', 'SubTotal'] as const;
+const HOST_DOC_CURRENCY_TOTAL_KEYS = ['TotalCurrancy', 'TotalCurrency'] as const;
+const HOST_LOCAL_ORDER_TOTAL_KEYS = ['Total', 'TotalOrder', 'NetTotal', 'FinalTotal', 'GrandTotal'] as const;
+const ROW_TOTAL_KEYS = ['TotalCurrancy', 'Total', 'NetTotal', 'RowTotal', 'FinalTotal', 'SubTotal'] as const;
 const ACTUAL_ROW_PRODUCT_KEYS = ['ProductID', 'ProID', 'ItemID'] as const;
 const ACTUAL_ROW_QTY_KEYS = ['Qty', 'Quntity', 'Quantity'] as const;
-const ACTUAL_ROW_PRICE_KEYS = ['Price', 'UnitPrice', 'Cost', 'PriceCurrancy'] as const;
+const ACTUAL_ROW_PRICE_KEYS = ['CostCurrancy', 'Price', 'UnitPrice', 'Cost', 'PriceCurrancy'] as const;
 
 export interface PurchasesV250AppliedHeaderEntry {
   field: PurchasesWave1HeaderField;
@@ -83,6 +84,8 @@ export interface PurchasesV250PreviewState {
   actualRows: Array<Record<string, unknown>>;
   plannedTotal?: number;
   actualTotal?: number;
+  plannedOrderTotal?: number;
+  actualOrderTotal?: number;
   exchangeRateInfo?: PurchasesV250ExchangeRateInfo;
   warnings: string[];
 }
@@ -650,6 +653,14 @@ export class PurchasesV250ExecutorService {
       }
     }
 
+    // Exchange rate inspection: NEVER inject manually; compare explicit user rate with host Currancy calculation
+    const currencyHeader = args.appliedHeaders.find((h) => h.field === 'CurrancyID');
+    const hostRateLookup = readCaseInsensitiveKey(actualDataObject, HOST_EXCHANGE_RATE_KEYS);
+    const hostComputedRate = hostRateLookup.found ? parseFiniteNumeric(hostRateLookup.value) : undefined;
+    const effectiveRate = hostComputedRate != null && hostComputedRate > 0 ? hostComputedRate : 1;
+    const isForeignCurrency = effectiveRate > 0 && Math.abs(effectiveRate - 1) > 0.0001;
+
+    // Document-currency totals (TotalCurrancy for foreign currency, or Total for local currency)
     const plannedTotal =
       args.appliedRows.length > 0 && args.appliedRows.every((r) => r.Price != null && Number.isFinite(r.Price))
         ? Number(args.appliedRows.reduce((acc, r) => acc + r.Qty * (r.Price as number), 0).toFixed(4))
@@ -673,25 +684,61 @@ export class PurchasesV250ExecutorService {
       }
     }
     const normalizedRowsTotal = hasComputedRowsTotal ? Number(computedRowsTotal.toFixed(4)) : undefined;
-    const docTotalLookup = readCaseInsensitiveKey(actualDataObject, HOST_TOTAL_KEYS);
-    const actualDocTotal = docTotalLookup.found ? parseFiniteNumeric(docTotalLookup.value) : undefined;
-    const actualTotal = actualDocTotal ?? normalizedRowsTotal;
+
+    const docCurrTotalLookup = readCaseInsensitiveKey(actualDataObject, HOST_DOC_CURRENCY_TOTAL_KEYS);
+    const explicitDocCurrencyTotal = docCurrTotalLookup.found ? parseFiniteNumeric(docCurrTotalLookup.value) : undefined;
+    const localOrderTotalLookup = readCaseInsensitiveKey(actualDataObject, HOST_LOCAL_ORDER_TOTAL_KEYS);
+    const explicitLocalOrderTotal = localOrderTotalLookup.found
+      ? parseFiniteNumeric(localOrderTotalLookup.value)
+      : undefined;
+
+    // Prefer TotalCurrancy when present; fall back to Total only when TotalCurrancy is absent
+    // and (local currency OR mock fixture not scaled by exchange rate).
+    let actualDocCurrencyTotal = explicitDocCurrencyTotal;
+    if (actualDocCurrencyTotal == null && explicitLocalOrderTotal != null) {
+      const looksScaledLocalTotalOnly =
+        isForeignCurrency &&
+        normalizedRowsTotal != null &&
+        Math.abs(explicitLocalOrderTotal - normalizedRowsTotal * effectiveRate) <= 0.05 &&
+        Math.abs(explicitLocalOrderTotal - normalizedRowsTotal) > 0.05;
+      if (!looksScaledLocalTotalOnly) {
+        actualDocCurrencyTotal = explicitLocalOrderTotal;
+      }
+    }
+
+    const actualTotal = actualDocCurrencyTotal ?? normalizedRowsTotal;
+    const docCurrencyBase = plannedTotal ?? actualTotal;
+    const plannedOrderTotal =
+      docCurrencyBase != null ? Number((docCurrencyBase * effectiveRate).toFixed(2)) : undefined;
+    const actualOrderTotal =
+      explicitLocalOrderTotal ?? (actualTotal != null ? Number((actualTotal * effectiveRate).toFixed(2)) : undefined);
 
     if (plannedTotal != null && actualTotal != null && Math.abs(plannedTotal - actualTotal) > 0.01) {
       warnings.push(
         `⚠️ الإجمالي الفعلي في الشاشة (${actualTotal}) يختلف عن الإجمالي المخطط (${plannedTotal}).`
       );
     }
-    if (actualDocTotal != null && normalizedRowsTotal != null && Math.abs(actualDocTotal - normalizedRowsTotal) > 0.01) {
+    if (
+      actualDocCurrencyTotal != null &&
+      normalizedRowsTotal != null &&
+      Math.abs(actualDocCurrencyTotal - normalizedRowsTotal) > 0.01
+    ) {
       warnings.push(
-        `⚠️ إجمالي رأس الفاتورة (${actualDocTotal}) لا يطابق مجموع صفوف الجدول (${normalizedRowsTotal}).`
+        `⚠️ إجمالي رأس الفاتورة (${actualDocCurrencyTotal}) لا يطابق مجموع صفوف الجدول (${normalizedRowsTotal}).`
+      );
+    }
+    if (
+      isForeignCurrency &&
+      plannedOrderTotal != null &&
+      explicitLocalOrderTotal != null &&
+      (explicitDocCurrencyTotal != null || (normalizedRowsTotal != null && Math.abs(explicitLocalOrderTotal - normalizedRowsTotal) > 0.05)) &&
+      Math.abs(plannedOrderTotal - explicitLocalOrderTotal) > 0.05
+    ) {
+      warnings.push(
+        `⚠️ إجمالي الفاتورة بالعملة المحلية TotalOrder (${explicitLocalOrderTotal}) يختلف عن المحسوب (${docCurrencyBase} × ${effectiveRate} = ${plannedOrderTotal}).`
       );
     }
 
-    // Exchange rate inspection: NEVER inject manually; compare explicit user rate with host Currancy calculation
-    const currencyHeader = args.appliedHeaders.find((h) => h.field === 'CurrancyID');
-    const hostRateLookup = readCaseInsensitiveKey(actualDataObject, HOST_EXCHANGE_RATE_KEYS);
-    const hostComputedRate = hostRateLookup.found ? parseFiniteNumeric(hostRateLookup.value) : undefined;
     const userRateLookup = readCaseInsensitiveKey(args.fields, EXPLICIT_EXCHANGE_RATE_KEYS);
     const userSpecifiedRate = userRateLookup.found ? parseFiniteNumeric(userRateLookup.value) : undefined;
 
@@ -750,6 +797,8 @@ export class PurchasesV250ExecutorService {
       actualRows,
       plannedTotal,
       actualTotal,
+      plannedOrderTotal,
+      actualOrderTotal,
       exchangeRateInfo,
       warnings
     };
