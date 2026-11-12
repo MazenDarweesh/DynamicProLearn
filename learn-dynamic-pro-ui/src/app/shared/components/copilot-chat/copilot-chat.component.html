@@ -106,9 +106,27 @@
                         type="button"
                         class="nav-ask-chip-btn"
                         (click)="selectAskOption(opt, msg.relatedUserQuery)">
-                  <span class="chip-icon">{{ opt.id === 'PURCHASE_INVOICE' ? '📦' : opt.id === 'SALES_INVOICE' ? '🧾' : opt.id === 'NEW_CUSTOMER' ? '👤' : opt.id === 'JOURNAL_ENTRY' ? '📑' : '📊' }}</span>
-                  <span class="chip-label">{{ getScreenDisplayName(opt.id) }}</span>
+                  <span class="chip-icon">{{ opt.id === 'PURCHASE_INVOICE' || opt.id === '289' ? '📦' : opt.id === 'SALES_INVOICE' ? '🧾' : opt.id === 'NEW_CUSTOMER' ? '👤' : opt.id === 'JOURNAL_ENTRY' ? '📑' : '📊' }}</span>
+                  <span class="chip-label">{{ getScreenDisplayName(opt.id, opt.label) }}</span>
                   <span class="chip-conf">{{ (opt.confidence * 100) | number:'1.0-0' }}%</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Pending v2.5.0 Task Cancellation Confirmation -->
+            <div *ngIf="msg.pendingV250CancelConfirm" class="v250-cancel-confirm-card">
+              <div class="v250-cancel-actions">
+                <button type="button"
+                        class="btn-v250-cancel-yes"
+                        [disabled]="msg.pendingV250CancelConfirm.resolved || isStreaming"
+                        (click)="confirmPendingV250Cancellation(msg)">
+                  ✅ نعم، ألغِ الفاتورة الحالية ونفّذ الطلب الجديد
+                </button>
+                <button type="button"
+                        class="btn-v250-cancel-no"
+                        [disabled]="msg.pendingV250CancelConfirm.resolved || isStreaming"
+                        (click)="rejectPendingV250Cancellation(msg)">
+                  ↩️ لا، أكمل الفاتورة الحالية
                 </button>
               </div>
             </div>
@@ -422,7 +440,7 @@
                 </div>
 
                 <div class="form-fill-footer">
-                  <label *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && !msg.v250PartialFailure && !shouldUsePurchasesV250(msg)" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
+                  <label *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && !msg.v250PartialFailure && !msg.isPurchasesV250Target" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
                     <input type="checkbox" [(ngModel)]="autoSaveAfterFill" name="autoSaveAfterFill">
                     <span>💾 حفظ تلقائي بعد التعبئة</span>
                   </label>
@@ -490,6 +508,22 @@
                           | TotalOrder (محلي): <strong>{{ msg.v250Preview.actualOrderTotal }}</strong>
                         </span>
                       </div>
+                    </div>
+
+                    <div *ngIf="msg.v250Preview.ignoredItems && msg.v250Preview.ignoredItems.length > 0" class="v250-preview-ignored">
+                      <div class="v250-ignored-title">🚫 حقول تم تجاهلها (خارج نطاق التعديل الآلي في Wave 1):</div>
+                      <div *ngFor="let ig of msg.v250Preview.ignoredItems" class="v250-ignored-line">
+                        <strong>{{ ig.labelAr }}</strong><span *ngIf="ig.value">: «{{ ig.value }}»</span>
+                        <small class="v250-ignored-reason"> — {{ ig.reasonAr }}</small>
+                      </div>
+                      <label class="v250-warning-ack-label v250-ignored-ack-label">
+                        <input type="checkbox"
+                               class="v250-ignored-ack-checkbox"
+                               [ngModel]="msg.v250IgnoredAcknowledged"
+                               (ngModelChange)="onV250IgnoredChanged(msg, $event)"
+                               [ngModelOptions]="{ standalone: true }">
+                        <span>أؤكد مراجعة الحقول المُتجاهَلة وأعلم أنها لن تُحفَظ تلقائياً وسأستكملها يدوياً إن لزم</span>
+                      </label>
                     </div>
 
                     <div *ngIf="msg.v250Preview.warnings.length > 0" class="v250-preview-warnings">

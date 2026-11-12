@@ -88,6 +88,7 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
       [
         'supportsContractV250',
         'getActiveScreen',
+        'listScreens',
         'getFormState',
         'getActiveFormContext',
         'fetchLookupRowsStrict',
@@ -103,6 +104,9 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
     );
     mockBridge.supportsContractV250.and.callFake(() => supportsV250Flag);
     mockBridge.getActiveScreen.and.callFake(() => ({ pageId: activePageId, pageName: activePageName }));
+    mockBridge.listScreens.and.returnValue([
+      { pageId: 289, pageName: 'Purchases', title: 'فاتورة المشتريات', screenKey: 'PURCHASE_INVOICE' }
+    ]);
     mockBridge.getFormState.and.callFake(() => mockState);
     mockBridge.getActiveFormContext.and.callFake(() => ({
       isOpen: true,
@@ -139,11 +143,17 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
     mockNavigator = jasmine.createSpyObj('ErpNavigatorService', [
       'isScreenActive',
       'navigateToScreen',
+      'resolveAndNavigate',
       'prepareFreshForm',
       'getFormMode'
     ]);
     mockNavigator.isScreenActive.and.returnValue(true);
     mockNavigator.navigateToScreen.and.resolveTo(true);
+    mockNavigator.resolveAndNavigate.and.resolveTo({
+      success: true,
+      decision: 'go',
+      chosen: { id: '289', confidence: 0.95, reason: 'mock', label: 'فاتورة المشتريات' }
+    });
     mockNavigator.prepareFreshForm.and.callFake(async () => {
       mockMode = 'EmptyNew';
       return true;
@@ -419,6 +429,176 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
       expectedPOID: 14001,
       expectedPONumber: 550
     });
+  });
+
+  it('retains conversational pendingV250Resolution on not_found, maps short reply cleanly without LLM/nav switch, and requires confirm to cancel on long/new command', async () => {
+    component.isActionMode = true;
+    const msg: ChatMessage = {
+      sender: 'assistant',
+      text: 'فاتورة مشتريات',
+      relatedUserQuery: 'سجل فاتورة مشتريات من حسين للتوريدات مخزن خامات تام',
+      formFillData: {
+        screenKey: 'PURCHASE_INVOICE',
+        pageId: 289,
+        action_intent: 'new',
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'دولار',
+          SupplierID: 'حسين للتوريدات',
+          المخزن: 'خامات تام' // not_found in Store (size 2 <= 10)
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 50 }]
+      }
+    };
+    component.messages.push(msg);
+
+    await component.applyFormFill(msg);
+    fixture.detectChanges();
+
+    // Item 2: not_found on small Store catalog exposes selectable candidates in UI
+    expect(msg.formFillApplied).toBeFalse();
+    expect(component.pendingV250Resolution?.targetMessage).toBe(msg);
+    const storeIssue = msg.v250ResolutionIssues!.find((i) => i.fieldKey === 'StoreID')!;
+    expect(storeIssue.status).toBe('not_found');
+    expect(storeIssue.candidates.map((c) => c.id)).toEqual([5, 6]);
+    const chipButtons = fixture.nativeElement.querySelectorAll('.v250-resolution-card .v250-option-chip');
+    expect(chipButtons.length).toBe(2);
+
+    // Item 3: clicking askOption / attempting screen switch while pending task active is blocked
+    await component.selectAskOption({ id: '12', confidence: 0.9, reason: 'test' }, 'سؤال');
+    expect(mockNavigator.navigateToScreen).not.toHaveBeenCalled();
+
+    // Item 1 (long/new command): asks confirmation before cancelling and keeps pendingV250Resolution alive
+    component.inputQuery = 'سجل فاتورة مشتريات جديدة بالكامل لصنف رمل بكمية 20 من شركة النور للتوريدات';
+    await component.sendMessage();
+    expect(component.pendingV250Resolution).not.toBeNull();
+    expect(mockCopilotService.streamSearch).not.toHaveBeenCalled();
+    expect(mockNavigator.resolveAndNavigate).not.toHaveBeenCalled();
+    const cancelPrompt = component.messages[component.messages.length - 1];
+    expect(cancelPrompt.pendingV250CancelConfirm).toBeDefined();
+
+    // Reject cancellation -> keeps pending invoice intact
+    component.rejectPendingV250Cancellation(cancelPrompt);
+    expect(component.pendingV250Resolution?.pendingCancelQuery).toBeUndefined();
+
+    // Item 1 (short reply): patches StoreID in-place, preserves SupplierID/POSetting/CurrancyID/rows, zero LLM/nav calls
+    component.inputQuery = 'مخزن الخامات';
+    await component.sendMessage();
+
+    expect(mockCopilotService.streamSearch).not.toHaveBeenCalled();
+    expect(mockNavigator.resolveAndNavigate).not.toHaveBeenCalled();
+    expect(component.pendingV250Resolution).toBeNull();
+    expect(msg.formFillApplied).toBeTrue();
+    expect(msg.formFillData!.fields!['SupplierID']).toBe('حسين للتوريدات');
+    expect(msg.formFillData!.rows!.length).toBe(1);
+    expect(mockBridge.selectLookup).toHaveBeenCalledWith('SupplierID', 10);
+    expect(mockBridge.selectLookup).toHaveBeenCalledWith('StoreID', 6);
+
+    // Long/new command when confirmed finally cancels and triggers streamSearch
+    msg.v250ResolutionIssues = [storeIssue];
+    msg.formFillApplied = false;
+    component.pendingV250Resolution = { targetMessage: msg, issues: [storeIssue] };
+    component.inputQuery = 'افتح شاشة قيود اليومية العامة وسجل قيد يومي جديد بمبلغ ألف جنيه';
+    await component.sendMessage();
+    const confirmMsg = component.messages[component.messages.length - 1];
+    await component.confirmPendingV250Cancellation(confirmMsg);
+    expect(component.pendingV250Resolution).toBeNull();
+    expect(mockCopilotService.streamSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it('resolves Arabic screen labels via bridge.listScreens for askOptions without falling back to numeric pageId', () => {
+    const labelMsg: ChatMessage = {
+      sender: 'assistant',
+      text: 'اختر الشاشة',
+      askOptions: [{ id: '289', confidence: 0.72, reason: 'match' }]
+    };
+    component.messages.push(labelMsg);
+    fixture.detectChanges();
+
+    expect(component.getScreenDisplayName('289')).toBe('فاتورة المشتريات');
+    const chipLabel = fixture.nativeElement.querySelector('.nav-ask-chip-btn .chip-label') as HTMLElement | null;
+    expect(chipLabel?.textContent?.trim()).toBe('فاتورة المشتريات');
+  });
+
+  it('caches shouldUsePurchasesV250 result so Angular change detection never re-invokes bridge.supportsContractV250() / getCapabilities()', () => {
+    const cachedMsg: ChatMessage = {
+      sender: 'assistant',
+      text: 'معاينة قبل التعبئة',
+      isPurchasesV250Target: true,
+      formFillData: {
+        screenKey: 'PURCHASE_INVOICE',
+        pageId: 289,
+        action_intent: 'new',
+        fields: { StoreID: 'المخزن الرئيسي' },
+        rows: []
+      }
+    };
+    component.messages.push(cachedMsg);
+    const shouldUseSpy = spyOn(component, 'shouldUsePurchasesV250').and.callThrough();
+    mockBridge.supportsContractV250.calls.reset();
+
+    fixture.detectChanges();
+    fixture.detectChanges();
+    fixture.detectChanges();
+
+    expect(shouldUseSpy).not.toHaveBeenCalled();
+    expect(mockBridge.supportsContractV250).not.toHaveBeenCalled();
+  });
+
+  it('renders ignored fields section in preview and blocks Save until v250IgnoredAcknowledged is checked', async () => {
+    hostDataObject = {
+      POSetting: 1,
+      CurrancyID: 1,
+      SupplierID: 10,
+      StoreID: 5,
+      Total: 500
+    };
+    const msg: ChatMessage = {
+      sender: 'assistant',
+      text: 'فاتورة مع حقول متجاهلة',
+      relatedUserQuery: 'سجل فاتورة مشتريات من حسين للمخزن الرئيسي لمشروع السحاب وسدد الإجمالي بالكامل نقداً',
+      formFillData: {
+        screenKey: 'PURCHASE_INVOICE',
+        pageId: 289,
+        action_intent: 'new',
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'مصري',
+          SupplierID: 'حسين للتوريدات',
+          StoreID: 'المخزن الرئيسي',
+          المشروعات: 'السحاب'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 50 }]
+      }
+    };
+    component.messages.push(msg);
+
+    await component.applyFormFill(msg);
+    fixture.detectChanges();
+
+    expect(msg.formFillApplied).toBeTrue();
+    expect(msg.v250Preview?.warnings).toEqual([]);
+    expect(msg.v250Preview?.ignoredItems?.length).toBe(2);
+    expect(msg.v250IgnoredAcknowledged).toBeFalse();
+    expect(component.isConfirmSaveDisabled(msg)).toBeTrue();
+
+    const ignoredSection = fixture.nativeElement.querySelector('.v250-preview-ignored') as HTMLElement | null;
+    expect(ignoredSection).not.toBeNull();
+    expect(ignoredSection?.textContent).toContain('المشروع');
+    expect(ignoredSection?.textContent).toContain('السحاب');
+    expect(ignoredSection?.textContent).toContain('نقد');
+
+    // Programmatic confirmSave refuses before acknowledgement
+    await component.confirmSave(msg, true);
+    expect(mockBridge.saveDocument).not.toHaveBeenCalled();
+
+    // After ticking acknowledgement checkbox -> Save unlocks and calls saveDocument
+    component.onV250IgnoredChanged(msg, true);
+    fixture.detectChanges();
+    expect(component.isConfirmSaveDisabled(msg)).toBeFalse();
+
+    await component.confirmSave(msg, true);
+    expect(mockBridge.saveDocument).toHaveBeenCalledTimes(1);
   });
 });
 

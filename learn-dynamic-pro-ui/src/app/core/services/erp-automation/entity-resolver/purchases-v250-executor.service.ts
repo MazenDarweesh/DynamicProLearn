@@ -72,6 +72,13 @@ export interface PurchasesV250ActualHeaderCheck {
   matches: boolean;
 }
 
+export interface PurchasesV250IgnoredItem {
+  key: string;
+  labelAr: string;
+  value?: string;
+  reasonAr: string;
+}
+
 export interface PurchasesV250PreviewState {
   mode: 'new' | 'edit_current';
   isSavedOpenEdit: boolean;
@@ -88,6 +95,7 @@ export interface PurchasesV250PreviewState {
   actualOrderTotal?: number;
   exchangeRateInfo?: PurchasesV250ExchangeRateInfo;
   warnings: string[];
+  ignoredItems?: PurchasesV250IgnoredItem[];
 }
 
 export interface PurchasesV250PartialFailure {
@@ -100,12 +108,12 @@ export interface PurchasesV250PartialFailure {
 
 export interface PurchasesV250ExecutionResult {
   status:
-    | 'ready_for_preview'
-    | 'needs_resolution'
-    | 'needs_draft_confirm'
-    | 'kept_draft'
-    | 'prep_failed'
-    | 'partial_failure';
+  | 'ready_for_preview'
+  | 'needs_resolution'
+  | 'needs_draft_confirm'
+  | 'kept_draft'
+  | 'prep_failed'
+  | 'partial_failure';
   mutated: boolean;
   isEditCurrent: boolean;
   initialFormMode: ErpFormMode;
@@ -128,6 +136,7 @@ export interface PurchasesV250ExecuteParams {
   rows?: Array<Record<string, unknown>>;
   schema?: FormFieldSchema[];
   isEditCurrent: boolean;
+  userQuery?: string;
   draftResetDecision?: 'pending' | 'reset_and_new' | 'keep_draft';
   preselectedLookupIds?: Partial<Record<PurchasesWave1HeaderField, string | number>>;
   preselectedRowItemIds?: Record<number, string | number>;
@@ -207,6 +216,123 @@ function firstNonEmptyId(values: unknown[]): string | number | undefined {
     }
   }
   return undefined;
+}
+
+const IGNORED_FIELD_HANDLED_NORMS = new Set(
+  [
+    ...EXPLICIT_EXCHANGE_RATE_KEYS,
+    'PODate',
+    'PO_Date',
+    'Date',
+    'التاريخ',
+    'تاريخ الفاتورة',
+    'تاريخ المستند'
+  ].map((k) => normalizeArabicText(k).toLowerCase())
+);
+
+const IGNORED_FIELD_LABELS_AR: Array<{ pattern: RegExp; labelAr: string; group: string }> = [
+  { pattern: /^(projectid|project|المشروع|المشروعات|مشروع)$/i, labelAr: 'المشروع', group: 'project' },
+  { pattern: /^(safeid|treasuryid|khaznaid|الخزينة|خزينة)$/i, labelAr: 'الخزينة / الصندوق', group: 'payment' },
+  { pattern: /^(paid|paidamount|paymenttype|paymentmethod|paytype|السداد|المسدد|طريقة السداد|الدفع|نقدي|نقدا|نقداً|كاش)$/i, labelAr: 'السداد / طريقة الدفع', group: 'payment' },
+  { pattern: /^(costcenterid|costcenter|مركز التكلفة|مركز تكلفة)$/i, labelAr: 'مركز التكلفة', group: 'cost_center' },
+  { pattern: /^(duedate|تاريخ الاستحقاق|الاستحقاق)$/i, labelAr: 'تاريخ الاستحقاق', group: 'due_date' },
+  { pattern: /^(notes|note|description|remarks|ملاحظات|ملاحظة|بيان|البيان)$/i, labelAr: 'ملاحظات / البيان', group: 'notes' },
+  { pattern: /^(discount|discountpercent|discountamount|الخصم|خصم)$/i, labelAr: 'الخصم', group: 'discount' },
+  { pattern: /^(tax|vat|taxamount|الضريبة|ضريبة)$/i, labelAr: 'الضريبة', group: 'tax' }
+];
+
+const QUERY_IGNORED_CLAUSE_EXTRACTORS: Array<{
+  key: string;
+  group: string;
+  labelAr: string;
+  regex: RegExp;
+  reasonAr: string;
+}> = [
+  {
+    key: '__query_payment__',
+    group: 'payment',
+    labelAr: 'السداد النقدي / الخزينة',
+    regex: /((?:و\s*)?(?:سدد|سدّد|مسدد|سداد|دفع|مدفوع|إجمالي\s+مدفوع)?[^،.\n]{0,30}(?:نقداً|نقدا|كاش|بالكامل\s+نقداً|بالكامل\s+نقدا|خزينة|الخزينة|آجل|اجل|على\s+الحساب)[^،.\n]{0,20})/i,
+    reasonAr: 'تعليمات السداد والخزينة غير مشمولة في Wave 1 ولم تُنفّذ تلقائياً.'
+  },
+  {
+    key: '__query_project__',
+    group: 'project',
+    labelAr: 'المشروع',
+    regex: /(?:ل?لمشروع|على\s+مشروع|مشروع|المشروعات)\s+([^\s،.\n]+(?:\s+[^\s،.\n]+){0,2})/i,
+    reasonAr: 'ربط الفاتورة بمشروع غير مشمول في Wave 1 ويلزم تحديده يدوياً إذا لزم.'
+  },
+  {
+    key: '__query_cost_center__',
+    group: 'cost_center',
+    labelAr: 'مركز التكلفة',
+    regex: /(مركز\s+تكلف[ةه]\s+[^\s،.\n]+(?:\s+[^\s،.\n]+){0,2})/i,
+    reasonAr: 'مركز التكلفة غير مشمول في Wave 1 ولم يُعبّأ تلقائياً.'
+  },
+  {
+    key: '__query_discount__',
+    group: 'discount',
+    labelAr: 'الخصم',
+    regex: /(خصم\s+%?\d+(?:\.\d+)?%?)/i,
+    reasonAr: 'الخصم غير مشمول في Wave 1 ويلزم إدخاله يدوياً إن وجد.'
+  }
+];
+
+export function collectPurchasesV250IgnoredItems(
+  fields?: Record<string, unknown>,
+  ignoredNonWave1Fields?: string[],
+  userQuery?: string
+): PurchasesV250IgnoredItem[] {
+  const items: PurchasesV250IgnoredItem[] = [];
+  const seenGroups = new Set<string>();
+  const seenKeys = new Set<string>();
+
+  for (const rawKey of ignoredNonWave1Fields || []) {
+    const normKey = normalizeArabicText(rawKey).toLowerCase();
+    if (!normKey || IGNORED_FIELD_HANDLED_NORMS.has(normKey) || seenKeys.has(normKey)) {
+      continue;
+    }
+    const rawVal = fields?.[rawKey];
+    if (rawVal == null || String(rawVal).trim() === '') {
+      continue;
+    }
+    const valStr = String(rawVal).trim();
+    const meta = IGNORED_FIELD_LABELS_AR.find((entry) => entry.pattern.test(normalizeArabicText(rawKey)));
+    const groupKey = meta ? `${meta.group}:${normalizeArabicText(valStr).toLowerCase()}` : normKey;
+    if (seenGroups.has(groupKey)) continue;
+    seenKeys.add(normKey);
+    seenGroups.add(groupKey);
+    if (meta) seenGroups.add(meta.group);
+
+    items.push({
+      key: rawKey,
+      labelAr: meta?.labelAr || rawKey,
+      value: valStr,
+      reasonAr: 'حقل خارج نطاق التعديل الآلي في Wave 1 ولم يُعبّأ في الشاشة.'
+    });
+  }
+
+  const trimmedQuery = typeof userQuery === 'string' ? userQuery.trim() : '';
+  if (trimmedQuery) {
+    for (const rule of QUERY_IGNORED_CLAUSE_EXTRACTORS) {
+      if (seenGroups.has(rule.group)) continue;
+      const m = trimmedQuery.match(rule.regex);
+      if (m) {
+        const snippet = (m[1] || m[0]).trim();
+        if (snippet) {
+          seenGroups.add(rule.group);
+          items.push({
+            key: rule.key,
+            labelAr: rule.labelAr,
+            value: snippet,
+            reasonAr: rule.reasonAr
+          });
+        }
+      }
+    }
+  }
+
+  return items;
 }
 
 /**
@@ -490,6 +616,8 @@ export class PurchasesV250ExecutorService {
     // 9. Read ACTUAL host form context & table rows to construct verified Preview
     const preview = await this.buildActualPreview({
       fields: params.fields,
+      userQuery: params.userQuery,
+      ignoredNonWave1Fields: resolution.ignoredNonWave1Fields,
       isEditCurrent: params.isEditCurrent,
       isSavedOpenEdit: params.isEditCurrent && initialFormMode === 'SavedOpen',
       preEditState,
@@ -588,6 +716,8 @@ export class PurchasesV250ExecutorService {
 
   private async buildActualPreview(args: {
     fields?: Record<string, unknown>;
+    userQuery?: string;
+    ignoredNonWave1Fields?: string[];
     isEditCurrent: boolean;
     isSavedOpenEdit: boolean;
     preEditState: ReturnType<ErpBridgeService['getFormState']>;
@@ -785,6 +915,12 @@ export class PurchasesV250ExecutorService {
       ]);
     }
 
+    const ignoredItems = collectPurchasesV250IgnoredItems(
+      args.fields,
+      args.ignoredNonWave1Fields,
+      args.userQuery
+    );
+
     return {
       mode: args.isEditCurrent ? 'edit_current' : 'new',
       isSavedOpenEdit: args.isSavedOpenEdit,
@@ -800,7 +936,8 @@ export class PurchasesV250ExecutorService {
       plannedOrderTotal,
       actualOrderTotal,
       exchangeRateInfo,
-      warnings
+      warnings,
+      ...(ignoredItems.length > 0 ? { ignoredItems } : {})
     };
   }
 }

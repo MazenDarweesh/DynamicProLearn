@@ -329,10 +329,14 @@ export class ErpNavigatorService {
           rawResolution: res,
         };
       } else if (res.decision === 'ask') {
+        const askOptions = res.candidates.slice(0, 3).map((opt) => {
+          const matched = candidates.find((c) => c.id === opt.id);
+          return matched && !opt.label ? { ...opt, label: matched.label } : opt;
+        });
         return {
           success: false,
           decision: 'ask',
-          askOptions: res.candidates.slice(0, 3),
+          askOptions,
           rawResolution: res,
         };
       } else {

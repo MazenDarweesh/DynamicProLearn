@@ -89,6 +89,7 @@ export interface NavScored {
   id: string;
   confidence: number;
   reason: string;
+  label?: string;
 }
 
 export type ErpIntent = 'question' | 'navigate' | 'action' | 'unknown';

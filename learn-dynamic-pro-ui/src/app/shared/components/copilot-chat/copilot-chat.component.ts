@@ -24,7 +24,10 @@ import {
   PurchasesV250PreviewState,
   PurchasesWave1HeaderField,
   SchemaFieldCandidate,
-  isPurchasesTargetScreen
+  extractRowItemQuery,
+  isPurchasesTargetScreen,
+  mapKeyToWave1HeaderField,
+  matchLookupOptionsStrict
 } from '../../../core/services/erp-automation';
 import {
   buildFormDiffEntries,
@@ -141,6 +144,12 @@ export interface ChatMessage {
   v250Preview?: PurchasesV250PreviewState;
   /** Mandatory acknowledgement checkbox state when `v250Preview.warnings` is non-empty */
   v250WarningsAcknowledged?: boolean;
+  /** Mandatory acknowledgement checkbox state when `v250Preview.ignoredItems` is non-empty */
+  v250IgnoredAcknowledged?: boolean;
+  /** Cached flag indicating whether this message targets v2.5.0 Purchases flow (avoids calling getCapabilities from template) */
+  isPurchasesV250Target?: boolean;
+  /** Confirmation prompt metadata when user tries a long/new command while a v2.5.0 resolution task is pending */
+  pendingV250CancelConfirm?: { query: string; resolved?: boolean };
   /** Expected PO identifiers passed only for `SavedOpen` updates */
   v250SavedDocExpected?: { expectedPOID?: string | number; expectedPONumber?: string | number };
   /** Saved document response identifiers returned by `saveDocument` */
@@ -216,6 +225,18 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     targetMessage: ChatMessage;
     missingFields: ErpMissingFieldInfo[];
     rawErrors: string[];
+  } | null = null;
+
+  /**
+   * Conversational Entity Resolution state (v2.5.0 Purchases):
+   * Preserves unresolved issues + formFillData so short user replies patch the missing field
+   * instead of re-entering RAG/navigation, and requires explicit confirmation before cancelling.
+   */
+  pendingV250Resolution: {
+    targetMessage: ChatMessage;
+    issues: EntityResolutionIssue[];
+    pendingCancelQuery?: string;
+    cancelPromptMessage?: ChatMessage;
   } | null = null;
 
   get currentModeKey(): string {
@@ -704,6 +725,43 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
     this.inputQuery = '';
 
+    // 🔄 Conversational Entity Resolution (Wave 1 v2.5.0 `needs_resolution`):
+    // Maps short replies to the unresolved field while preserving all existing invoice data,
+    // and requires explicit user confirmation before cancelling on a long message / new command.
+    if (this.pendingV250Resolution) {
+      const pending = this.pendingV250Resolution;
+      if (pending.pendingCancelQuery) {
+        if (/^(?:نعم|أيوه|ايوه|أكيد|اكيد|موافق|إلغاء|الغاء|الغي|متابعة|تابع|نفذ|yes|y|ok|confirm|cancel)$/i.test(query)) {
+          await this.confirmPendingV250Cancellation(pending.cancelPromptMessage);
+          return;
+        }
+        if (/^(?:لا|لأ|استمر|كمّل|كمل|أكمل|اكمل|خليك|ابقي|keep|continue|no|n)$/i.test(query)) {
+          this.rejectPendingV250Cancellation(pending.cancelPromptMessage);
+          return;
+        }
+      }
+
+      if (this.shouldConfirmCancelPendingTask(query)) {
+        pending.pendingCancelQuery = query;
+        const unresolvedLabels = pending.issues.map((i) => i.labelAr).join('، ') || 'الحقول غير المحسومة';
+        const confirmMsg: ChatMessage = {
+          sender: 'assistant',
+          text: `⚠️ لديك فاتورة معلّقة بانتظار استكمال (${unresolvedLabels}). هل تريد إلغاء الفاتورة الحالية والبدء في الطلب الجديد؟`,
+          sources: [],
+          isStreaming: false,
+          pendingV250CancelConfirm: { query, resolved: false }
+        };
+        pending.cancelPromptMessage = confirmMsg;
+        this.messages.push(confirmMsg);
+        this.cdr.markForCheck();
+        this.scrollToBottom();
+        return;
+      }
+
+      await this.applyV250PendingResolutionReply(query);
+      return;
+    }
+
     // 🔄 Conversational Validation Recovery: If waiting for user to supply missing field(s) after a Save toast error,
     // patch the currently open form in-place (without resetting/re-opening) and auto-save!
     const isExplicitNewNavOrFullDoc =
@@ -925,10 +983,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
 
       let effectiveTarget = targetScreen;
-      if (targetScreen && !isSameScreen) {
+      const lockedOnPendingTask = this.hasActivePendingTask();
+      if (targetScreen && !isSameScreen && !lockedOnPendingTask) {
         console.info('%c[Copilot FormFill] Screen mismatch detected! Switching to:', 'color:#3b82f6;font-weight:bold', targetScreen);
         await this.navigator.navigateToScreen(targetScreen);
         await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
+      } else if (lockedOnPendingTask && !isSameScreen) {
+        console.info('%c[Copilot FormFill] Pending task active — blocking screen switch.', 'color:#f59e0b;font-weight:bold', targetScreen);
+        effectiveTarget = currentActive || targetScreen;
       } else if (isSameScreen) {
         console.info(
           `%c[Copilot FormFill] User is already on '${currentActive}' (pageId: ${currentPageId}). Retaining active screen.`,
@@ -938,7 +1000,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
       this.syncErpKey(effectiveTarget || currentActive);
 
-      if (this.shouldUsePurchasesV250(msg)) {
+      if (this.updateV250TargetFlag(msg)) {
         await this.executePurchasesV250Flow(msg, effectiveTarget || currentActive);
         return;
       }
@@ -1051,6 +1113,193 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     );
   }
 
+  private updateV250TargetFlag(msg?: ChatMessage | null): boolean {
+    if (!msg) return false;
+    const flag = this.shouldUsePurchasesV250(msg);
+    msg.isPurchasesV250Target = flag;
+    return flag;
+  }
+
+  hasActivePendingTask(): boolean {
+    return !!(this.pendingV250Resolution || this.pendingMissingFieldsRecovery);
+  }
+
+  private shouldConfirmCancelPendingTask(query: string): boolean {
+    const trimmed = query.trim();
+    const words = trimmed.split(/\s+/).filter(Boolean);
+    if (trimmed.length > 60 || words.length >= 8) {
+      return true;
+    }
+    if (/^(?:اذهب|انتقل|افتح|وديني|روح|سجل|انشئ|أنشئ|اضف|أضف|اعمل|إعمل|عمل|سوي|سوّي|دخل|أدخل|ادخل|جهز|احفظ)\s/i.test(trimmed) && words.length >= 3) {
+      return true;
+    }
+    if (/(?:فاتور[ةه]?|سند\s+\S+|قيد\s+يومي[ةه]|إذن\s+صرف|إذن\s+إضافة)/i.test(trimmed)) {
+      return true;
+    }
+    return false;
+  }
+
+  async confirmPendingV250Cancellation(promptMsg?: ChatMessage): Promise<void> {
+    const pending = this.pendingV250Resolution;
+    const nextQuery = pending?.pendingCancelQuery || promptMsg?.pendingV250CancelConfirm?.query;
+    const msgToMark = promptMsg || pending?.cancelPromptMessage;
+    if (msgToMark?.pendingV250CancelConfirm) {
+      msgToMark.pendingV250CancelConfirm.resolved = true;
+    }
+    this.pendingV250Resolution = null;
+    this.pendingMissingFieldsRecovery = null;
+    this.cdr.markForCheck();
+    if (nextQuery) {
+      await this.streamQuery(nextQuery, false);
+    }
+  }
+
+  rejectPendingV250Cancellation(promptMsg?: ChatMessage): void {
+    const pending = this.pendingV250Resolution;
+    const msgToMark = promptMsg || pending?.cancelPromptMessage;
+    if (msgToMark?.pendingV250CancelConfirm) {
+      msgToMark.pendingV250CancelConfirm.resolved = true;
+    }
+    if (pending) {
+      pending.pendingCancelQuery = undefined;
+      pending.cancelPromptMessage = undefined;
+      const unresolvedLabels = pending.issues.map((i) => i.labelAr).join('، ') || 'الحقل الناقص';
+      this.pushUniqueAssistantNotice(`↩️ تم الإبقاء على الفاتورة الحالية. يرجى كتابة قيمة (${unresolvedLabels}) أو اختيارها من البطاقة أعلاه.`);
+    }
+    this.cdr.markForCheck();
+  }
+
+  private async applyV250PendingResolutionReply(reply: string): Promise<void> {
+    const pending = this.pendingV250Resolution;
+    if (!pending || !pending.targetMessage.formFillData) return;
+
+    const targetMsg = pending.targetMessage;
+    const unresolvedIssue =
+      pending.issues.find((i) => !this.isV250IssueSelected(targetMsg, i)) || pending.issues[0];
+    if (!unresolvedIssue) return;
+
+    const rawReply = reply.trim();
+    const strippedReply = this.stripPendingFieldPrefix(rawReply, unresolvedIssue.labelAr);
+    const patchValue = strippedReply || rawReply;
+
+    this.patchV250IssueFromReply(targetMsg, unresolvedIssue, rawReply, patchValue);
+    targetMsg.v250ResolutionIssues = undefined;
+    this.cdr.markForCheck();
+
+    await this.applyFormFill(targetMsg);
+
+    const stillPending = this.pendingV250Resolution;
+    const remainingIssues = stillPending?.issues || [];
+    if (stillPending && stillPending.targetMessage === targetMsg && remainingIssues.length > 0) {
+      const firstRemaining = remainingIssues[0];
+      this.pushUniqueAssistantNotice(
+        `🔍 تم تحديث «${unresolvedIssue.labelAr}» مع الاحتفاظ ببيانات الفاتورة. ${firstRemaining.message}`
+      );
+    } else if (!this.pendingV250Resolution && targetMsg.formFillApplied) {
+      this.pushUniqueAssistantNotice(
+        `✅ تم استكمال «${unresolvedIssue.labelAr}» وتجهيز معاينة الفاتورة الفعلية في البطاقة أعلاه.`
+      );
+    }
+  }
+
+  private stripPendingFieldPrefix(reply: string, labelAr: string): string {
+    const clean = reply.trim();
+    const escapedLabel = labelAr.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const explicitPrefixRe = new RegExp(`^(?:${escapedLabel}|المخزن|المورد|العملة|نوع\\s+الأمر|نوع\\s+الشراء|الصنف)\\s*(?::|=|هو|هي)\\s*(.+)$`, 'i');
+    const m = clean.match(explicitPrefixRe);
+    if (m && m[1]?.trim()) {
+      return m[1].trim();
+    }
+    const colonRe = new RegExp(`^${escapedLabel}\\s+(.+)$`, 'i');
+    const m2 = clean.match(colonRe);
+    return m2 && m2[1]?.trim() ? m2[1].trim() : clean;
+  }
+
+  private patchV250IssueFromReply(
+    targetMsg: ChatMessage,
+    issue: EntityResolutionIssue,
+    rawReply: string,
+    patchValue: string
+  ): void {
+    const formData = targetMsg.formFillData;
+    if (!formData) return;
+
+    if (issue.scope === 'schema' && issue.fieldCandidates && issue.fieldCandidates.length > 0) {
+      const normReply = normalizeArabicText(patchValue).toLowerCase();
+      const matchedSchema = issue.fieldCandidates.find(
+        (fc) =>
+          fc.key.toLowerCase() === normReply ||
+          normalizeArabicText(fc.label).toLowerCase() === normReply
+      );
+      if (matchedSchema) {
+        targetMsg.v250ResolvedSchemaFields = {
+          ...(targetMsg.v250ResolvedSchemaFields || {}),
+          [issue.fieldKey]: matchedSchema.key
+        };
+      }
+      return;
+    }
+
+    const candidates = issue.candidates || [];
+    let matchedOption: ErpLookupOption | undefined;
+    if (candidates.length > 0) {
+      const idMatch = patchValue.match(/^#?(\d+)$/);
+      if (idMatch) {
+        matchedOption = candidates.find((c) => String(c.id) === idMatch[1]);
+      }
+      if (!matchedOption) {
+        for (const candidateTerm of [rawReply, patchValue]) {
+          const res = matchLookupOptionsStrict(candidateTerm, candidates, {
+            scope: issue.scope === 'row' ? 'row' : 'header'
+          });
+          if (res.status === 'resolved' && res.resolvedOption) {
+            matchedOption = res.resolvedOption;
+            break;
+          }
+        }
+      }
+    }
+
+    if (issue.scope === 'header') {
+      const headerField = issue.fieldKey as PurchasesWave1HeaderField;
+      const nextFields: Record<string, unknown> = { ...(formData.fields || {}) };
+      for (const existingKey of Object.keys(nextFields)) {
+        if (mapKeyToWave1HeaderField(existingKey) === headerField) {
+          delete nextFields[existingKey];
+        }
+      }
+      const nextPreselected = { ...(targetMsg.v250PreselectedLookupIds || {}) };
+      if (matchedOption) {
+        nextPreselected[headerField] = matchedOption.id;
+        nextFields[headerField] = matchedOption.label;
+      } else {
+        delete nextPreselected[headerField];
+        nextFields[headerField] = patchValue;
+      }
+      formData.fields = nextFields;
+      targetMsg.v250PreselectedLookupIds = nextPreselected;
+      return;
+    }
+
+    if (issue.scope === 'row' && issue.rowIndex != null && Array.isArray(formData.rows) && formData.rows[issue.rowIndex]) {
+      const nextRow: Record<string, unknown> = { ...formData.rows[issue.rowIndex] };
+      const itemExtracted = extractRowItemQuery(nextRow);
+      const itemKey = itemExtracted?.itemKey || 'Product';
+      const nextRowPreselected = { ...(targetMsg.v250PreselectedRowItemIds || {}) };
+      if (matchedOption) {
+        nextRowPreselected[issue.rowIndex] = matchedOption.id;
+        nextRow[itemKey] = matchedOption.label;
+      } else {
+        delete nextRowPreselected[issue.rowIndex];
+        nextRow[itemKey] = patchValue;
+      }
+      const nextRows = [...formData.rows];
+      nextRows[issue.rowIndex] = nextRow;
+      formData.rows = nextRows;
+      targetMsg.v250PreselectedRowItemIds = nextRowPreselected;
+    }
+  }
+
   /** Wave 1 Purchases (`Page 289`, `contractVersion >= 2.5.0`) deterministic resolver + execution path. */
   private async executePurchasesV250Flow(msg: ChatMessage, targetScreenKey: string): Promise<void> {
     if (!msg.formFillData) return;
@@ -1059,9 +1308,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     msg.usedV250Pipeline = true;
+    msg.isPurchasesV250Target = true;
     msg.v250PartialFailure = undefined;
     msg.v250Preview = undefined;
     msg.v250WarningsAcknowledged = false;
+    msg.v250IgnoredAcknowledged = false;
     msg.v250SavedDoc = undefined;
     msg.v250SavedDocExpected = undefined;
     msg.v250ResolutionIssues = undefined;
@@ -1077,6 +1328,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       rows: msg.formFillData.rows,
       schema: schemas,
       isEditCurrent,
+      userQuery: msg.relatedUserQuery,
       draftResetDecision: msg.draftResetDecision,
       preselectedLookupIds: msg.v250PreselectedLookupIds,
       preselectedRowItemIds: msg.v250PreselectedRowItemIds,
@@ -1101,6 +1353,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (execResult.status === 'kept_draft') {
       msg.requiresDraftResetConfirm = false;
       msg.draftResetDecision = 'keep_draft';
+      if (this.pendingV250Resolution?.targetMessage === msg) {
+        this.pendingV250Resolution = null;
+      }
       this.cdr.markForCheck();
       return;
     }
@@ -1115,6 +1370,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (execResult.status === 'needs_resolution') {
       msg.formFillApplied = false;
       msg.v250ResolutionIssues = execResult.resolution?.blockingIssues || [];
+      this.pendingV250Resolution = {
+        targetMessage: msg,
+        issues: msg.v250ResolutionIssues,
+        pendingCancelQuery: undefined
+      };
       this.telemetry?.logSessionEnd({
         success: false,
         fieldsFilled: 0,
@@ -1131,13 +1391,20 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       msg.formFillApplied = false;
       msg.v250PartialFailure = execResult.failure;
       msg.formPrepError = execResult.failure?.message || execResult.errorMessage;
+      if (this.pendingV250Resolution?.targetMessage === msg) {
+        this.pendingV250Resolution = null;
+      }
       this.cdr.markForCheck();
       return;
     }
 
     // ready_for_preview: preview built strictly from host getActiveFormContext / getTableRows; never auto-save
+    if (this.pendingV250Resolution?.targetMessage === msg) {
+      this.pendingV250Resolution = null;
+    }
     msg.v250Preview = execResult.preview;
     msg.v250WarningsAcknowledged = (execResult.preview?.warnings?.length ?? 0) === 0;
+    msg.v250IgnoredAcknowledged = (execResult.preview?.ignoredItems?.length ?? 0) === 0;
     msg.formFillApplied = true;
     msg.formPrepared = true;
 
@@ -1175,7 +1442,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (issue.scope === 'schema') {
       return !!msg.v250ResolvedSchemaFields?.[issue.fieldKey];
     }
-    if (issue.status !== 'ambiguous') {
+    if (issue.status !== 'ambiguous' && !(issue.status === 'not_found' && (issue.candidates?.length ?? 0) > 0)) {
       return false;
     }
     if (issue.scope === 'header') {
@@ -1254,6 +1521,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     msg.formFillApplied = false;
     msg.v250Preview = undefined;
     msg.v250WarningsAcknowledged = false;
+    msg.v250IgnoredAcknowledged = false;
+    if (this.pendingV250Resolution?.targetMessage === msg) {
+      this.pendingV250Resolution = null;
+    }
     msg.saveStatus = undefined;
     msg.saveMessage = undefined;
     msg.formPrepError = resetRes.ok ? undefined : resetRes.errorMessage;
@@ -1268,6 +1539,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  onV250IgnoredChanged(msg: ChatMessage, acknowledged: boolean): void {
+    msg.v250IgnoredAcknowledged = !!acknowledged;
+    this.cdr.markForCheck();
+  }
+
   isConfirmSaveDisabled(msg: ChatMessage): boolean {
     if (this.isSavingInFlight || msg.saveStatus === 'saving' || msg.saveStatus === 'saved') {
       return true;
@@ -1276,6 +1552,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       return true;
     }
     if (msg.usedV250Pipeline && msg.v250Preview && msg.v250Preview.warnings.length > 0 && !msg.v250WarningsAcknowledged) {
+      return true;
+    }
+    if (
+      msg.usedV250Pipeline &&
+      msg.v250Preview &&
+      (msg.v250Preview.ignoredItems?.length ?? 0) > 0 &&
+      !msg.v250IgnoredAcknowledged
+    ) {
       return true;
     }
     if (msg.requiresExplicitUpdateConfirm && !msg.formFillApplied) {
@@ -1519,6 +1803,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     ) {
       msg.saveStatus = 'failed';
       msg.saveMessage = '⚠️ يرجى مراجعة التنبيهات الظاهرة في المعاينة وتأكيد الإقرار قبل الحفظ.';
+      this.cdr.markForCheck();
+      return;
+    }
+    if (
+      msg.usedV250Pipeline &&
+      msg.v250Preview &&
+      (msg.v250Preview.ignoredItems?.length ?? 0) > 0 &&
+      !msg.v250IgnoredAcknowledged
+    ) {
+      msg.saveStatus = 'failed';
+      msg.saveMessage = '⚠️ يرجى تأكيد مراجعة الحقول المُتجاهَلة (التي لم تُعبّأ في Wave 1) قبل الحفظ.';
       this.cdr.markForCheck();
       return;
     }
@@ -1863,6 +2158,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   async selectAskOption(option: NavScored, originalQuery?: string) {
+    if (this.hasActivePendingTask()) {
+      this.pushUniqueAssistantNotice('⏳ توجد مهمة فاتورة معلّقة حالياً. استكملها أو ألغِها أولاً قبل الانتقال لشاشة أخرى.');
+      this.cdr.markForCheck();
+      return;
+    }
     console.info('%c[Copilot Navigation] User clicked ambiguity chip:', 'color:#3b82f6;font-weight:bold', option);
     this.isActionMode = true;
     await this.navigator.navigateToScreen(option.id);
@@ -1875,7 +2175,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     }
   }
 
-  getScreenDisplayName(key: string): string {
+  getScreenDisplayName(key: string, label?: string): string {
+    if (label && label.trim()) {
+      return label.trim();
+    }
     const map: Record<string, string> = {
       'PURCHASE_INVOICE': 'فاتورة المشتريات',
       'SALES_INVOICE': 'فاتورة المبيعات',
@@ -1883,7 +2186,17 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       'JOURNAL_ENTRY': 'قيود اليومية العامة',
       'INVENTORY_AUDIT': 'الجرد والتسويات المخزنية'
     };
-    return map[key] || key;
+    if (map[key]) {
+      return map[key];
+    }
+    const screens = this.bridge.listScreens?.() || [];
+    const normKey = String(key || '').trim().toLowerCase();
+    const matched = screens.find((s) =>
+      String(s.pageId ?? '').trim() === String(key || '').trim() ||
+      (s.pageName || '').trim().toLowerCase() === normKey ||
+      (s.screenKey || '').trim().toLowerCase() === normKey
+    );
+    return (matched?.title || matched?.pageName || '').trim() || key;
   }
 
   /** Core stream method — shared by sendMessage() and retryMessage() */
@@ -1930,7 +2243,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       }
 
       let navRes: any = null;
-      if (!skipNavCheck && typeof document !== 'undefined') {
+      if (!skipNavCheck && !this.hasActivePendingTask() && typeof document !== 'undefined') {
         try {
           navRes = await this.navigator.resolveAndNavigate(query, { deferFormPrepOnOpenForm: true });
           resolvedIntent = navRes?.rawResolution?.intent;
@@ -2110,6 +2423,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
             fillData.screenKey = active.pageName.trim();
           }
           assistantMsg.formFillData = fillData;
+          this.updateV250TargetFlag(assistantMsg);
           assistantMsg.canEscalateToVisionAgent = false;
           assistantMsg.escalationGoal = undefined;
           if (!this.blockIfUnsupportedEdit(assistantMsg, false)) {
@@ -2146,7 +2460,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
     const completedMsg = this.messages[assistantMsgIndex];
     if (completedMsg?.formFillData && (this.isValidFormFill(completedMsg.formFillData) || completedMsg.unsupportedEditReason)) {
-      if (this.shouldUsePurchasesV250(completedMsg)) {
+      if (this.updateV250TargetFlag(completedMsg)) {
         this.blockIfUnsupportedEdit(completedMsg, true);
       } else {
         await this.prepareFormForMessage(completedMsg, formSchema, true);

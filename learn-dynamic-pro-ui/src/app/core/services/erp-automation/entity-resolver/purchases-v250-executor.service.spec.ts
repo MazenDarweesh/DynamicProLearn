@@ -637,6 +637,48 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
       expect(result.preview?.warnings[0]).toContain('7500');
       expect(result.preview?.warnings[0]).toContain('8000');
     });
+
+    it('surfaces ignored non-Wave-1 fields (ProjectID / المشروعات) and unextracted cash payment clauses in preview.ignoredItems while excluding PODate and ExchangePrice', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-12T00:00:00Z',
+          POSetting: 1,
+          CurrancyID: 1,
+          SupplierID: 15,
+          StoreID: 5,
+          Total: 4000
+        },
+        rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 400, Total: 4000 }]
+      });
+      mockBridge.getTableRows.and.resolveTo([
+        { ProductID: 101, Qty: 10, CostCurrancy: 400, Total: 4000 }
+      ]);
+
+      const result = await service.execute({
+        fields: {
+          PODate: '2026-11-12',
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'مصري',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي',
+          المشروعات: 'السحاب',
+          ProjectID: 'السحاب'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 400 }],
+        userQuery: 'سجل فاتورة مشتريات من النصر لمشروع السحاب وسدد الإجمالي بالكامل نقداً',
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      const ignored = result.preview?.ignoredItems || [];
+      expect(ignored.length).toBe(2);
+      expect(ignored.some((i) => i.labelAr === 'المشروع' && i.value === 'السحاب')).toBeTrue();
+      expect(ignored.some((i) => i.labelAr.includes('السداد') && (i.value || '').includes('نقد'))).toBeTrue();
+      expect(ignored.some((i) => i.key === 'PODate')).toBeFalse();
+    });
   });
 });
 

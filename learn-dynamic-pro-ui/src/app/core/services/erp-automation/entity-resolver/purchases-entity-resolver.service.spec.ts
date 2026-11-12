@@ -413,5 +413,52 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
       price: 500
     });
   });
+
+  it('attaches small-list candidates (<= 10) on not_found lookups, and withholds them for > 10 or numeric_item_rejected', async () => {
+    mockCatalogs['Store'] = {
+      status: 'ok',
+      count: 5,
+      data: [
+        { SID: 1, SName: 'مخزن خامات' },
+        { SID: 2, SName: 'مخزن منتج تام' },
+        { SID: 3, SName: 'مخزن الرئيسي' },
+        { SID: 4, SName: 'مخزن مواد بناء' },
+        { SID: 5, SName: 'مخزن طنطا' }
+      ]
+    };
+    mockCatalogs['Supplier'] = {
+      status: 'ok',
+      count: 11,
+      data: Array.from({ length: 11 }, (_, idx) => ({
+        SID: 100 + idx,
+        SName: `مورد رقم ${idx + 1}`
+      }))
+    };
+
+    const res = await resolver.resolveWave1({
+      fields: {
+        StoreID: 'خامات تام',
+        SupplierID: 'شركة غير موجودة'
+      },
+      rows: [
+        { 'اسم المنتج': 'صنف غير موجود', 'الكمية': 2 },
+        { 'اسم المنتج': '15', 'الكمية': 3 }
+      ]
+    });
+
+    expect(res.readyToApply).toBeFalse();
+    expect(res.headerResolutions.StoreID?.status).toBe('not_found');
+    expect(res.headerResolutions.StoreID?.candidates.length).toBe(5);
+    expect(res.blockingIssues.find((i) => i.fieldKey === 'StoreID')?.candidates.length).toBe(5);
+
+    expect(res.headerResolutions.SupplierID?.status).toBe('not_found');
+    expect(res.headerResolutions.SupplierID?.candidates).toEqual([]);
+
+    // Small Product catalog (6 items in beforeEach, <= 10) attaches candidates for non-numeric not_found, never for numeric_item_rejected
+    expect(res.rowResolutions[0].status).toBe('not_found');
+    expect(res.rowResolutions[0].candidates.length).toBe(6);
+    expect(res.rowResolutions[1].reason).toBe('numeric_item_rejected');
+    expect(res.rowResolutions[1].candidates).toEqual([]);
+  });
 });
 

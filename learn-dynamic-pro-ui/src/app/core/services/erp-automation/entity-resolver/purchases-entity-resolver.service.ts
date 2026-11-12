@@ -525,6 +525,13 @@ export class PurchasesEntityResolverService {
         synonymGroups: field === 'CurrancyID' ? PURCHASES_CURRENCY_SYNONYM_GROUPS : undefined
       });
 
+      const headerFallbackCandidates =
+        match.status === 'not_found' && fetchRes.options.length > 0 && fetchRes.options.length <= 10
+          ? [...fetchRes.options]
+          : [];
+      const headerCandidates =
+        match.status === 'ambiguous' ? match.candidates : headerFallbackCandidates;
+
       const outcome: ResolvedFieldOutcome = {
         field,
         labelAr: spec.labelAr,
@@ -534,8 +541,8 @@ export class PurchasesEntityResolverService {
         matchTier: match.matchTier,
         resolvedId: match.resolvedOption?.id,
         resolvedLabel: match.resolvedOption?.label,
-        candidates: match.candidates,
-        ambiguityKind: match.status === 'ambiguous' ? 'lookup_value' : undefined,
+        candidates: headerCandidates,
+        ambiguityKind: headerCandidates.length > 0 ? 'lookup_value' : undefined,
         reason: match.reason
       };
       headerResolutions[field] = outcome;
@@ -551,7 +558,7 @@ export class PurchasesEntityResolverService {
           rawTerm: extracted.rawValue,
           status: 'ambiguous',
           ambiguityKind: 'lookup_value',
-          candidates: match.candidates,
+          candidates: headerCandidates,
           message: `يوجد أكثر من مطابقة أو تطابق غير تام لحقل "${spec.labelAr}" ("${extracted.rawValue}").`
         });
       } else {
@@ -562,8 +569,12 @@ export class PurchasesEntityResolverService {
           labelAr: spec.labelAr,
           rawTerm: extracted.rawValue,
           status: 'not_found',
-          candidates: [],
-          message: `لم يتم العثور على "${extracted.rawValue}" في قائمة "${spec.labelAr}".`
+          ambiguityKind: headerFallbackCandidates.length > 0 ? 'lookup_value' : undefined,
+          candidates: headerFallbackCandidates,
+          message:
+            headerFallbackCandidates.length > 0
+              ? `لم يتم العثور على "${extracted.rawValue}" في قائمة "${spec.labelAr}" — اختر من القائمة المتاحة أدناه.`
+              : `لم يتم العثور على "${extracted.rawValue}" في قائمة "${spec.labelAr}".`
         });
       }
     }
@@ -622,6 +633,16 @@ export class PurchasesEntityResolverService {
           preselectedId: input.preselectedRowItemIds?.[rowIndex]
         });
 
+        const rowFallbackCandidates =
+          match.status === 'not_found' &&
+          match.reason !== 'numeric_item_rejected' &&
+          productFetch.options.length > 0 &&
+          productFetch.options.length <= 10
+            ? [...productFetch.options]
+            : [];
+        const rowCandidates =
+          match.status === 'ambiguous' ? match.candidates : rowFallbackCandidates;
+
         const rowOut: ResolvedRowItemOutcome = {
           rowIndex,
           rawTerm: extractedRow.rawTerm,
@@ -632,7 +653,7 @@ export class PurchasesEntityResolverService {
           matchTier: match.matchTier,
           resolvedId: match.resolvedOption?.id,
           resolvedLabel: match.resolvedOption?.label,
-          candidates: match.candidates,
+          candidates: rowCandidates,
           reason: match.reason
         };
         rowResolutions.push(rowOut);
@@ -651,7 +672,7 @@ export class PurchasesEntityResolverService {
             rawTerm: extractedRow.rawTerm,
             status: 'ambiguous',
             ambiguityKind: 'lookup_value',
-            candidates: match.candidates,
+            candidates: rowCandidates,
             message: `الصنف "${extractedRow.rawTerm}" في السطر #${rowIndex + 1} غير محسوم أو متعدد المرشحين.`
           });
         } else {
@@ -664,11 +685,14 @@ export class PurchasesEntityResolverService {
             labelAr: `صنف سطر #${rowIndex + 1}`,
             rawTerm: extractedRow.rawTerm,
             status: 'not_found',
-            candidates: [],
+            ambiguityKind: rowFallbackCandidates.length > 0 ? 'lookup_value' : undefined,
+            candidates: rowFallbackCandidates,
             message:
               match.reason === 'numeric_item_rejected'
                 ? `القيمة "${extractedRow.rawTerm}" رقمية وتشبه الكمية وليست اسم صنف.`
-                : `الصنف "${extractedRow.rawTerm}" غير موجود في دليل الأصناف.`
+                : rowFallbackCandidates.length > 0
+                  ? `الصنف "${extractedRow.rawTerm}" غير موجود في دليل الأصناف — اختر من القائمة المتاحة أدناه.`
+                  : `الصنف "${extractedRow.rawTerm}" غير موجود في دليل الأصناف.`
           });
         }
       }
