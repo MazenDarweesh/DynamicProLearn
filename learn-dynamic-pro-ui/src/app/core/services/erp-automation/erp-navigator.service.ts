@@ -12,7 +12,6 @@ import {
   simulateNavClick,
 } from './navigator/nav-candidate-scanner';
 import {
-  checkIsFormAlreadyOpen,
   getFormModeFromBridgeAndDom,
   isEditExistingFormQuery,
   triggerDomAddNewButton,
@@ -25,6 +24,7 @@ export class ErpNavigatorService {
   private injector = inject(Injector);
   private bridge = inject(ErpBridgeService);
   private candidateElementsMap = new Map<string, HTMLElement>();
+  private inFlightPrepare: Promise<boolean> | null = null;
 
   private get copilotService(): CopilotService | null {
     try {
@@ -144,6 +144,19 @@ export class ErpNavigatorService {
     maxWaitMs = 2500,
     options?: { resetSaved?: boolean; resetDraft?: boolean }
   ): Promise<boolean> {
+    if (this.inFlightPrepare) {
+      return this.inFlightPrepare;
+    }
+    this.inFlightPrepare = this._prepareFreshFormImpl(maxWaitMs, options).finally(() => {
+      this.inFlightPrepare = null;
+    });
+    return this.inFlightPrepare;
+  }
+
+  private async _prepareFreshFormImpl(
+    maxWaitMs = 2500,
+    options?: { resetSaved?: boolean; resetDraft?: boolean }
+  ): Promise<boolean> {
     const initialMode = this.getFormMode(true);
     if (initialMode === 'EmptyNew') {
       return true;
@@ -161,29 +174,26 @@ export class ErpNavigatorService {
     const start = Date.now();
     const remainingMs = () => Math.max(50, maxWaitMs - (Date.now() - start));
 
+    let bridgeTriggered = false;
     if (this.bridge.isAvailable) {
       try {
-        const opened = await this.bridge.triggerAddNew();
-        if (opened) {
-          const ready = await this.waitForFreshForm(requireEmptyNew, Math.min(1200, remainingMs()));
-          if (ready) return true;
+        bridgeTriggered = await this.bridge.triggerAddNew();
+        if (bridgeTriggered) {
+          return await this.waitForFreshForm(requireEmptyNew, remainingMs());
         }
       } catch (err) {
         console.warn('[ErpNavigator] bridge.triggerAddNew error:', err);
       }
     }
 
-    while (Date.now() - start < maxWaitMs) {
-      const currentMode = this.getFormMode(true);
-      if (currentMode === 'EmptyNew' || (!requireEmptyNew && currentMode !== 'ClosedOrList')) {
-        return true;
-      }
-      const clicked = triggerDomAddNewButton();
-      if (clicked) {
-        const ready = await this.waitForFreshForm(requireEmptyNew, Math.min(1500, remainingMs()));
-        if (ready) return true;
-      }
-      await this.delay(Math.min(100, remainingMs()));
+    const currentMode = this.getFormMode(true);
+    if (currentMode === 'EmptyNew' || (!requireEmptyNew && currentMode !== 'ClosedOrList')) {
+      return true;
+    }
+
+    const clicked = triggerDomAddNewButton();
+    if (clicked) {
+      return await this.waitForFreshForm(requireEmptyNew, remainingMs());
     }
 
     const finalMode = this.getFormMode(true);
@@ -203,16 +213,63 @@ export class ErpNavigatorService {
   }
 
   private async waitForFreshForm(requireEmptyNew: boolean, timeoutMs = 1200): Promise<boolean> {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
+    const isTargetMode = () => {
       const mode = this.getFormMode(true);
-      if (requireEmptyNew ? mode === 'EmptyNew' : mode !== 'ClosedOrList') {
-        return true;
-      }
-      await this.delay(50);
+      return requireEmptyNew ? mode === 'EmptyNew' : mode !== 'ClosedOrList';
+    };
+    if (isTargetMode()) {
+      return true;
     }
-    const mode = this.getFormMode(true);
-    return requireEmptyNew ? mode === 'EmptyNew' : mode !== 'ClosedOrList';
+    if (typeof document === 'undefined' || !document.body) {
+      return false;
+    }
+
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
+      let intervalId: ReturnType<typeof setInterval> | null = null;
+      let observer: MutationObserver | null = null;
+
+      const finish = (result: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (timeoutId !== null) clearTimeout(timeoutId);
+        if (intervalId !== null) clearInterval(intervalId);
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+        resolve(result);
+      };
+
+      const check = () => {
+        try {
+          if (isTargetMode()) {
+            finish(true);
+          }
+        } catch {
+          finish(false);
+        }
+      };
+
+      if (typeof MutationObserver !== 'undefined') {
+        observer = new MutationObserver(() => check());
+        observer.observe(document.body, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      }
+
+      intervalId = setInterval(() => check(), 50);
+      timeoutId = setTimeout(() => {
+        try {
+          finish(isTargetMode());
+        } catch {
+          finish(false);
+        }
+      }, timeoutMs);
+    });
   }
 
   scanVisibleCandidates(): NavCandidateIn[] {
@@ -229,6 +286,7 @@ export class ErpNavigatorService {
     askOptions?: NavScored[];
     message?: string;
     rawResolution?: NavResolution;
+    formPrepared?: boolean;
   }> {
     const candidates = this.scanVisibleCandidates();
     if (candidates.length === 0) {
@@ -240,8 +298,10 @@ export class ErpNavigatorService {
     }
 
     try {
-      const activeScreenName = this.bridge.getActiveScreen()?.pageName;
-      const currentPath = activeScreenName ? [activeScreenName.trim()] : [];
+      const activeScreen = this.bridge.getActiveScreen();
+      const activeScreenName = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
+      const hasActiveScreen = !!(activeScreenName || activeScreen?.pageId != null);
+      const currentPath = activeScreenName ? [activeScreenName] : [];
       const res = await this.copilotService.resolveErpNavigation({
         user_message: userMessage,
         candidates,
@@ -252,7 +312,7 @@ export class ErpNavigatorService {
       if (res.decision === 'go' && res.candidates.length > 0) {
         const top = res.candidates[0];
 
-        if (activeScreenName && this.isScreenActive(top.id)) {
+        if (hasActiveScreen && this.isScreenActive(top.id)) {
           console.info('%c[ErpNavigator] Already on target screen:', 'color:#10b981;font-weight:bold', top.id);
           return {
             success: true,
@@ -262,7 +322,7 @@ export class ErpNavigatorService {
           };
         }
 
-        const activeNorm = (activeScreenName || '').trim().toLowerCase();
+        const activeNorm = activeScreenName.toLowerCase();
         const topIdNorm = top.id.trim().toLowerCase();
         const isDetailScreen =
           topIdNorm.includes('detail') ||
@@ -307,6 +367,7 @@ export class ErpNavigatorService {
           await this.navigateToScreen(realScreenName);
         }
 
+        let formPrepared = false;
         if (res.intent === 'action') {
           const currentMode = this.getFormMode(true);
           const isOpenNonEmpty = currentMode === 'SavedOpen' || currentMode === 'UnsavedDraft';
@@ -314,7 +375,7 @@ export class ErpNavigatorService {
             !(options?.deferFormPrepOnOpenForm && isOpenNonEmpty) &&
             !(currentMode === 'SavedOpen' && isEditExistingFormQuery(userMessage))
           ) {
-            await this.prepareFreshForm();
+            formPrepared = await this.prepareFreshForm();
           }
         }
 
@@ -327,6 +388,7 @@ export class ErpNavigatorService {
           decision: 'go',
           chosen: enrichedTop,
           rawResolution: res,
+          formPrepared,
         };
       } else if (res.decision === 'ask') {
         const askOptions = res.candidates.slice(0, 5).map((opt) => {

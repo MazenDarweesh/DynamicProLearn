@@ -172,7 +172,7 @@ function isContextOfActiveScreen(bridge: ErpBridgeService, ctxScreenName?: strin
 
 function hasVisibleFormMarkup(container: Element): boolean {
   const el = container.querySelector(
-    'app-add-or-edit, .dp-edit, .dp-edit__head, section.dp-pu__sup, ng-select[formcontrolname], input#productQty'
+    'app-add-or-edit, .dp-edit, .dp-edit__head, section.dp-pu__sup, [formcontrolname="SupplierID"], [formcontrolname="CustomerID"], [formcontrolname="StoreID"], [formcontrolname="EmpId"], input#productQty'
   );
   return !!el && isNavElementVisible(el);
 }
@@ -209,7 +209,7 @@ export function checkIsFormAlreadyOpen(bridge: ErpBridgeService, forceRefresh = 
   }
 
   const primaryInput = activePage.querySelector<HTMLElement>(
-    'ng-select[formcontrolname], [formcontrolname="SupplierID"], [formcontrolname="CustomerID"], [formcontrolname="StoreID"], [formcontrolname="EmpId"], input#productQty'
+    'app-add-or-edit ng-select[formcontrolname], .dp-edit ng-select[formcontrolname], [formcontrolname="SupplierID"], [formcontrolname="CustomerID"], [formcontrolname="StoreID"], [formcontrolname="EmpId"], input#productQty'
   );
   if (primaryInput && isNavElementVisible(primaryInput)) {
     return true;

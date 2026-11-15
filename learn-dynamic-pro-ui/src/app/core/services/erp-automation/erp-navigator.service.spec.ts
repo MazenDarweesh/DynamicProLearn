@@ -3,6 +3,7 @@ import { TestBed } from '@angular/core/testing';
 import { ErpNavigatorService } from './erp-navigator.service';
 import { ErpBridgeService } from './erp-bridge.service';
 import {
+  checkIsFormAlreadyOpen,
   getFormModeFromBridgeAndDom,
   resolveHostFormMode,
 } from './navigator/form-opener';
@@ -278,6 +279,79 @@ describe('ErpNavigatorService & getFormMode()', () => {
     expect(res.success).toBeFalse();
     expect(res.decision).toBe('clarify');
     expect(res.message).toContain('لم يتم العثور على أي شاشات متاحة');
+  });
+
+  it('Module 3-a: concurrent prepareFreshForm calls share the same in-flight promise and call triggerAddNew once', async () => {
+    mountDomFormMarker();
+    let formState: ErpFormStateSnapshot = { isOpen: false, mode: 'closed' };
+    const triggerAddNewSpy = jasmine.createSpy('triggerAddNew').and.callFake(async () => {
+      await new Promise((r) => setTimeout(r, 30));
+      formState = { isOpen: true, mode: 'new', dirty: false };
+      return true;
+    });
+
+    (window as any).DynamicERP = {
+      getActiveScreen: () => ({ pageId: 289, pageName: 'Purchases' }),
+      navigateToScreen: async () => true,
+      triggerAddNew: triggerAddNewSpy,
+      submitActiveForm: async () => true,
+      getFormState: () => formState,
+    };
+
+    const p1 = navigator.prepareFreshForm(500);
+    const p2 = navigator.prepareFreshForm(500);
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    expect(r1).toBeTrue();
+    expect(r2).toBeTrue();
+    expect(triggerAddNewSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('Module 3-b: checkIsFormAlreadyOpen ignores Master List filter dropdowns (CreatedBy_gd) when form is closed', () => {
+    const bridge = TestBed.inject(ErpBridgeService);
+    (window as any).DynamicERP = {
+      getActiveScreen: () => ({ pageId: 289, pageName: 'Purchases' }),
+      getActiveFormContext: () => null,
+    };
+
+    const filterDropdown = document.createElement('ng-select');
+    filterDropdown.className = 'test-erp-form-node';
+    filterDropdown.setAttribute('formcontrolname', 'CreatedBy_gd');
+    filterDropdown.textContent = 'المستخدم';
+    document.body.appendChild(filterDropdown);
+
+    expect(checkIsFormAlreadyOpen(bridge, true)).toBeFalse();
+
+    // Once app-add-or-edit is mounted, checkIsFormAlreadyOpen returns true
+    mountDomFormMarker();
+    expect(checkIsFormAlreadyOpen(bridge, true)).toBeTrue();
+  });
+
+  it('Module 3-b fallback: when bridge.triggerAddNew returns false, prepareFreshForm falls back to clicking DOM Add New button', async () => {
+    let formState: ErpFormStateSnapshot = { isOpen: false, mode: 'closed' };
+    const triggerAddNewSpy = jasmine.createSpy('triggerAddNew').and.resolveTo(false);
+
+    (window as any).DynamicERP = {
+      getActiveScreen: () => ({ pageId: 289, pageName: 'Purchases' }),
+      navigateToScreen: async () => true,
+      triggerAddNew: triggerAddNewSpy,
+      submitActiveForm: async () => true,
+      getFormState: () => formState,
+    };
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'dp-btn--primary dp-list__act test-erp-form-node';
+    addBtn.textContent = 'اضافة جديد';
+    addBtn.addEventListener('click', () => {
+      formState = { isOpen: true, mode: 'new', dirty: false };
+      mountDomFormMarker();
+    });
+    document.body.appendChild(addBtn);
+
+    const ok = await navigator.prepareFreshForm(500);
+    expect(triggerAddNewSpy).toHaveBeenCalledTimes(1);
+    expect(ok).toBeTrue();
+    expect(navigator.getFormMode(true)).toBe('EmptyNew');
   });
 });
 
