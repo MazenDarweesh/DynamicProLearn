@@ -345,6 +345,28 @@ describe('ErpBridgeService v2.5.0 Contract & Strict Lookup Transport (Step 1)', 
       expect(missingRes.ok).toBeFalse();
       expect(missingRes.reason).toContain('setFieldValue');
     });
+
+    it('Module 1: getActiveScreen enriches empty pageName/screenKey from listScreens and trims whitespace', () => {
+      let rawScreen: any = { pageId: 289, screenKey: '', pageName: '' };
+      (window as any).DynamicERP = buildFullV250Bridge({
+        getActiveScreen: () => rawScreen,
+        listScreens: () => [
+          { pageId: 289, pageName: ' Purchases ', screenKey: ' Purchases ', title: ' فواتير المشتريات ' }
+        ]
+      });
+
+      const enriched = service.getActiveScreen(true);
+      expect(enriched).toBeTruthy();
+      expect(enriched?.pageId).toBe(289);
+      expect(enriched?.pageName).toBe('Purchases');
+      expect(enriched?.screenKey).toBe('Purchases');
+      expect(enriched?.title).toBe('فواتير المشتريات');
+
+      rawScreen = { pageId: 289, pageName: '  Purchases  ', screenKey: '  Purchases  ' };
+      const trimmed = service.getActiveScreen(true);
+      expect(trimmed?.pageName).toBe('Purchases');
+      expect(trimmed?.screenKey).toBe('Purchases');
+    });
   });
 });
 

@@ -108,6 +108,15 @@ export function applyEmbeddedHostStyles(
   return { isEmbedded: false, inline: currentInline, hideHeader: currentHideHeader };
 }
 
+export function isPureNavigationQuery(query: string): boolean {
+  const q = normalizeArabicText(query || '').trim();
+  if (!q) return false;
+  const hasNav = /(?:افتح|اذهب|انتقل|وديني|روح|هات|هاتلي|شاشه|شاشة|صفحه|صفحة)/i.test(q);
+  const hasAction =
+    /(?:سجل|اضف|انشئ|اعمل|دخل|عدل|تعديل|غير|امسح|احذف|فاتوره جديده|فاتورة جديدة|احفظ|حفظ)/i.test(q);
+  return hasNav && !hasAction;
+}
+
 export function evaluateActiveScreenMatch(
   query: string,
   activeScreen: { pageId?: string | number; pageName?: string; screenKey?: string; title?: string } | null,
@@ -121,7 +130,7 @@ export function evaluateActiveScreenMatch(
   const activeRaw = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
   const activeName = activeRaw.toLowerCase();
   const activeTitleNorm = normalizeArabicText(activeScreen?.title || '').toLowerCase();
-  const activePid = activeScreen?.pageId != null ? String(activeScreen.pageId) : '';
+  const activePid = activeScreen?.pageId != null ? String(activeScreen.pageId).trim() : '';
   const queryNorm = normalizeArabicText(query || '').toLowerCase();
 
   const isInvoiceQuery =
@@ -154,15 +163,21 @@ export function evaluateActiveScreenMatch(
   const isPurchaseQuery =
     queryNorm.includes('مشتريات') || queryNorm.includes('شراء') || queryNorm.includes('مورد');
   const isCurrentPurchase =
-    !!activeName &&
-    (activeName.includes('purchas') || activeName.includes('مشتريات') || activePid === '289');
+    activePid === '289' ||
+    (!!activeName && (activeName.includes('purchas') || activeName.includes('مشتريات'))) ||
+    activeTitleNorm.includes('مشتريات');
 
   const isSalesQuery =
     queryNorm.includes('مبيعات') || queryNorm.includes('بيع') || queryNorm.includes('عميل');
   const isCurrentSales =
-    !!activeName && (activeName.includes('sale') || activeName.includes('مبيعات') || activePid === '244');
+    activePid === '244' ||
+    (!!activeName && (activeName.includes('sale') || activeName.includes('مبيعات'))) ||
+    activeTitleNorm.includes('مبيعات');
 
-  const isExplicitNavRequest = /^(افتح|انتقل|اذهب|وديني|روح|شاشة|صفحة)\s+/i.test(query.trim());
+  const isExplicitNavRequest =
+    /^(?:(?:عايز|ممكن|ابغى|اريد|أريد)\s+)?(افتح|إفتح|انتقل|اذهب|وديني|روح|هات|هاتلي|شاشة|شاشه|صفحة|صفحه)\s+/i.test(
+      query.trim()
+    ) && isPureNavigationQuery(query);
   const isAlreadyOnMatchingDomain =
     !isSetupOrConfigScreen &&
     ((isPurchaseQuery && isCurrentPurchase) || (isSalesQuery && isCurrentSales));

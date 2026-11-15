@@ -147,9 +147,100 @@ export class ErpBridgeService {
   private lastActiveScreenCache: { time: number; val: ErpActiveScreen | null } | null = null;
   private lastFormContextCache: { time: number; val: ErpActiveFormContext | null } | null = null;
   private lastFormStateCache: { time: number; val: ErpFormStateSnapshot | null } | null = null;
+  private screenMetaByPageId = new Map<number, { pageName: string; title?: string; screenKey?: string }>();
   /** Last logged signatures — polling loops must not flood the session log with identical entries. */
   private lastLoggedScreenSig = '';
   private lastLoggedFormCtxSig = '';
+
+  private cacheScreenMeta(
+    pageId: unknown,
+    pageName?: unknown,
+    screenKey?: unknown,
+    title?: unknown
+  ): void {
+    const pid = Number(pageId);
+    if (!Number.isFinite(pid) || pid <= 0) return;
+    const cleanPageName = typeof pageName === 'string' ? pageName.trim() : '';
+    const cleanScreenKey = typeof screenKey === 'string' ? screenKey.trim() : '';
+    const cleanTitle = typeof title === 'string' ? title.trim() : '';
+    const resolvedName = cleanPageName || cleanScreenKey;
+    if (!resolvedName && !cleanTitle) return;
+    const prev = this.screenMetaByPageId.get(pid);
+    this.screenMetaByPageId.set(pid, {
+      pageName: resolvedName || prev?.pageName || '',
+      screenKey: cleanScreenKey || cleanPageName || prev?.screenKey,
+      title: cleanTitle || prev?.title
+    });
+  }
+
+  private enrichActiveScreen(rawScreen: ErpActiveScreen | null): ErpActiveScreen | null {
+    if (!rawScreen) return null;
+    const trimmedName = typeof rawScreen.pageName === 'string' ? rawScreen.pageName.trim() : '';
+    const trimmedKey = typeof rawScreen.screenKey === 'string' ? rawScreen.screenKey.trim() : '';
+    const trimmedTitle = typeof rawScreen.title === 'string' ? rawScreen.title.trim() : undefined;
+    this.cacheScreenMeta(rawScreen.pageId, trimmedName, trimmedKey, trimmedTitle);
+
+    if (trimmedName && trimmedKey) {
+      return {
+        ...rawScreen,
+        pageName: trimmedName,
+        screenKey: trimmedKey,
+        ...(trimmedTitle !== undefined ? { title: trimmedTitle } : {})
+      };
+    }
+    const pid = Number(rawScreen.pageId);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      return {
+        ...rawScreen,
+        ...(typeof rawScreen.pageName === 'string' ? { pageName: trimmedName } : {}),
+        ...(typeof rawScreen.screenKey === 'string' ? { screenKey: trimmedKey } : {})
+      };
+    }
+    let cached = this.screenMetaByPageId.get(pid);
+    if (!cached) {
+      this.populateScreenMetaFromCatalog();
+      cached = this.screenMetaByPageId.get(pid);
+    }
+    if (!cached) {
+      return {
+        ...rawScreen,
+        ...(typeof rawScreen.pageName === 'string' ? { pageName: trimmedName } : {}),
+        ...(typeof rawScreen.screenKey === 'string' ? { screenKey: trimmedKey } : {})
+      };
+    }
+    return {
+      ...rawScreen,
+      pageName: trimmedName || cached.pageName || cached.screenKey || '',
+      screenKey: trimmedKey || cached.screenKey || cached.pageName || '',
+      title: trimmedTitle || cached.title
+    };
+  }
+
+  private populateScreenMetaFromCatalog(): void {
+    if (!this.isAvailable) return;
+    try {
+      const bridge = window.DynamicERP as any;
+      const list: any[] | null =
+        (typeof bridge.listUserPages === 'function' ? bridge.listUserPages() : null) ??
+        (typeof bridge.listScreens === 'function' ? bridge.listScreens() : null) ??
+        (Array.isArray(bridge.screens) ? bridge.screens : null) ??
+        (Array.isArray(bridge.pages) ? bridge.pages : null);
+      if (Array.isArray(list)) {
+        for (const item of list) {
+          if (item && typeof item === 'object') {
+            this.cacheScreenMeta(
+              item.pageId ?? item.page_id ?? item.id,
+              item.pageName ?? item.screen_key,
+              item.screenKey ?? item.screen_key ?? item.pageName,
+              item.title ?? item.name_ar
+            );
+          }
+        }
+      }
+    } catch {
+      // Ignore catalog enrichment errors so getActiveScreen remains non-throwing
+    }
+  }
 
   getActiveScreen(forceRefresh = false): ErpActiveScreen | null {
     if (!this.isAvailable) return null;
@@ -158,7 +249,8 @@ export class ErpBridgeService {
       return this.lastActiveScreenCache.val;
     }
     try {
-      const screen = window.DynamicERP!.getActiveScreen?.() ?? null;
+      const rawScreen = window.DynamicERP!.getActiveScreen?.() ?? null;
+      const screen = this.enrichActiveScreen(rawScreen);
       this.lastActiveScreenCache = { time: now, val: screen };
       const sig = `${screen?.pageId ?? ''}|${screen?.pageName ?? ''}`;
       if (sig !== this.lastLoggedScreenSig) {
@@ -187,6 +279,14 @@ export class ErpBridgeService {
       else if (typeof bridge.getAuthorizedPages === 'function') screens = bridge.getAuthorizedPages() ?? null;
       else if (Array.isArray(bridge.screens)) screens = bridge.screens;
       else if (Array.isArray(bridge.pages)) screens = bridge.pages;
+
+      if (Array.isArray(screens)) {
+        for (const s of screens) {
+          if (s && typeof s === 'object') {
+            this.cacheScreenMeta(s.pageId, s.pageName, s.screenKey, s.title);
+          }
+        }
+      }
 
       this.telemetry?.logBridge('listScreens', undefined, { count: screens?.length ?? 0 });
       return screens;
