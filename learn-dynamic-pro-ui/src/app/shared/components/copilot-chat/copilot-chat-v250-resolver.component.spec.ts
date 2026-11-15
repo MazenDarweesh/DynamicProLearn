@@ -14,6 +14,10 @@ import {
   StrictLookupFetchResult
 } from '../../../core/services/erp-automation';
 import { ErpFormMode, ErpFormStateSnapshot, FormFieldSchema } from '../../../core/services/erp-automation';
+import {
+  evaluateActiveScreenMatch,
+  isPureNavigationQuery
+} from './utils/copilot-host-bridge.helper';
 
 describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (Step 3)', () => {
   let component: CopilotChatComponent;
@@ -747,6 +751,64 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
     expect(lastMsg.askOptions).toBeUndefined();
     expect(lastMsg.text).toContain('تم الانتقال إلى شاشة');
     expect(lastMsg.text).toContain('فواتير المبيعات');
+  });
+
+  it('Module 2: evaluateActiveScreenMatch detects active Purchases screen by pageId=289 even when pageName/screenKey are empty after save', () => {
+    const match = evaluateActiveScreenMatch(
+      'سجل فاتورة مشتريات جديدة',
+      { pageId: 289, screenKey: '', pageName: '' },
+      true
+    );
+    expect(match.isExplicitNavRequest).toBeFalse();
+    expect(match.isAlreadyOnMatchingDomain).toBeTrue();
+    expect(match.isAlreadyOnMatchingScreen).toBeTrue();
+  });
+
+  it('Module 4: isPureNavigationQuery distinguishes pure navigation from compound action queries, and selectAskOption short-circuits on pure navigation', async () => {
+    expect(isPureNavigationQuery('هاتلي صفحة الفواتير')).toBeTrue();
+    expect(isPureNavigationQuery('افتح شاشة المشتريات')).toBeTrue();
+    expect(isPureNavigationQuery('افتح شاشة المشتريات وسجل فاتورة للمورد حسين')).toBeFalse();
+    expect(isPureNavigationQuery('هاتلي صفحة الفواتير وسجل فاتورة')).toBeFalse();
+
+    await component.selectAskOption(
+      { id: '289', label: 'فواتير المشتريات', confidence: 0.78, reason: 'ask' },
+      'هاتلي صفحة الفواتير'
+    );
+
+    expect(mockNavigator.navigateToScreen).toHaveBeenCalledWith('289');
+    expect(mockCopilotService.streamSearch).not.toHaveBeenCalled();
+    const lastMsg = component.messages[component.messages.length - 1];
+    expect(lastMsg.text).toContain('✅ تم الانتقال إلى شاشة «فواتير المشتريات» بنجاح.');
+
+    // Compound query (navigate + action) MUST continue to streamQuery / streamSearch
+    await component.selectAskOption(
+      { id: '289', label: 'فواتير المشتريات', confidence: 0.78, reason: 'ask' },
+      'افتح شاشة المشتريات وسجل فاتورة للمورد حسين'
+    );
+    expect(mockCopilotService.streamSearch).toHaveBeenCalledTimes(1);
+  });
+
+  it('Module 3-c: when resolveAndNavigate returns early (formPrepared undefined, e.g. downgrade prevented), streamQuery prepares form once', async () => {
+    activePageId = 999;
+    activePageName = 'OtherScreen';
+    mockNavigator.isScreenActive.and.returnValue(false);
+    component.isActionMode = true;
+    mockNavigator.resolveAndNavigate.and.resolveTo({
+      success: true,
+      decision: 'go',
+      chosen: { id: 'Purchases', confidence: 1.0, reason: 'Retained primary transactional screen' },
+      rawResolution: {
+        decision: 'go',
+        intent: 'action',
+        source: 'ai',
+        candidates: [{ id: 'PurchasesDetail', confidence: 0.9, reason: 'detail' }]
+      }
+      // formPrepared is undefined on early return (lines 315 & 342)
+    } as any);
+
+    await (component as any).streamQuery('سجل فاتورة مشتريات جديدة للمورد حسين');
+
+    expect(mockNavigator.prepareFreshForm).toHaveBeenCalledTimes(1);
   });
 });
 

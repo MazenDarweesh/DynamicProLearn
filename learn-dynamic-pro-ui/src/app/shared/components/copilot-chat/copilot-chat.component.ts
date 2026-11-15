@@ -52,6 +52,7 @@ import {
 import {
   applyEmbeddedHostStyles,
   evaluateActiveScreenMatch,
+  isPureNavigationQuery,
   readHostElementAttributes
 } from './utils/copilot-host-bridge.helper';
 
@@ -1890,13 +1891,13 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         const isSavedOpenEdit = msg.targetFormMode === 'SavedOpen';
         const docRes = isSavedOpenEdit
           ? await this.bridge.saveDocument(
-              msg.v250SavedDocExpected
-                ? {
-                    expectedPOID: msg.v250SavedDocExpected.expectedPOID,
-                    expectedPONumber: msg.v250SavedDocExpected.expectedPONumber
-                  }
-                : undefined
-            )
+            msg.v250SavedDocExpected
+              ? {
+                expectedPOID: msg.v250SavedDocExpected.expectedPOID,
+                expectedPONumber: msg.v250SavedDocExpected.expectedPONumber
+              }
+              : undefined
+          )
           : await this.bridge.saveDocument();
 
         if (docRes.ok) {
@@ -1961,14 +1962,14 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         const fieldsBulletList =
           missingFields.length > 0
             ? missingFields
-                .map((mf) => {
-                  const optsHint =
-                    mf.options && mf.options.length > 0
-                      ? ` *(الخيارات المتاحة: ${mf.options.slice(0, 8).join('، ')})*`
-                      : '';
-                  return `- **${mf.label}**${optsHint}`;
-                })
-                .join('\n')
+              .map((mf) => {
+                const optsHint =
+                  mf.options && mf.options.length > 0
+                    ? ` *(الخيارات المتاحة: ${mf.options.slice(0, 8).join('، ')})*`
+                    : '';
+                return `- **${mf.label}**${optsHint}`;
+              })
+              .join('\n')
             : `- يرجى كتابة اسم الحقل وقيمته المطلوبة بناءً على رسالة التنبيه أعلاه.`;
 
         const promptText =
@@ -2198,10 +2199,25 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     this.syncErpKey(option.id);
     // 2. Wait for DOM to settle
     await this.formDriver.settle(undefined, { quietMs: 250, maxMs: 2500, minMs: 120 });
-    // 3. Re-run streamQuery on the newly selected screen
-    if (originalQuery) {
-      await this.streamQuery(originalQuery, true, true);
+    // 3. Short-circuit pure navigation queries without invoking streamQuery / ERP_ACTION_GUIDE
+    if (!originalQuery || this.isPureNavigationQuery(originalQuery)) {
+      const targetTitle = this.getScreenDisplayName(option.id, option.label);
+      this.messages.push({
+        sender: 'assistant',
+        text: `✅ تم الانتقال إلى شاشة «${targetTitle}» بنجاح.`,
+        sources: [],
+        isStreaming: false,
+        relatedUserQuery: originalQuery,
+        filters: { ...this.activeFilter },
+        lessonId: this.activeFilter.lessonId,
+        lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
+      });
+      this.cdr.markForCheck();
+      this.scrollToBottom();
+      return;
     }
+    // 4. Composite query (navigation + action): re-run streamQuery on the newly selected screen
+    await this.streamQuery(originalQuery, true, true);
   }
 
   getScreenDisplayName(key: string, label?: string): string {
@@ -2233,6 +2249,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     return /^(?:عايز\s+|ممكن\s+|ابغى\s+|اريد\s+|أريد\s+)?(?:افتح|اذهب|انتقل|وديني|روح)|شاش[ةه]|صفح[ةه]/i.test(q);
   }
 
+  private isPureNavigationQuery(query: string): boolean {
+    return isPureNavigationQuery(query);
+  }
+
   /** Core stream method — shared by sendMessage() and retryMessage() */
   private async streamQuery(query: string, skipCache: boolean = false, skipNavCheck: boolean = false) {
     this.isStreaming = true;
@@ -2250,8 +2270,11 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       const activeScreen = this.bridge.getActiveScreen();
       const activeRaw = (activeScreen?.pageName || activeScreen?.screenKey || '').trim();
       const activeName = activeRaw.toLowerCase();
-      const activePid = activeScreen?.pageId != null ? String(activeScreen.pageId) : '';
-      const isDomActive = !!activeRaw && (this.navigator.isScreenActive(activePid || activeRaw) || this.navigator.isScreenActive(activeName));
+      const activePid = activeScreen?.pageId != null ? String(activeScreen.pageId).trim() : '';
+      const isDomActive =
+        !!(activeRaw || activePid) &&
+        (this.navigator.isScreenActive(activePid || activeRaw) ||
+          (!!activeName && this.navigator.isScreenActive(activeName)));
       const { isAlreadyOnMatchingScreen, isExplicitNavRequest, isSetupOrConfigScreen } = evaluateActiveScreenMatch(
         query,
         activeScreen,
@@ -2368,7 +2391,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
           : 'EmptyNew';
       const deferFormPrepUntilFillData =
         streamFormMode === 'SavedOpen' || streamFormMode === 'UnsavedDraft';
-      if (isEntryIntent && isOnTargetScreen && !deferFormPrepUntilFillData && typeof document !== 'undefined') {
+      if (navRes?.formPrepared) {
+        formPreparedDuringStream = true;
+        await this.formDriver.settle(undefined, { quietMs: 80, maxMs: 800 });
+      } else if (isEntryIntent && isOnTargetScreen && !deferFormPrepUntilFillData && typeof document !== 'undefined') {
         try {
           const formOpened = await this.navigator.prepareFreshForm(this.formPrepareTimeoutMs);
           if (formOpened) {
