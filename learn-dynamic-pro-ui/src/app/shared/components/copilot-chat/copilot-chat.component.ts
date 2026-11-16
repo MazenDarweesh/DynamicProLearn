@@ -1,7 +1,6 @@
 import { Component, inject, ElementRef, ViewChild, OnDestroy, OnInit, OnChanges, SimpleChanges, Input, Output, EventEmitter, ChangeDetectorRef, booleanAttribute, HostBinding } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { MarkdownComponent } from 'ngx-markdown';
 import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
@@ -174,7 +173,6 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   batchStepper = inject(ErpBatchStepperService);
   /** Optional: when on, saves right after a clean (fully filled) form fill. Off by default. */
   autoSaveAfterFill = false;
-  private router = inject(Router, { optional: true });
   private cdr = inject(ChangeDetectorRef);
   private elRef = inject(ElementRef);
   authService = inject(AuthService);
@@ -283,7 +281,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (this.isEmbedded || this.inline) {
       return true;
     }
-    const url = this.router?.url || '';
+    const url = typeof window !== 'undefined' ? window.location.pathname : '';
     const isAuthRoute = url.includes('/login') || url.includes('/erp-redirect');
     return this.authService.isAuthenticated() && !isAuthRoute;
   }
@@ -491,7 +489,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
   detectLessonFromRoute() {
     try {
-      const url = this.router?.url || '';
+      const url = typeof window !== 'undefined' ? window.location.pathname : '';
       const queryParams = new URLSearchParams(window.location.search);
 
       // Check ERP Key query param (?erpKey=... or ?key=...)

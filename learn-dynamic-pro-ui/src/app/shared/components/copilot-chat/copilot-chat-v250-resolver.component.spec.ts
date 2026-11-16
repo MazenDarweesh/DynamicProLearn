@@ -560,7 +560,7 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
     const msg: ChatMessage = {
       sender: 'assistant',
       text: 'فاتورة مع حقول متجاهلة',
-      relatedUserQuery: 'سجل فاتورة مشتريات من حسين للمخزن الرئيسي لمشروع السحاب وسدد الإجمالي بالكامل نقداً',
+      relatedUserQuery: 'سجل فاتورة مشتريات من حسين للمخزن الرئيسي لمركز تكلفة الإدارة وسدد الإجمالي بالكامل نقداً',
       formFillData: {
         screenKey: 'PURCHASE_INVOICE',
         pageId: 289,
@@ -570,7 +570,7 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
           CurrancyID: 'مصري',
           SupplierID: 'حسين للتوريدات',
           StoreID: 'المخزن الرئيسي',
-          المشروعات: 'السحاب'
+          CostCenterID: 'الإدارة'
         },
         rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 50 }]
       }
@@ -588,8 +588,8 @@ describe('CopilotChatComponent - Wave 1 Purchases v2.5.0 Resolver & Save Flow (S
 
     const ignoredSection = fixture.nativeElement.querySelector('.v250-preview-ignored') as HTMLElement | null;
     expect(ignoredSection).not.toBeNull();
-    expect(ignoredSection?.textContent).toContain('المشروع');
-    expect(ignoredSection?.textContent).toContain('السحاب');
+    expect(ignoredSection?.textContent).toContain('مركز التكلفة');
+    expect(ignoredSection?.textContent).toContain('الإدارة');
     expect(ignoredSection?.textContent).toContain('نقد');
 
     // Programmatic confirmSave refuses before acknowledgement

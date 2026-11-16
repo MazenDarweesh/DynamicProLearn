@@ -1,10 +1,11 @@
-import { Component, Input, Output, EventEmitter, booleanAttribute } from '@angular/core';
+import { Component, Input, Output, EventEmitter, booleanAttribute, ChangeDetectionStrategy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-copilot-header',
   standalone: true,
   imports: [CommonModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './copilot-header.component.html',
   styleUrls: ['./copilot-header.component.css']
 })

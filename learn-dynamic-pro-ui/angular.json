@@ -69,9 +69,7 @@
             "outputPath": "dist/lms-copilot-element",
             "index": false,
             "browser": "src/copilot-element.ts",
-            "polyfills": [
-              "zone.js"
-            ],
+            "polyfills": [],
             "tsConfig": "tsconfig.element.json",
             "styles": [],
             "scripts": []
