@@ -19,11 +19,16 @@ export class ErpTelemetryService {
     }
   }
 
+  private static readonly MAX_BUFFER_SIZE = 100;
+  private static readonly MAX_SCAN_FIELDS = 50;
+  private static readonly SENSITIVE_KEY_PATTERN =
+    /^(password|token|secret|authorization|api_?key|access_?token|refresh_?token)$/i;
+
   private sessionId = this.generateSessionId();
   private screenKey: string | null = null;
   private currentTraceId: string | null = null;
-  private lastSchemaSignature = '';
-  private lastSchemaKeys: string[] = [];
+  private lastSchemaSignatures = new Map<string, string>();
+  private lastSchemaKeysMap = new Map<string, string[]>();
   private buffer: TelemetryEventPayload[] = [];
   private flushTimer: any = null;
 
@@ -63,14 +68,33 @@ export class ErpTelemetryService {
     this.flush();
     this.sessionId = this.generateSessionId();
     this.currentTraceId = null;
-    this.lastSchemaSignature = '';
-    this.lastSchemaKeys = [];
+    this.lastSchemaSignatures.clear();
+    this.lastSchemaKeysMap.clear();
     if (typeof window !== 'undefined') {
       (window as any).__COPILOT_SESSION_ID__ = this.sessionId;
       (window as any).__COPILOT_SESSION_LOG__ = [];
     }
     this.log('GENERAL', 'New chat session started', { sessionId: this.sessionId }, 'INFO');
     return this.sessionId;
+  }
+
+  private sanitizeDetails(value: any, depth = 0): any {
+    if (depth > 5 || value === null || value === undefined) return value;
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sanitizeDetails(item, depth + 1));
+    }
+    if (typeof value === 'object') {
+      const sanitized: Record<string, any> = {};
+      for (const [k, v] of Object.entries(value)) {
+        if (ErpTelemetryService.SENSITIVE_KEY_PATTERN.test(k.trim())) {
+          sanitized[k] = '[REDACTED]';
+        } else {
+          sanitized[k] = this.sanitizeDetails(v, depth + 1);
+        }
+      }
+      return sanitized;
+    }
+    return value;
   }
 
   log(
@@ -81,14 +105,15 @@ export class ErpTelemetryService {
     durationMs?: number
   ): void {
     const timestamp = new Date().toISOString();
+    const safeDetails = details ? this.sanitizeDetails(details) : undefined;
     const payload: TelemetryEventPayload = {
       timestamp,
       level,
       stage,
       event,
       traceId: this.currentTraceId || undefined,
-      durationMs: durationMs !== undefined ? durationMs : details?.['durationMs'],
-      details
+      durationMs: durationMs !== undefined ? durationMs : safeDetails?.['durationMs'],
+      details: safeDetails
     };
 
     this.printDevToolsBadge(payload);
@@ -160,46 +185,64 @@ export class ErpTelemetryService {
   }
 
   logScan(schemas: any[], context?: string): void {
-    const signature = schemas.map(s => `${s.key}:${s.disabled ? '0' : '1'}`).join('|');
-    const currentKeys = schemas.map(s => s.key);
+    const validLabels = new Set(
+      schemas
+        .filter((s) => s?.key && s.key !== 'undefined' && s?.label)
+        .map((s) => String(s.label))
+    );
+    const filteredSchemas = schemas.filter(
+      (s) => (s?.key && s.key !== 'undefined') || !s?.label || !validLabels.has(String(s.label))
+    );
 
-    if (this.lastSchemaSignature && this.lastSchemaSignature === signature) {
+    const bucketKey = this.screenKey || '__default__';
+    const signature = filteredSchemas.map(s => `${s.key}:${s.disabled ? '0' : '1'}`).join('|');
+    const currentKeys = filteredSchemas.map(s => s.key);
+    const prevSignature = this.lastSchemaSignatures.get(bucketKey) || '';
+    const prevKeys = this.lastSchemaKeysMap.get(bucketKey) || [];
+
+    if (prevSignature && prevSignature === signature) {
       this.log(
         'SCAN',
-        `Schema verified: Unchanged (${schemas.length} fields, stable)`,
-        { fieldsCount: schemas.length, unchanged: true },
+        `Schema verified: Unchanged (${filteredSchemas.length} fields, stable)`,
+        { fieldsCount: filteredSchemas.length, unchanged: true },
         'DEBUG'
       );
       return;
     }
 
-    const isFirstScan = !this.lastSchemaSignature;
-    const added = currentKeys.filter(k => !this.lastSchemaKeys.includes(k));
-    const removed = this.lastSchemaKeys.filter(k => !currentKeys.includes(k));
+    const isFirstScan = !prevSignature;
+    const added = currentKeys.filter(k => !prevKeys.includes(k));
+    const removed = prevKeys.filter(k => !currentKeys.includes(k));
 
-    this.lastSchemaSignature = signature;
-    this.lastSchemaKeys = currentKeys;
+    this.lastSchemaSignatures.set(bucketKey, signature);
+    this.lastSchemaKeysMap.set(bucketKey, currentKeys);
 
     if (isFirstScan) {
-      const summary = schemas.map(s => ({
-        key: s.key,
-        label: s.label,
-        kind: s.kind,
-        disabled: s.disabled
-      }));
+      const summary = filteredSchemas
+        .slice(0, ErpTelemetryService.MAX_SCAN_FIELDS)
+        .map(s => ({
+          key: s.key,
+          label: s.label,
+          kind: s.kind,
+          disabled: s.disabled
+        }));
       this.log(
         'SCAN',
-        `Collected form schema (${schemas.length} fields) [${context || 'active root'}]`,
-        { fieldsCount: schemas.length, fields: summary },
+        `Collected form schema (${filteredSchemas.length} fields) [${context || 'active root'}]`,
+        {
+          fieldsCount: filteredSchemas.length,
+          fieldsTruncated: filteredSchemas.length > ErpTelemetryService.MAX_SCAN_FIELDS,
+          fields: summary
+        },
         'INFO'
       );
     } else {
       this.log(
         'SCAN',
-        `Schema changed: +${added.length} added, -${removed.length} removed (${schemas.length} total)`,
+        `Schema changed: +${added.length} added, -${removed.length} removed (${filteredSchemas.length} total)`,
         {
-          fieldsCount: schemas.length,
-          schemaDiff: { added, removed, count: schemas.length }
+          fieldsCount: filteredSchemas.length,
+          schemaDiff: { added, removed, count: filteredSchemas.length }
         },
         'INFO'
       );
@@ -247,6 +290,14 @@ export class ErpTelemetryService {
     this.log(stage, event, { error: err ? String(err) : undefined, stack: err?.stack }, 'ERROR');
   }
 
+  private requeueEvents(events: TelemetryEventPayload[]): void {
+    const combined = [...events, ...this.buffer];
+    this.buffer =
+      combined.length > ErpTelemetryService.MAX_BUFFER_SIZE
+        ? combined.slice(combined.length - ErpTelemetryService.MAX_BUFFER_SIZE)
+        : combined;
+  }
+
   flush(): void {
     if (this.flushTimer) {
       clearTimeout(this.flushTimer);
@@ -266,7 +317,8 @@ export class ErpTelemetryService {
 
     if (this.copilotService) {
       this.copilotService.sendErpTelemetry(batch).catch(err => {
-        console.warn('[ErpTelemetry] Flush failed, attempting keepalive fallback:', err);
+        console.warn('[ErpTelemetry] Flush failed, re-queuing events and attempting keepalive:', err);
+        this.requeueEvents(eventsToSend);
         this.sendKeepalive(batch);
       });
     } else {
@@ -277,7 +329,9 @@ export class ErpTelemetryService {
   private sendKeepalive(batch: any): void {
     if (typeof window === 'undefined') return;
     try {
-      const url = `${this.copilotService?.getAiBaseUrl() || 'http://localhost:8000'}/v1/erp/telemetry`;
+      const baseUrl = this.copilotService?.getAiBaseUrl();
+      if (!baseUrl) return;
+      const url = `${baseUrl}/v1/erp/telemetry`;
       const data = JSON.stringify(batch);
       if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
         const blob = new Blob([data], { type: 'application/json' });
