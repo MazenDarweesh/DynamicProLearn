@@ -86,7 +86,7 @@ function isNonEmptyTextValue(value: unknown): boolean {
 
 /**
  * Strictly validates each row for exact own properties `valueKey` and `textKey`
- * without heuristic fallback keys (`id`, `name`, `label`, etc.).
+ * without loose heuristic fallback keys (`id`, `name`, `label`, etc.).
  */
 export function validateAndMapLookupRows(
   rows: unknown[],
@@ -106,10 +106,8 @@ export function validateAndMapLookupRows(
     }
 
     const record = row as Record<string, unknown>;
-    const hasValueKey =
-      Object.prototype.hasOwnProperty.call(record, valueKey) && isNonEmptyIdValue(record[valueKey]);
-    const hasTextKey =
-      Object.prototype.hasOwnProperty.call(record, textKey) && isNonEmptyTextValue(record[textKey]);
+    const hasValueKey = Object.prototype.hasOwnProperty.call(record, valueKey) && isNonEmptyIdValue(record[valueKey]);
+    const hasTextKey = Object.prototype.hasOwnProperty.call(record, textKey) && isNonEmptyTextValue(record[textKey]);
 
     if (!hasValueKey || !hasTextKey) {
       invalidRows++;

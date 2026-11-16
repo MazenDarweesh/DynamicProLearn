@@ -8,7 +8,9 @@ export type PurchasesWave1HeaderField =
   | 'SupplierID'
   | 'StoreID'
   | 'CurrancyID'
-  | 'POSetting';
+  | 'POSetting'
+  | 'ProjectID'
+  | 'SafeAccounId';
 
 export type PurchasesWave1FieldKey = PurchasesWave1HeaderField | 'ProductID';
 
@@ -17,10 +19,12 @@ export const PURCHASES_SAFE_HEADER_ORDER: readonly PurchasesWave1HeaderField[] =
   'POSetting',
   'CurrancyID',
   'SupplierID',
-  'StoreID'
+  'StoreID',
+  'ProjectID',
+  'SafeAccounId'
 ] as const;
 
-/** Fixed static Wave 1 lookup table for Purchases (Page 289). Wave 2 fields are intentionally omitted. */
+/** Fixed static Wave 1 & Wave 2 lookup table for Purchases (Page 289). */
 export const PURCHASES_WAVE1_LOOKUP_TABLE: Readonly<Record<PurchasesWave1FieldKey, ErpLookupFieldSpec>> = {
   SupplierID: {
     field: 'SupplierID',
@@ -54,6 +58,22 @@ export const PURCHASES_WAVE1_LOOKUP_TABLE: Readonly<Record<PurchasesWave1FieldKe
     valueKey: 'PSID',
     textKey: 'PSName'
   },
+  ProjectID: {
+    field: 'ProjectID',
+    labelAr: 'المشروع',
+    scope: 'header',
+    droModel: 'ProductNonInventory',
+    valueKey: 'ProID',
+    textKey: 'ProName'
+  },
+  SafeAccounId: {
+    field: 'SafeAccounId',
+    labelAr: 'الخزينة',
+    scope: 'header',
+    droModel: 'MonyAccount',
+    valueKey: 'AcID',
+    textKey: 'AcName'
+  },
   ProductID: {
     field: 'ProductID',
     labelAr: 'الأصناف',
@@ -68,7 +88,9 @@ const HEADER_FIELD_ALIASES: Readonly<Record<PurchasesWave1HeaderField, readonly 
   SupplierID: ['supplierid', 'المورد', 'مورد', 'vendorid'],
   StoreID: ['storeid', 'المخزن', 'مخزن'],
   CurrancyID: ['currancyid', 'currencyid', 'العمله', 'العملة', 'عمله الشراء', 'عملة الشراء'],
-  POSetting: ['posetting', 'طريقه الشراء', 'طريقة الشراء', 'نوع الشراء', 'اعدادات الشراء']
+  POSetting: ['posetting', 'طريقه الشراء', 'طريقة الشراء', 'نوع الشراء', 'اعدادات الشراء'],
+  ProjectID: ['projectid', 'project', 'المشروع', 'مشروع', 'اسم المشروع', 'المشروعات', 'مشروعات'],
+  SafeAccounId: ['safeaccounid', 'safeaccountid', 'safeaccount', 'safeid', 'الخزينة', 'خزينة', 'الصندوق', 'صندوق', 'الخزينه', 'خزينه']
 };
 
 /**

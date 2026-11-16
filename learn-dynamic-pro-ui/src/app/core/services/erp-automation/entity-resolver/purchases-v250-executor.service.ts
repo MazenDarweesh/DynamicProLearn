@@ -281,11 +281,23 @@ const QUERY_IGNORED_CLAUSE_EXTRACTORS: Array<{
 export function collectPurchasesV250IgnoredItems(
   fields?: Record<string, unknown>,
   ignoredNonWave1Fields?: string[],
-  userQuery?: string
+  userQuery?: string,
+  appliedHeaders?: PurchasesV250AppliedHeaderEntry[]
 ): PurchasesV250IgnoredItem[] {
   const items: PurchasesV250IgnoredItem[] = [];
   const seenGroups = new Set<string>();
   const seenKeys = new Set<string>();
+
+  if (appliedHeaders && appliedHeaders.length > 0) {
+    for (const h of appliedHeaders) {
+      if (h.field === 'ProjectID') {
+        seenGroups.add('project');
+      }
+      if (h.field === 'SafeAccounId') {
+        seenGroups.add('payment');
+      }
+    }
+  }
 
   for (const rawKey of ignoredNonWave1Fields || []) {
     const normKey = normalizeArabicText(rawKey).toLowerCase();
@@ -299,7 +311,7 @@ export function collectPurchasesV250IgnoredItems(
     const valStr = String(rawVal).trim();
     const meta = IGNORED_FIELD_LABELS_AR.find((entry) => entry.pattern.test(normalizeArabicText(rawKey)));
     const groupKey = meta ? `${meta.group}:${normalizeArabicText(valStr).toLowerCase()}` : normKey;
-    if (seenGroups.has(groupKey)) continue;
+    if (seenGroups.has(groupKey) || (meta && seenGroups.has(meta.group))) continue;
     seenKeys.add(normKey);
     seenGroups.add(groupKey);
     if (meta) seenGroups.add(meta.group);
@@ -308,7 +320,7 @@ export function collectPurchasesV250IgnoredItems(
       key: rawKey,
       labelAr: meta?.labelAr || rawKey,
       value: valStr,
-      reasonAr: 'حقل خارج نطاق التعديل الآلي في Wave 1 ولم يُعبّأ في الشاشة.'
+      reasonAr: 'حقل خارج نطاق التعديل الآلي ولم يُعبّأ في الشاشة.'
     });
   }
 
@@ -740,7 +752,8 @@ export class PurchasesV250ExecutorService {
     const actualHeaders: PurchasesV250ActualHeaderCheck[] = [];
     for (const hdr of args.appliedHeaders) {
       const spec = PURCHASES_WAVE1_LOOKUP_TABLE[hdr.field];
-      const fieldLookup = readCaseInsensitiveKey(actualDataObject, [hdr.field, spec.valueKey]);
+      const candidateKeys = [hdr.field, spec.valueKey];
+      const fieldLookup = readCaseInsensitiveKey(actualDataObject, candidateKeys);
       const actualVal = fieldLookup.value;
       const matches = !fieldLookup.found || actualVal == null || String(actualVal) === String(hdr.id);
       if (fieldLookup.found && (actualVal == null || String(actualVal) === '' || String(actualVal) !== String(hdr.id))) {
@@ -918,7 +931,8 @@ export class PurchasesV250ExecutorService {
     const ignoredItems = collectPurchasesV250IgnoredItems(
       args.fields,
       args.ignoredNonWave1Fields,
-      args.userQuery
+      args.userQuery,
+      args.appliedHeaders
     );
 
     return {

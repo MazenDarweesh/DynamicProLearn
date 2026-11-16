@@ -85,6 +85,24 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
           { ProID: 10, ProName: 'حديد 10 مم' },
           { ProID: 20, ProName: 'اسمنت 20' }
         ]
+      },
+      ProductNonInventory: {
+        status: 'ok',
+        count: 3,
+        data: [
+          { ProID: 101, ProName: 'مشروع العاصمة الإدارية' },
+          { ProID: 102, ProName: 'مشروع العلمين الجديدة' },
+          { ProID: 103, ProName: 'مشروع تطوير المخازن' }
+        ]
+      },
+      MonyAccount: {
+        status: 'ok',
+        count: 3,
+        data: [
+          { AcID: 7619, AcName: 'الخزينة الرئيسية', FullName: 'الخزينة الرئيسية  1010101' },
+          { AcID: 7620, AcName: 'خزينة الفرع', FullName: 'خزينة الفرع  1010102' },
+          { AcID: 7621, AcName: 'خزينة المبيعات', FullName: 'خزينة المبيعات  1010103' }
+        ]
       }
     };
 
@@ -104,7 +122,7 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
     delete (window as any).DynamicERP;
   });
 
-  it('defines the fixed Wave 1 static registry including Product/ProID/ProName and excludes Wave 2 fields', () => {
+  it('defines the fixed Wave 1 & Wave 2 static registry including ProjectID and SafeAccounId', () => {
     expect(PURCHASES_WAVE1_LOOKUP_TABLE.SupplierID).toEqual({
       field: 'SupplierID',
       labelAr: 'المورد',
@@ -137,6 +155,22 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
       valueKey: 'PSID',
       textKey: 'PSName'
     });
+    expect(PURCHASES_WAVE1_LOOKUP_TABLE.ProjectID).toEqual({
+      field: 'ProjectID',
+      labelAr: 'المشروع',
+      scope: 'header',
+      droModel: 'ProductNonInventory',
+      valueKey: 'ProID',
+      textKey: 'ProName'
+    });
+    expect(PURCHASES_WAVE1_LOOKUP_TABLE.SafeAccounId).toEqual({
+      field: 'SafeAccounId',
+      labelAr: 'الخزينة',
+      scope: 'header',
+      droModel: 'MonyAccount',
+      valueKey: 'AcID',
+      textKey: 'AcName'
+    });
     expect(PURCHASES_WAVE1_LOOKUP_TABLE.ProductID).toEqual({
       field: 'ProductID',
       labelAr: 'الأصناف',
@@ -145,8 +179,6 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
       valueKey: 'ProID',
       textKey: 'ProName'
     });
-    expect((PURCHASES_WAVE1_LOOKUP_TABLE as Record<string, unknown>)['ProjectID']).toBeUndefined();
-    expect((PURCHASES_WAVE1_LOOKUP_TABLE as Record<string, unknown>)['SafeAccounId']).toBeUndefined();
   });
 
   it('resolves unique exact/near-exact normalized matches automatically even alongside partial siblings', async () => {
@@ -157,8 +189,9 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
         StoreID: '  مخزن\u200F خامات  ', // near-exact with bidi char & whitespace
         CurrancyID: 'egp', // near-exact case-insensitive
         POSetting: 'مشتريات مباشره', // near-exact ة -> ه
-        ProjectID: 'السحاب', // Wave 2 -> ignored by Wave 1 resolver
-        SafeAccounId: 'الخزينة الرئيسية' // Wave 2 -> ignored
+        ProjectID: 'مشروع العاصمة الإدارية', // Wave 2 resolved
+        SafeAccounId: 'الخزينة الرئيسية', // Wave 2 resolved
+        CostCenterID: 'مركز 1' // non-wave field -> ignored
       },
       rows: [
         { 'اسم المنتج': 'سن', 'الكمية': 10 },
@@ -168,14 +201,18 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
 
     expect(res.readyToApply).toBeTrue();
     expect(res.blockingIssues).toEqual([]);
-    expect(res.ignoredNonWave1Fields).toEqual(['ProjectID', 'SafeAccounId']);
+    expect(res.ignoredNonWave1Fields).toEqual(['CostCenterID']);
     expect(res.headerResolutions.SupplierID?.resolvedId).toBe(3218);
     expect(res.headerResolutions.StoreID?.resolvedId).toBe(1047);
     expect(res.headerResolutions.CurrancyID?.resolvedId).toBe(1);
     expect(res.headerResolutions.POSetting?.resolvedId).toBe(15);
+    expect(res.headerResolutions.ProjectID?.droModel).toBe('ProductNonInventory');
+    expect(res.headerResolutions.ProjectID?.resolvedId).toBe(101);
+    expect(res.headerResolutions.SafeAccounId?.droModel).toBe('MonyAccount');
+    expect(res.headerResolutions.SafeAccounId?.resolvedId).toBe(7619);
     expect(res.rowResolutions[0].resolvedId).toBe(36962);
     expect(res.rowResolutions[1].resolvedId).toBe(36963);
-    expect(res.metricsSummary.resolved).toBe(6);
+    expect(res.metricsSummary.resolved).toBe(8);
     expect(res.metricsSummary.itemAmbiguityRate).toBe(0);
   });
 
@@ -485,6 +522,52 @@ describe('PurchasesEntityResolverService & Wave 1 Matching (Step 2)', () => {
     // Header scope does not strip "صنف" arbitrarily
     const headerOutcome = matchLookupOptionsStrict('صنف سن', productOptions, { scope: 'header' });
     expect(headerOutcome.status).toBe('not_found');
+  });
+
+  describe('Wave 2: ProjectID & SafeAccounId Field Resolution', () => {
+    it('resolves ProjectID and SafeAccounId via Arabic aliases and canonical keys', async () => {
+      const res = await resolver.resolveWave1({
+        fields: {
+          المشروع: 'مشروع العلمين الجديدة',
+          الخزينة: 'خزينة الفرع'
+        }
+      });
+
+      expect(res.readyToApply).toBeTrue();
+      expect(res.blockingIssues).toEqual([]);
+      expect(res.headerResolutions.ProjectID?.droModel).toBe('ProductNonInventory');
+      expect(res.headerResolutions.ProjectID?.resolvedId).toBe(102);
+      expect(res.headerResolutions.ProjectID?.resolvedLabel).toBe('مشروع العلمين الجديدة');
+      expect(res.headerResolutions.SafeAccounId?.droModel).toBe('MonyAccount');
+      expect(res.headerResolutions.SafeAccounId?.resolvedId).toBe(7620);
+      expect(res.headerResolutions.SafeAccounId?.resolvedLabel).toBe('خزينة الفرع');
+    });
+
+    it('detects ambiguity for ProjectID when term matches multiple projects (e.g. "مشروع")', async () => {
+      const res = await resolver.resolveWave1({
+        fields: {
+          ProjectID: 'مشروع'
+        }
+      });
+
+      expect(res.readyToApply).toBeFalse();
+      expect(res.headerResolutions.ProjectID?.status).toBe('ambiguous');
+      expect(res.headerResolutions.ProjectID?.candidates.length).toBe(3);
+      expect(res.blockingIssues.some((i) => i.fieldKey === 'ProjectID')).toBeTrue();
+    });
+
+    it('detects ambiguity for SafeAccounId when term matches multiple safes (e.g. "خزينة")', async () => {
+      const res = await resolver.resolveWave1({
+        fields: {
+          SafeAccounId: 'خزينة'
+        }
+      });
+
+      expect(res.readyToApply).toBeFalse();
+      expect(res.headerResolutions.SafeAccounId?.status).toBe('ambiguous');
+      expect(res.headerResolutions.SafeAccounId?.candidates.length).toBe(3);
+      expect(res.blockingIssues.some((i) => i.fieldKey === 'SafeAccounId')).toBeTrue();
+    });
   });
 });
 

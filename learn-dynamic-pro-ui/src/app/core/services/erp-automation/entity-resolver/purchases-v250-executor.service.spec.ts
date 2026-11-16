@@ -36,6 +36,14 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
       { id: 5, label: 'المخزن الرئيسي' },
       { id: 6, label: 'مخزن الخامات' }
     ],
+    ProductNonInventory: [
+      { id: 50, label: 'مشروع العاصمة' },
+      { id: 51, label: 'مشروع الساحل' }
+    ],
+    MonyAccount: [
+      { id: 70, label: 'خزينة رئيسية' },
+      { id: 71, label: 'خزينة فرعية' }
+    ],
     Product: [
       { id: 101, label: 'حجر سن 1' },
       { id: 202, label: 'حديد تسليح 16مم' }
@@ -104,6 +112,8 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
           CurrancyID: 2,
           SupplierID: 15,
           StoreID: 5,
+          ProjectID: 50,
+          SafeAccounId: 70,
           ExchangePrice: 48.5,
           Total: 4000
         },
@@ -216,7 +226,7 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
     expect(mockBridge.addTableRow).not.toHaveBeenCalled();
   });
 
-  for (const failedHeader of ['POSetting', 'CurrancyID', 'SupplierID', 'StoreID'] as const) {
+  for (const failedHeader of ['POSetting', 'CurrancyID', 'SupplierID', 'StoreID', 'ProjectID', 'SafeAccounId'] as const) {
     it(`halts immediately when selectLookup('${failedHeader}') returns ok: false`, async () => {
       mockBridge.selectLookup.and.callFake(async (fieldKey: string, id: string | number) => {
         callLog.push(`selectLookup:${fieldKey}:${id}`);
@@ -231,7 +241,9 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
           POSetting: 'أمر شراء مباشر',
           CurrancyID: 'دولار',
           SupplierID: 'مؤسسة النصر',
-          StoreID: 'المخزن الرئيسي'
+          StoreID: 'المخزن الرئيسي',
+          ProjectID: 'مشروع العاصمة',
+          SafeAccounId: 'خزينة رئيسية'
         },
         rows: [{ Product: 'حجر سن 1', Qty: 10 }],
         isEditCurrent: false,
@@ -244,7 +256,7 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
       expect(res.failure?.reason).toBe(`${failedHeader} rejected`);
       expect(mockBridge.addTableRow).not.toHaveBeenCalled();
 
-      const headerOrder = ['POSetting', 'CurrancyID', 'SupplierID', 'StoreID'];
+      const headerOrder = ['POSetting', 'CurrancyID', 'SupplierID', 'StoreID', 'ProjectID', 'SafeAccounId'];
       const failIdx = headerOrder.indexOf(failedHeader);
       for (const laterHeader of headerOrder.slice(failIdx + 1)) {
         expect(callLog.some((c) => c.startsWith(`selectLookup:${laterHeader}`))).toBeFalse();
@@ -638,7 +650,7 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
       expect(result.preview?.warnings[0]).toContain('8000');
     });
 
-    it('surfaces ignored non-Wave-1 fields (ProjectID / المشروعات) and unextracted cash payment clauses in preview.ignoredItems while excluding PODate and ExchangePrice', async () => {
+    it('surfaces ignored non-Wave fields (CostCenterID / Discount) in preview.ignoredItems while excluding PODate and resolved Wave 1 & 2 fields', async () => {
       mockBridge.getActiveFormContext.and.returnValue({
         isOpen: true,
         screenName: 'Purchases',
@@ -648,6 +660,8 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
           CurrancyID: 1,
           SupplierID: 15,
           StoreID: 5,
+          ProjectID: 50,
+          SafeAccounId: 70,
           Total: 4000
         },
         rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 400, Total: 4000 }]
@@ -663,21 +677,66 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
           CurrancyID: 'مصري',
           SupplierID: 'مؤسسة النصر',
           StoreID: 'المخزن الرئيسي',
-          المشروعات: 'السحاب',
-          ProjectID: 'السحاب'
+          ProjectID: 'مشروع العاصمة',
+          SafeAccounId: 'خزينة رئيسية',
+          CostCenterID: 'مركز 1'
         },
         rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 400 }],
-        userQuery: 'سجل فاتورة مشتريات من النصر لمشروع السحاب وسدد الإجمالي بالكامل نقداً',
+        userQuery: 'سجل فاتورة مشتريات من النصر لمشروع العاصمة من الخزينة الرئيسية لمركز تكلفة الإدارة مع خصم 5%',
         prepareFormFn: async () => ({ status: 'ready' }),
         isEditCurrent: false
       });
 
       expect(result.status).toBe('ready_for_preview');
+      expect(result.preview?.actualHeaders.some((h) => h.field === 'ProjectID' && h.plannedId === 50)).toBeTrue();
+      expect(result.preview?.actualHeaders.some((h) => h.field === 'SafeAccounId' && h.plannedId === 70)).toBeTrue();
       const ignored = result.preview?.ignoredItems || [];
-      expect(ignored.length).toBe(2);
-      expect(ignored.some((i) => i.labelAr === 'المشروع' && i.value === 'السحاب')).toBeTrue();
-      expect(ignored.some((i) => i.labelAr.includes('السداد') && (i.value || '').includes('نقد'))).toBeTrue();
+      expect(ignored.some((i) => i.labelAr === 'مركز التكلفة')).toBeTrue();
+      expect(ignored.some((i) => i.labelAr === 'الخصم')).toBeTrue();
+      expect(ignored.some((i) => i.labelAr === 'المشروع')).toBeFalse();
+      expect(ignored.some((i) => i.labelAr.includes('الخزينة'))).toBeFalse();
       expect(ignored.some((i) => i.key === 'PODate')).toBeFalse();
+    });
+
+    it('executes full 6-header sequence in strict safe order: POSetting -> CurrancyID -> SupplierID -> StoreID -> ProjectID -> SafeAccounId', async () => {
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'دولار',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي',
+          المشروع: 'مشروع العاصمة',
+          الخزينة: 'خزينة رئيسية'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10 }],
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(result.appliedHeaders?.map((h) => h.field)).toEqual([
+        'POSetting',
+        'CurrancyID',
+        'SupplierID',
+        'StoreID',
+        'ProjectID',
+        'SafeAccounId'
+      ]);
+
+      const poIdx = callLog.indexOf('selectLookup:POSetting:1');
+      const currIdx = callLog.indexOf('selectLookup:CurrancyID:2');
+      const supIdx = callLog.indexOf('selectLookup:SupplierID:15');
+      const storeIdx = callLog.indexOf('selectLookup:StoreID:5');
+      const proIdx = callLog.indexOf('selectLookup:ProjectID:50');
+      const safeIdx = callLog.indexOf('selectLookup:SafeAccounId:70');
+      const rowIdx = callLog.indexOf('addTableRow:101:10');
+
+      expect(poIdx).toBeLessThan(currIdx);
+      expect(currIdx).toBeLessThan(supIdx);
+      expect(supIdx).toBeLessThan(storeIdx);
+      expect(storeIdx).toBeLessThan(proIdx);
+      expect(proIdx).toBeLessThan(safeIdx);
+      expect(safeIdx).toBeLessThan(rowIdx);
     });
   });
 });
