@@ -1341,6 +1341,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     const execResult = await this.purchasesV250Executor.execute({
       fields: msg.formFillData.fields,
       rows: msg.formFillData.rows,
+      paidAmount: msg.formFillData.paid_amount,
+      paidCash: msg.formFillData.paid_cash,
       schema: schemas,
       isEditCurrent,
       userQuery: msg.relatedUserQuery,

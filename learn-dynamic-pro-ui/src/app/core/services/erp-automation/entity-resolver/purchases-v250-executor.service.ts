@@ -79,6 +79,12 @@ export interface PurchasesV250IgnoredItem {
   reasonAr: string;
 }
 
+export interface PurchasesV250PaymentSummary {
+  paidAmount: number;
+  remainingAmount?: number;
+  source: 'explicit_amount' | 'cash_full' | 'none';
+}
+
 export interface PurchasesV250PreviewState {
   mode: 'new' | 'edit_current';
   isSavedOpenEdit: boolean;
@@ -93,6 +99,7 @@ export interface PurchasesV250PreviewState {
   actualTotal?: number;
   plannedOrderTotal?: number;
   actualOrderTotal?: number;
+  paymentSummary?: PurchasesV250PaymentSummary;
   exchangeRateInfo?: PurchasesV250ExchangeRateInfo;
   warnings: string[];
   ignoredItems?: PurchasesV250IgnoredItem[];
@@ -134,6 +141,8 @@ export interface PurchasesV250PrepareFormResult {
 export interface PurchasesV250ExecuteParams {
   fields?: Record<string, unknown>;
   rows?: Array<Record<string, unknown>>;
+  paidAmount?: number | null;
+  paidCash?: boolean;
   schema?: FormFieldSchema[];
   isEditCurrent: boolean;
   userQuery?: string;
@@ -282,11 +291,16 @@ export function collectPurchasesV250IgnoredItems(
   fields?: Record<string, unknown>,
   ignoredNonWave1Fields?: string[],
   userQuery?: string,
-  appliedHeaders?: PurchasesV250AppliedHeaderEntry[]
+  appliedHeaders?: PurchasesV250AppliedHeaderEntry[],
+  paymentApplied?: boolean
 ): PurchasesV250IgnoredItem[] {
   const items: PurchasesV250IgnoredItem[] = [];
   const seenGroups = new Set<string>();
   const seenKeys = new Set<string>();
+
+  if (paymentApplied) {
+    seenGroups.add('payment');
+  }
 
   if (appliedHeaders && appliedHeaders.length > 0) {
     for (const h of appliedHeaders) {
@@ -625,6 +639,95 @@ export class PurchasesV250ExecutorService {
       });
     }
 
+    // 8b. Wave 3: Apply POPaidCurrancy AFTER addTableRow so host TotalOrder/TotalCurrancy is known
+    const explicitPaid = parseFiniteNumeric(params.paidAmount);
+    if (explicitPaid != null && explicitPaid < 0) {
+      return this.buildPartialFailureResult({
+        failedStep: 'setFieldValue:POPaidCurrancy',
+        failedStepLabelAr: 'المبلغ المدفوع',
+        reason: `المبلغ المدفوع غير صالح (${explicitPaid}).`,
+        completedSteps,
+        appliedHeaders,
+        appliedRows,
+        resolution,
+        isEditCurrent: params.isEditCurrent,
+        initialFormMode
+      });
+    }
+
+    let effectivePaid = 0;
+    let paymentSource: PurchasesV250PaymentSummary['source'] = 'none';
+    let cashMissingTotalWarning = false;
+
+    if ((explicitPaid != null && explicitPaid > 0) || params.paidCash === true) {
+      const postRowCtx = this.bridge.getActiveFormContext(true);
+      const postRowObj =
+        postRowCtx?.dataObject && typeof postRowCtx.dataObject === 'object' ? postRowCtx.dataObject : {};
+      const hostDocTotal = parseFiniteNumeric(readCaseInsensitiveKey(postRowObj, HOST_DOC_CURRENCY_TOTAL_KEYS).value);
+      const hostLocalTotal = parseFiniteNumeric(readCaseInsensitiveKey(postRowObj, HOST_LOCAL_ORDER_TOTAL_KEYS).value);
+      const plannedRowsTotal =
+        appliedRows.length > 0 && appliedRows.every((r) => r.Price != null && Number.isFinite(r.Price))
+          ? Number(appliedRows.reduce((acc, r) => acc + r.Qty * (r.Price as number), 0).toFixed(4))
+          : undefined;
+      const knownOrderTotal = hostDocTotal ?? hostLocalTotal ?? plannedRowsTotal;
+
+      if (explicitPaid != null && explicitPaid > 0) {
+        if (knownOrderTotal != null && explicitPaid > knownOrderTotal + 0.0001) {
+          return this.buildPartialFailureResult({
+            failedStep: 'setFieldValue:POPaidCurrancy',
+            failedStepLabelAr: 'المبلغ المدفوع',
+            reason: `المبلغ المدفوع (${explicitPaid}) أكبر من إجمالي الفاتورة (${knownOrderTotal}).`,
+            completedSteps,
+            appliedHeaders,
+            appliedRows,
+            resolution,
+            isEditCurrent: params.isEditCurrent,
+            initialFormMode
+          });
+        }
+        effectivePaid = explicitPaid;
+        paymentSource = 'explicit_amount';
+      } else if (params.paidCash === true) {
+        if (knownOrderTotal != null && knownOrderTotal > 0) {
+          effectivePaid = knownOrderTotal;
+          paymentSource = 'cash_full';
+        } else {
+          cashMissingTotalWarning = true;
+        }
+      }
+
+      if (effectivePaid > 0) {
+        if (typeof this.bridge.setFieldValue !== 'function') {
+          return this.buildPartialFailureResult({
+            failedStep: 'setFieldValue:POPaidCurrancy',
+            failedStepLabelAr: 'المبلغ المدفوع',
+            reason: 'setFieldValue غير متاح لتعيين POPaidCurrancy.',
+            completedSteps,
+            appliedHeaders,
+            appliedRows,
+            resolution,
+            isEditCurrent: params.isEditCurrent,
+            initialFormMode
+          });
+        }
+        const paidRes = await this.bridge.setFieldValue('POPaidCurrancy', effectivePaid);
+        if (paidRes.ok !== true) {
+          return this.buildPartialFailureResult({
+            failedStep: 'setFieldValue:POPaidCurrancy',
+            failedStepLabelAr: 'المبلغ المدفوع',
+            reason: paidRes.reason,
+            completedSteps,
+            appliedHeaders,
+            appliedRows,
+            resolution,
+            isEditCurrent: params.isEditCurrent,
+            initialFormMode
+          });
+        }
+        completedSteps.push('setFieldValue:POPaidCurrancy');
+      }
+    }
+
     // 9. Read ACTUAL host form context & table rows to construct verified Preview
     const preview = await this.buildActualPreview({
       fields: params.fields,
@@ -636,7 +739,10 @@ export class PurchasesV250ExecutorService {
       preEditCtx,
       appliedHeaders,
       appliedRows,
-      qtyDefaultedWarning
+      qtyDefaultedWarning,
+      effectivePaid,
+      paymentSource,
+      cashMissingTotalWarning
     });
 
     this.telemetry?.log('FILL', 'Purchases v2.5.0 execution completed and actual preview built', {
@@ -737,6 +843,9 @@ export class PurchasesV250ExecutorService {
     appliedHeaders: PurchasesV250AppliedHeaderEntry[];
     appliedRows: PurchasesV250PlannedRow[];
     qtyDefaultedWarning: boolean;
+    effectivePaid: number;
+    paymentSource: PurchasesV250PaymentSummary['source'];
+    cashMissingTotalWarning: boolean;
   }): Promise<PurchasesV250PreviewState> {
     const actualCtx = this.bridge.getActiveFormContext(true);
     const actualRows = await this.bridge.getTableRows();
@@ -928,11 +1037,33 @@ export class PurchasesV250ExecutorService {
       ]);
     }
 
+    const actualPaid = parseFiniteNumeric(readCaseInsensitiveKey(actualDataObject, ['POPaidCurrancy', 'POPaid']).value);
+    const actualRemind = parseFiniteNumeric(readCaseInsensitiveKey(actualDataObject, ['RemindCurrancy']).value);
+    const hasSafeHeader = args.appliedHeaders.some((h) => h.field === 'SafeAccounId');
+    const resolvedPaidDisplay = actualPaid ?? args.effectivePaid;
+
+    if (args.cashMissingTotalWarning) {
+      warnings.push('⚠️ ذُكر الدفع نقداً لكن تعذر قراءة إجمالي الفاتورة لتحديد المبلغ المدفوع؛ ستُحفظ آجلة ما لم يُحدد المبلغ.');
+    } else if (hasSafeHeader && resolvedPaidDisplay === 0) {
+      warnings.push('⚠️ تم تحديد الخزينة لكن المبلغ المدفوع 0 — ستُحفظ الفاتورة آجلة.');
+    }
+
+    const paymentSummary: PurchasesV250PaymentSummary | undefined =
+      args.effectivePaid > 0 || args.paymentSource !== 'none' || actualPaid != null || hasSafeHeader
+        ? {
+            paidAmount: resolvedPaidDisplay,
+            remainingAmount:
+              actualRemind ?? (actualTotal != null ? Number((actualTotal - resolvedPaidDisplay).toFixed(2)) : undefined),
+            source: args.paymentSource
+          }
+        : undefined;
+
     const ignoredItems = collectPurchasesV250IgnoredItems(
       args.fields,
       args.ignoredNonWave1Fields,
       args.userQuery,
-      args.appliedHeaders
+      args.appliedHeaders,
+      args.effectivePaid > 0 || args.paymentSource !== 'none'
     );
 
     return {
@@ -949,6 +1080,7 @@ export class PurchasesV250ExecutorService {
       actualTotal,
       plannedOrderTotal,
       actualOrderTotal,
+      ...(paymentSummary ? { paymentSummary } : {}),
       exchangeRateInfo,
       warnings,
       ...(ignoredItems.length > 0 ? { ignoredItems } : {})

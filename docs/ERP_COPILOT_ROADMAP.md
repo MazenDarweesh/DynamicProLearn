@@ -37,7 +37,7 @@
 ---
 
 ## 2. بنود إغلاق معلّقة (قبل Wave 3)
-- [ ] Commit تحسينات الأداء في `DynamicProLearn` (`angular.json` بدون `zone.js` مكرر، إزالة `Router`، `OnPush` في `CopilotHeaderComponent`، وتحديث `copilot-chat-v250-resolver.component.spec.ts`) بعد موافقتك.
+- [x] Commit تحسينات الأداء في `DynamicProLearn` (`3db48ba`: `angular.json` بدون `zone.js` مكرر، إزالة `Router`، `OnPush` في `CopilotHeaderComponent`، وتحديث `copilot-chat-v250-resolver.component.spec.ts`).
 - [ ] التأكد أن الـ 13 فشلاً في مكونات LMS (`NullInjectorError: HttpClient`) موجودة قبل Wave 2، بتشغيلها على commit سابق، وتسجيلها كدَين معروف.
 - [ ] تحديد موعد الـ `git push` (بأمر صريح فقط).
 
@@ -46,27 +46,27 @@
 ## 3. Wave 3: السداد النقدي (`POPaidCurrancy`)
 
 ### 3.0 اكتشاف (بدون كود)
-- [ ] هل يستخرج الـ extractor مبلغاً مدفوعاً أصلاً؟ (في لوج `#239` كان `"والمدفوع 200"` في النص ولم يُستخرج).
-- [ ] هل `POPaidCurrancy` يُحسب أو يُصفَّر عند إضافة الأصناف؟ (يُحدَّد من الكود؛ يُملأ بعد الأصناف إن كان الإجمالي يعتمد عليها).
-- [ ] تأكيد أن `RemindCurrancy` يُعاد حسابه تلقائياً بعد تعيين `POPaidCurrancy` (مؤكد من `PurchaseRepository.cs` + `calculateSum()`).
+- [x] هل يستخرج الـ extractor مبلغاً مدفوعاً أصلاً؟ (`POPaidCurrancy` غير موجود في `fields_ctx_json` لأن `collectFormSchema` يمسح `<ng-select>` فقط؛ أُضيف `paid_amount` + `paid_cash` على مستوى أعلى في `erp_action_extractor.py`).
+- [x] هل `POPaidCurrancy` يُحسب أو يُصفَّر عند إضافة الأصناف؟ (لا يُصفّر؛ يُملأ بعد `addTableRow` حتى يكون `TotalOrder` محسوباً).
+- [x] تأكيد أن `RemindCurrancy` يُعاد حسابه تلقائياً بعد تعيين `POPaidCurrancy` (مؤكد من `PurchaseRepository.cs` + `calculateSum()` في `purchases.component.ts`).
 
-### 3.1 قواعد القرار (تُعتمد قبل الكود)
-- [ ] مبلغ صريح (`"والمدفوع 200"`): `POPaidCurrancy = 200`.
-- [ ] `"نقداً"` أو `"كاش"` بدون مبلغ: `POPaidCurrancy = إجمالي الفاتورة`، ويظهر في المعاينة بوضوح.
-- [ ] لا ذكر للدفع: يبقى `0` وتُحفظ آجلة، ويُملأ `SafeAccounId` فقط إن ذُكرت خزينة.
-- [ ] المدفوع أكبر من الإجمالي: يتوقف التنفيذ برسالة واضحة، ولا يُحفظ.
-- [ ] خزينة محددة والمدفوع `0`: تحذير في المعاينة (`"ستُحفظ آجلة"`)، بدون منع.
+### 3.1 قواعد القرار (معتمدة)
+- [x] مبلغ صريح (`"والمدفوع 200"`): `POPaidCurrancy = 200`.
+- [x] **القاعدة 2: نقداً بلا مبلغ = `POPaidCurrancy` بإجمالي الفاتورة (سند صرف تلقائي). قرار: مازن، 16/11/2026.** (تُعرض في المعاينة بعبارة واضحة: `سيُسجَّل مدفوعاً بالكامل: X`).
+- [x] لا ذكر للدفع: يبقى `0` وتُحفظ آجلة، ويُملأ `SafeAccounId` فقط إن ذُكرت خزينة.
+- [x] المدفوع أكبر من الإجمالي: يتوقف التنفيذ برسالة واضحة (`partial_failure`)، ولا يُحفظ.
+- [x] خزينة محددة والمدفوع `0`: تحذير في المعاينة (`"تم تحديد الخزينة لكن المبلغ المدفوع 0 — ستُحفظ الفاتورة آجلة."`)، بدون منع.
 
-### 3.2 المكونات المتأثرة (تقديرية)
-- [ ] Backend (`LMS_CO_Pilot`): مخطط الاستخراج (حقل المبلغ المدفوع + علامة الدفع النقدي)، واختبارات `pytest` للاستخراج.
-- [ ] Frontend (`DynamicProLearn`): `registry`، ثم `executor` بعد إضافة الأصناف، ثم المعاينة.
+### 3.2 المكونات المتأثرة
+- [x] Backend (`LMS_CO_Pilot`): `src/core/prompts.py` + `src/services/cognitive_search/search/erp_action_extractor.py` (`paid_amount` + `paid_cash`) + `tests/unit/test_extraction_prompts.py`.
+- [x] Frontend (`DynamicProLearn`): `copilot.models.ts` + `copilot-chat.component.{ts,html}` + `purchases-v250-executor.service.{ts,spec.ts}`.
 
 ### 3.3 بوابات القبول
-- [ ] `pytest`: كل الاختبارات تمر، مع حالات جديدة: مبلغ صريح / نقداً بلا مبلغ / بلا ذكر / نص غامض.
-- [ ] Karma (ERP Copilot): العدد الحالي `104` أو أكثر، والكل ينجح، مع حالات: مدفوع جزئي / كامل / أكبر من الإجمالي / خزينة بلا مدفوع.
-- [ ] `tsc` للإعدادين: `tsconfig.element.json` و`tsconfig.spec.json` -> Exit `0`.
-- [ ] `npm run build:element` ينجح، وحجم الحزمة لا يتجاوز نحو `800 KB` (الحالي `793.4 KB`).
-- [ ] اختبار حي بسيناريوهات (بإذنك): (أ) مبلغ جزئي، (ب) نقداً بلا مبلغ، (ج) آجل بلا خزينة، (د) خزينة بلا مدفوع.
+- [x] `pytest`: `22 passed` (تشمل: مبلغ صريح / نقداً بلا مبلغ / بلا ذكر / غير صالح).
+- [x] Karma (ERP Copilot): `108 / 108 SUCCESS` (تشمل: مدفوع جزئي / نقداً كامل / أكبر من الإجمالي / خزينة بلا مدفوع).
+- [x] `tsc` للإعدادين: `tsconfig.element.json` و`tsconfig.spec.json` -> Exit `0`.
+- [x] `npm run build:element` ينجح، وحجم الحزمة `797.7 KB` (`< 800 KB`).
+- [ ] اختبار حي بسيناريوهات (بإذنك): (أ) جزئي، (ب) نقداً بلا مبلغ، (ج) آجل بلا خزينة، (د) خزينة بلا مدفوع، (هـ) `"دفعت 200 جنيه"` الغامض، والتحقق في اللوج أن `RemindCurrancy = Total - paid` وأن `calculateSum()` تحدّث فعلاً بعد `setFieldValue`.
 
 ---
 
@@ -115,4 +115,4 @@
 ## 7. ديون معروفة (تُراجع كل Wave)
 - [ ] 13 فشلاً في اختبارات مكونات LMS عامة (`NullInjectorError: HttpClient`)
 - [ ] أي fallback في Host Bridge يخالف الـ registry (يُجرد دورياً)
-- [ ] مراجعة حجم الحزمة (الهدف: عدم تجاوز `800 KB`، الحالي `793.4 KB`)
+- [ ] مراجعة حجم الحزمة قبل Wave 4 (الهدف: عدم تجاوز `800 KB`، الحالي `797.7 KB` — هامش `2.3 KB` فقط)

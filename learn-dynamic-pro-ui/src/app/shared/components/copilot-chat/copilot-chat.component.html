@@ -508,6 +508,15 @@
                           | TotalOrder (محلي): <strong>{{ msg.v250Preview.actualOrderTotal }}</strong>
                         </span>
                       </div>
+                      <div *ngIf="msg.v250Preview.paymentSummary" class="v250-preview-payment">
+                        💵 المدفوع: <strong>{{ msg.v250Preview.paymentSummary.paidAmount }}</strong>
+                        <span *ngIf="msg.v250Preview.paymentSummary.source === 'cash_full'" class="v250-cash-full-note">
+                          (سيُسجَّل مدفوعاً بالكامل: {{ msg.v250Preview.paymentSummary.paidAmount }})
+                        </span>
+                        <span *ngIf="msg.v250Preview.paymentSummary.remainingAmount != null">
+                          | المتبقي: <strong>{{ msg.v250Preview.paymentSummary.remainingAmount }}</strong>
+                        </span>
+                      </div>
                     </div>
 
                     <div *ngIf="msg.v250Preview.ignoredItems && msg.v250Preview.ignoredItems.length > 0" class="v250-preview-ignored">

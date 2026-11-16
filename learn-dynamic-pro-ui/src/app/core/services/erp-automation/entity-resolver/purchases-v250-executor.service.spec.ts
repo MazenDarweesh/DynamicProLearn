@@ -739,5 +739,167 @@ describe('PurchasesV250ExecutorService (Step 3 Execution, Guards & Actual Previe
       expect(safeIdx).toBeLessThan(rowIdx);
     });
   });
+
+  describe('Wave 3: POPaidCurrancy Payment & Preview Warnings', () => {
+    it('sets POPaidCurrancy AFTER addTableRow for partial payment (200 of 500) and populates paymentSummary', async () => {
+      mockBridge.getTableRows.and.resolveTo([{ ProductID: 101, Qty: 10, CostCurrancy: 50, Total: 500 }]);
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-16T00:00:00Z',
+          POSetting: 1,
+          CurrancyID: 1,
+          SupplierID: 15,
+          StoreID: 5,
+          SafeAccounId: 70,
+          TotalCurrancy: 500,
+          Total: 500
+        },
+        rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 50, Total: 500 }]
+      });
+      mockBridge.setFieldValue.and.callFake(async (key: string, value: unknown) => {
+        callLog.push(`setFieldValue:${key}:${value}`);
+        return { ok: true, key, value };
+      });
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'مصري',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي',
+          SafeAccounId: 'خزينة رئيسية'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 50 }],
+        paidAmount: 200,
+        paidCash: false,
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      const rowIdx = callLog.indexOf('addTableRow:101:10');
+      const paidIdx = callLog.indexOf('setFieldValue:POPaidCurrancy:200');
+      expect(paidIdx).toBeGreaterThan(rowIdx);
+      expect(result.preview?.paymentSummary?.paidAmount).toBe(200);
+      expect(result.preview?.paymentSummary?.remainingAmount).toBe(300);
+      expect(result.preview?.warnings).toEqual([]);
+    });
+
+    it('fills POPaidCurrancy with TotalOrder when paidCash=true without explicit amount', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-16T00:00:00Z',
+          POSetting: 1,
+          CurrancyID: 1,
+          SupplierID: 15,
+          StoreID: 5,
+          SafeAccounId: 70,
+          TotalCurrancy: 500,
+          Total: 500
+        },
+        rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 50, Total: 500 }]
+      });
+      mockBridge.setFieldValue.and.callFake(async (key: string, value: unknown) => {
+        callLog.push(`setFieldValue:${key}:${value}`);
+        return { ok: true, key, value };
+      });
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'مصري',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي',
+          SafeAccounId: 'خزينة رئيسية'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 50 }],
+        paidAmount: null,
+        paidCash: true,
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(callLog).toContain('setFieldValue:POPaidCurrancy:500');
+      expect(result.preview?.paymentSummary?.paidAmount).toBe(500);
+      expect(result.preview?.paymentSummary?.remainingAmount).toBe(0);
+      expect(result.preview?.paymentSummary?.source).toBe('cash_full');
+    });
+
+    it('halts execution with partial_failure when paidAmount exceeds invoice total', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-16T00:00:00Z',
+          TotalCurrancy: 500,
+          Total: 500
+        },
+        rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 50, Total: 500 }]
+      });
+      mockBridge.setFieldValue.and.callFake(async (key: string, value: unknown) => {
+        callLog.push(`setFieldValue:${key}:${value}`);
+        return { ok: true, key, value };
+      });
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'مصري',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 50 }],
+        paidAmount: 700,
+        paidCash: false,
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('partial_failure');
+      expect(result.failure?.failedStep).toBe('setFieldValue:POPaidCurrancy');
+      expect(result.failure?.reason).toContain('أكبر من إجمالي الفاتورة');
+      expect(callLog.some((c) => c.startsWith('setFieldValue:POPaidCurrancy'))).toBeFalse();
+    });
+
+    it('warns in preview when SafeAccounId is selected with paid=0 (saved as credit)', async () => {
+      mockBridge.getActiveFormContext.and.returnValue({
+        isOpen: true,
+        screenName: 'Purchases',
+        dataObject: {
+          PODate: '2026-11-16T00:00:00Z',
+          POSetting: 1,
+          CurrancyID: 1,
+          SupplierID: 15,
+          StoreID: 5,
+          SafeAccounId: 70,
+          TotalCurrancy: 500,
+          Total: 500
+        },
+        rows: [{ ProductID: 101, Qty: 10, CostCurrancy: 50, Total: 500 }]
+      });
+
+      const result = await service.execute({
+        fields: {
+          POSetting: 'أمر شراء مباشر',
+          CurrancyID: 'مصري',
+          SupplierID: 'مؤسسة النصر',
+          StoreID: 'المخزن الرئيسي',
+          SafeAccounId: 'خزينة رئيسية'
+        },
+        rows: [{ Product: 'حجر سن 1', Qty: 10, Price: 50 }],
+        prepareFormFn: async () => ({ status: 'ready' }),
+        isEditCurrent: false
+      });
+
+      expect(result.status).toBe('ready_for_preview');
+      expect(result.preview?.paymentSummary?.paidAmount).toBe(0);
+      expect(result.preview?.warnings.some((w) => w.includes('تم تحديد الخزينة لكن المبلغ المدفوع 0'))).toBeTrue();
+    });
+  });
 });
 
