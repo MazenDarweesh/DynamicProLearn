@@ -384,6 +384,9 @@ npm start
 - [x] Autonomous multi-row table grid creation and dynamic `$TOTAL` binding
 - [x] Sequential multi-document batch stepper and autonomous Turbo execution
 - [x] Context-aware ERP screen routing with ambiguity resolution chips
+- [x] Purchases v2.5.0 strict Entity Resolver & Executor (Wave 1 & Wave 2: `ProjectID` / `SafeAccounId` — `104/104` Karma specs)
+- [x] Lean Copilot Element Bundle (`793.4 KB` / `183.59 KB` transfer, no duplicate `zone.js`, `OnPush` header)
+- [ ] Wave 3: Cash Payment (`POPaidCurrancy`) & remaining Purchases fields ([ERP Copilot Roadmap](docs/ERP_COPILOT_ROADMAP.md))
 - [ ] Multi-tenant database schema isolation per enterprise client
 
 ---
