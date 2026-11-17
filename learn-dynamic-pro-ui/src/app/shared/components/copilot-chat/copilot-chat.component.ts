@@ -185,6 +185,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   @Input() activeLessonId?: string;
   @Input() lmsPageId?: string;
   @Input() token?: string;
+  @Input() ssoToken?: string;
   @Input() u?: string;
   @Input() p?: string;
   @Input() apiUrl?: string;
@@ -347,6 +348,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     this.u = snap.u;
     this.p = snap.p;
     this.token = snap.token;
+    const hostEl: HTMLElement | undefined = this.elRef?.nativeElement;
+    const attrSsoToken = hostEl?.getAttribute('sso-token') ?? hostEl?.getAttribute('ssoToken');
+    if (attrSsoToken) this.ssoToken = attrSsoToken;
     if (snap.hideHeader != null) this.hideHeader = snap.hideHeader;
     if (snap.inline != null) this.inline = snap.inline;
   }
@@ -359,6 +363,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       const prevApiUrl = this.apiUrl;
       const prevBackendUrl = this.backendUrl;
       const prevToken = this.token;
+      const prevSsoToken = this.ssoToken;
       const prevU = this.u;
       const prevP = this.p;
 
@@ -368,6 +373,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         this.apiUrl !== prevApiUrl ||
         this.backendUrl !== prevBackendUrl ||
         this.token !== prevToken ||
+        this.ssoToken !== prevSsoToken ||
         this.u !== prevU ||
         this.p !== prevP;
 
@@ -388,7 +394,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       attributeFilter: [
         'api-url', 'apiUrl', 'backend-url', 'backendUrl',
         'erp-key', 'erpKey', 'active-screen-key', 'activeScreenKey', 'active-screen', 'activeScreen',
-        'lms-page-id', 'lmsPageId', 'u', 'p', 'token', 'hide-header', 'inline'
+        'lms-page-id', 'lmsPageId', 'u', 'p', 'token', 'sso-token', 'ssoToken', 'hide-header', 'inline'
       ]
     });
   }
@@ -418,17 +424,19 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       this.isAuthenticating = false;
       this.authError = null;
       this.topFilterBar?.loadFilters(true);
+    } else if (this.ssoToken && !this.authService.isAuthenticated()) {
+      this.performErpLogin(null, null, this.erpKey || null, this.ssoToken);
     } else if (this.u && this.p && !this.authService.isAuthenticated()) {
       this.performErpLogin(this.u, this.p, this.erpKey || null);
     }
   }
 
-  performErpLogin(u: string, p: string, erpKey: string | null) {
+  performErpLogin(u: string | null, p: string | null, erpKey: string | null, ssoToken?: string | null) {
     this.isAuthenticating = true;
     this.authError = null;
     this.cdr.markForCheck();
 
-    this.authService.erpLogin(u, p, erpKey).subscribe({
+    this.authService.erpLogin(u, p, erpKey, ssoToken).subscribe({
       next: (res: any) => {
         this.authService.login(res.token, res.refreshToken);
         if (res.erpRedirect?.lessonId) {
@@ -449,7 +457,9 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   retryAuth() {
-    if (this.u && this.p) {
+    if (this.ssoToken) {
+      this.performErpLogin(null, null, this.erpKey || null, this.ssoToken);
+    } else if (this.u && this.p) {
       this.performErpLogin(this.u, this.p, this.erpKey || null);
     }
   }
@@ -498,10 +508,13 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         this.erpKey = queryErpKey;
       }
 
-      // Check silent ERP handshake credentials (?u=...&p=...)
+      // Check ERP handshake (?ssoToken=... preferred, or legacy ?u=...&p=...)
+      const ssoToken = queryParams.get('ssoToken');
       const u = queryParams.get('u');
       const p = queryParams.get('p');
-      if (u && p && !this.authService.isAuthenticated()) {
+      if (ssoToken && !this.authService.isAuthenticated()) {
+        this.performErpLogin(null, null, queryErpKey || null, ssoToken);
+      } else if (u && p && !this.authService.isAuthenticated()) {
         this.performErpLogin(u, p, queryErpKey || null);
       }
 

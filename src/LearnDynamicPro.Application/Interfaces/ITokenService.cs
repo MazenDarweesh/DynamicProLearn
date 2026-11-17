@@ -5,6 +5,7 @@ namespace LearnDynamicPro.Application.Interfaces;
 
 public interface ITokenService
 {
+    bool IsLegacyErpLoginAllowed { get; }
     string GenerateToken(User user);
     string GenerateRefreshToken(User user);
     ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);

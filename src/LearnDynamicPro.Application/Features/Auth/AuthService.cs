@@ -72,7 +72,10 @@ public class AuthService : IAuthService
         }
         else
         {
-            // Legacy u/p fallback kept temporarily until ERP LMSController migrates to ssoToken
+            if (!_tokenService.IsLegacyErpLoginAllowed)
+                return Result<ErpLoginResponse>.Failure("Legacy ERP login is disabled. Use a signed ssoToken.");
+
+            // Legacy u/p fallback kept temporarily in Development until ERP LMSController migrates to ssoToken
             if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
                 return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
 

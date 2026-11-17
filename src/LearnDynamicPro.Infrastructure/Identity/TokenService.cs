@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using LearnDynamicPro.Application.Interfaces;
 using LearnDynamicPro.Domain.Entities;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 
@@ -11,11 +12,21 @@ namespace LearnDynamicPro.Infrastructure.Identity;
 public class TokenService : ITokenService
 {
     private readonly JwtSettings _jwtSettings;
+    private readonly ErpSsoSettings _erpSsoSettings;
+    private readonly IMemoryCache _memoryCache;
+    private readonly object _jtiLock = new();
 
-    public TokenService(IOptions<JwtSettings> jwtSettings)
+    public TokenService(
+        IOptions<JwtSettings> jwtSettings,
+        IOptions<ErpSsoSettings> erpSsoSettings,
+        IMemoryCache memoryCache)
     {
         _jwtSettings = jwtSettings.Value;
+        _erpSsoSettings = erpSsoSettings.Value;
+        _memoryCache = memoryCache;
     }
+
+    public bool IsLegacyErpLoginAllowed => _erpSsoSettings.AllowLegacyErpLogin;
 
     public string GenerateToken(User user)
     {
@@ -104,7 +115,14 @@ public class TokenService : ITokenService
     public bool ValidateRefreshToken(string refreshToken, out Guid userId)
     {
         userId = Guid.Empty;
-        var principal = ValidateSignedToken(refreshToken, expectedTokenType: "refresh");
+        var principal = ValidateSignedToken(
+            refreshToken,
+            expectedTokenType: "refresh",
+            secret: _jwtSettings.Secret,
+            issuer: _jwtSettings.Issuer,
+            audience: _jwtSettings.Audience,
+            clockSkew: TimeSpan.FromMinutes(1),
+            out _);
         if (principal is null) return false;
 
         var sub = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
@@ -117,8 +135,36 @@ public class TokenService : ITokenService
     public bool ValidateErpSsoToken(string ssoToken, out string username)
     {
         username = string.Empty;
-        var principal = ValidateSignedToken(ssoToken, expectedTokenType: "erp_sso");
-        if (principal is null) return false;
+        if (string.IsNullOrWhiteSpace(_erpSsoSettings.Secret) || _erpSsoSettings.Secret.Length < 32)
+            return false;
+
+        var principal = ValidateSignedToken(
+            ssoToken,
+            expectedTokenType: "erp_sso",
+            secret: _erpSsoSettings.Secret,
+            issuer: _erpSsoSettings.Issuer,
+            audience: _erpSsoSettings.Audience,
+            clockSkew: TimeSpan.FromSeconds(30),
+            out var securityToken);
+        if (principal is null || securityToken is null) return false;
+
+        var maxAllowedExpiry = DateTime.UtcNow.AddMinutes(Math.Max(1, _erpSsoSettings.MaxTokenLifetimeMinutes) + 1);
+        if (securityToken.ValidTo > maxAllowedExpiry)
+            return false;
+
+        var jti = principal.FindFirst(JwtRegisteredClaimNames.Jti)?.Value;
+        if (string.IsNullOrWhiteSpace(jti))
+            return false;
+
+        var cacheKey = $"erp_sso_jti:{jti}";
+        lock (_jtiLock)
+        {
+            if (_memoryCache.TryGetValue(cacheKey, out _))
+                return false;
+
+            var expiryOffset = new DateTimeOffset(DateTime.SpecifyKind(securityToken.ValidTo, DateTimeKind.Utc)).AddMinutes(1);
+            _memoryCache.Set(cacheKey, true, expiryOffset);
+        }
 
         var resolved = principal.FindFirst(JwtRegisteredClaimNames.UniqueName)?.Value
                        ?? principal.FindFirst(ClaimTypes.Name)?.Value
@@ -131,20 +177,29 @@ public class TokenService : ITokenService
         return true;
     }
 
-    private ClaimsPrincipal? ValidateSignedToken(string token, string expectedTokenType)
+    private static ClaimsPrincipal? ValidateSignedToken(
+        string token,
+        string expectedTokenType,
+        string secret,
+        string? issuer,
+        string? audience,
+        TimeSpan clockSkew,
+        out SecurityToken? validatedToken)
     {
-        if (string.IsNullOrWhiteSpace(token)) return null;
+        validatedToken = null;
+        if (string.IsNullOrWhiteSpace(token) || string.IsNullOrWhiteSpace(secret)) return null;
 
         var tokenValidationParameters = new TokenValidationParameters
         {
-            ValidateAudience = !string.IsNullOrEmpty(_jwtSettings.Audience),
-            ValidAudience = _jwtSettings.Audience,
-            ValidateIssuer = !string.IsNullOrEmpty(_jwtSettings.Issuer),
-            ValidIssuer = _jwtSettings.Issuer,
+            ValidateAudience = !string.IsNullOrEmpty(audience),
+            ValidAudience = audience,
+            ValidateIssuer = !string.IsNullOrEmpty(issuer),
+            ValidIssuer = issuer,
             ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSettings.Secret)),
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret)),
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromMinutes(1)
+            RequireExpirationTime = true,
+            ClockSkew = clockSkew
         };
 
         var tokenHandler = new JwtSecurityTokenHandler();
@@ -158,7 +213,10 @@ public class TokenService : ITokenService
             }
 
             var tokenType = principal.FindFirst("token_type")?.Value;
-            return tokenType == expectedTokenType ? principal : null;
+            if (tokenType != expectedTokenType) return null;
+
+            validatedToken = securityToken;
+            return principal;
         }
         catch
         {

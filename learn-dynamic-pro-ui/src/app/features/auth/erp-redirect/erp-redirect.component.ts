@@ -45,9 +45,7 @@ export class ErpRedirectComponent implements OnInit {
   private authService = inject(AuthService);
 
   ngOnInit(): void {
-    const ssoToken =
-      this.route.snapshot.queryParamMap.get('ssoToken') ||
-      this.route.snapshot.queryParamMap.get('token');
+    const ssoToken = this.route.snapshot.queryParamMap.get('ssoToken');
     const u = this.route.snapshot.queryParamMap.get('u');
     const p = this.route.snapshot.queryParamMap.get('p');
     const key = this.route.snapshot.queryParamMap.get('key');

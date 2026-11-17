@@ -22,6 +22,13 @@ services:
       - JwtSettings__Audience=${JWT_AUDIENCE:-DynamicProLearnClient}
       - JwtSettings__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
 
+      # ERP SSO Settings
+      - ErpSso__Secret=${ERP_SSO_SECRET:?ERP_SSO_SECRET is required}
+      - ErpSso__Issuer=${ERP_SSO_ISSUER:-ERPSystemAPI}
+      - ErpSso__Audience=${ERP_SSO_AUDIENCE:-DynamicProLearn}
+      - ErpSso__MaxTokenLifetimeMinutes=${ERP_SSO_MAX_LIFETIME_MINUTES:-5}
+      - ErpSso__AllowLegacyErpLogin=${ALLOW_LEGACY_ERP_LOGIN:-false}
+
       # AI Co-Pilot Settings
       - AiCoPilot__BaseUrl=${AI_BASE_URL:-http://lms_copilot_api:8000}
       - AiCoPilot__ServiceToken=${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required}

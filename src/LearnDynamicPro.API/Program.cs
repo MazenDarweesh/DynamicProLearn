@@ -49,6 +49,7 @@ builder.Services.AddScoped<IApplicationDbContext>(provider => provider.GetRequir
 // Configure JWT Settings
 var jwtSettingsSection = builder.Configuration.GetSection(JwtSettings.SectionName);
 builder.Services.Configure<JwtSettings>(jwtSettingsSection);
+builder.Services.Configure<ErpSsoSettings>(builder.Configuration.GetSection(ErpSsoSettings.SectionName));
 var jwtSettings = jwtSettingsSection.Get<JwtSettings>();
 
 // Configure Authentication
