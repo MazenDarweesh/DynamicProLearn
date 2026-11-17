@@ -4,17 +4,19 @@ export interface HostAttributesSnapshot {
   apiUrl?: string;
   backendUrl?: string;
   erpKey?: string;
+  activeScreenKey?: string;
   lmsPageId?: string;
   u?: string;
   p?: string;
   token?: string;
   hideHeader?: boolean;
   inline?: boolean;
+  useUnifiedChat?: boolean;
 }
 
 export function readHostElementAttributes(
   hostEl: HTMLElement | undefined,
-  current: HostAttributesSnapshot & { activeScreenKey?: string }
+  current: HostAttributesSnapshot
 ): HostAttributesSnapshot {
   if (!hostEl || !hostEl.getAttribute) {
     return current;
@@ -32,23 +34,28 @@ export function readHostElementAttributes(
 
   const hideHeaderAttr = getAttr('hide-header', 'hideHeader');
   const inlineAttr = getAttr('inline', 'inline');
+  const hasUnifiedAttr = hostEl.hasAttribute('use-unified-chat') || hostEl.hasAttribute('useUnifiedChat');
+  const unifiedRaw = hostEl.getAttribute('use-unified-chat') ?? hostEl.getAttribute('useUnifiedChat');
+  const resolvedScreenKey = clean(
+    current.activeScreenKey ||
+      getAttr('active-screen-key', 'activeScreenKey') ||
+      getAttr('active-screen', 'activeScreen')
+  );
 
   return {
     apiUrl: clean(current.apiUrl || getAttr('api-url', 'apiUrl')),
     backendUrl: clean(current.backendUrl || getAttr('backend-url', 'backendUrl')),
-    erpKey: clean(
-      current.erpKey ||
-        current.activeScreenKey ||
-        getAttr('active-screen-key', 'activeScreenKey') ||
-        getAttr('erp-key', 'erpKey') ||
-        getAttr('active-screen', 'activeScreen')
-    ),
+    erpKey: clean(current.erpKey || resolvedScreenKey || getAttr('erp-key', 'erpKey')),
+    activeScreenKey: resolvedScreenKey,
     lmsPageId: clean(current.lmsPageId || getAttr('lms-page-id', 'lmsPageId')),
     u: clean(current.u || getAttr('u', 'u')),
     p: clean(current.p || getAttr('p', 'p')),
     token: clean(current.token || getAttr('token', 'token')),
     hideHeader: hideHeaderAttr != null ? hideHeaderAttr === 'true' || hideHeaderAttr === '' : current.hideHeader,
     inline: inlineAttr != null ? inlineAttr === 'true' || inlineAttr === '' : current.inline,
+    useUnifiedChat: hasUnifiedAttr
+      ? unifiedRaw !== 'false' && unifiedRaw !== '0'
+      : current.useUnifiedChat,
   };
 }
 

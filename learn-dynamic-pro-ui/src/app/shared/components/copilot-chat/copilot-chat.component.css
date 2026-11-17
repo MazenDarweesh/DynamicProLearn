@@ -197,6 +197,14 @@
   color: #991b1b;
 }
 
+.ai-status-banner.info {
+  background: #eef2ff;
+  border-bottom: 1px solid #c7d2fe;
+  color: #3730a3;
+  padding: 5px 14px;
+  font-size: 11px;
+}
+
 .status-banner-content {
   display: flex;
   align-items: center;

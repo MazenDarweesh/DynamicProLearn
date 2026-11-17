@@ -1,4 +1,4 @@
-import { ErpBatchItem } from './erp-form.models';
+import { ErpBatchItem, NavCandidateIn, NavScored } from './erp-form.models';
 
 export interface CopilotSource {
   type?: 'video' | 'pdf' | string;
@@ -100,4 +100,64 @@ export interface StudentCopilotFilterData {
   modules: CopilotFilterModule[];
   levels: CopilotFilterOption[];
   types: CopilotFilterOption[];
+}
+
+export interface ChatHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface GeneralChatNavAction {
+  decision?: 'go' | 'ask' | 'clarify' | string;
+  screen?: string;
+  pageId?: number | string;
+  page_id?: number | string;
+  screenKey?: string;
+  screen_key?: string;
+  label?: string;
+  reason?: string;
+  candidates?: NavScored[];
+}
+
+export interface GeneralChatToolEvent {
+  type: 'tool_start' | 'tool_end';
+  tool?: string;
+  name?: string;
+  input?: any;
+  output?: any;
+  [key: string]: any;
+}
+
+export interface GeneralChatDoneMeta {
+  thread_id?: string;
+  trace_id?: string;
+  mcp_enabled?: boolean;
+  provider?: string;
+  model?: string;
+  latency_ms?: number;
+  metrics?: {
+    ttftMs?: number | null;
+    streamDurationMs?: number;
+    tokenCount?: number;
+    total_latency_ms?: number;
+  };
+  [key: string]: any;
+}
+
+export interface GeneralChatStreamParams {
+  query: string;
+  history?: ChatHistoryMessage[];
+  threadId?: string;
+  erpKey?: string;
+  activeScreenKey?: string;
+  lessonId?: string;
+  lessonIds?: string[];
+  candidates?: NavCandidateIn[];
+  traceId?: string;
+  onSources?: (sources: CopilotSource[]) => void;
+  onToken?: (token: string) => void;
+  onNavAction?: (action: GeneralChatNavAction) => void;
+  onToolEvent?: (event: GeneralChatToolEvent) => void;
+  onDone?: (meta?: GeneralChatDoneMeta) => void;
+  onError?: (err: any) => void;
 }

@@ -26,7 +26,8 @@ import {
   CopilotFilterLesson,
   CopilotFilterUnit,
   CopilotFilterModule,
-  StudentCopilotFilterData
+  StudentCopilotFilterData,
+  GeneralChatStreamParams
 } from '../../models/copilot.models';
 
 export type * from '../../models/copilot.models';
@@ -146,6 +147,14 @@ export class CopilotService {
       formSchema,
       erpIntent
     );
+  }
+
+  /**
+   * Streams unified general chat + LMS RAG + ERP navigation via POST /v1/erp/chat/stream.
+   * Delegates to CopilotSearchStreamService.
+   */
+  streamGeneralChat(params: GeneralChatStreamParams): Promise<void> {
+    return this.searchStreamService.streamGeneralChat(params);
   }
 
   sendFeedback(feedback: CopilotFeedbackRequest): Observable<any> {

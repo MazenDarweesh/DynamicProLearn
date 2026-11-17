@@ -68,6 +68,14 @@
           <span>إعادة الاتصال</span> 🔄
         </button>
       </div>
+
+      <!-- Unified General Chat + LMS Mode Status Indicator (shown pre-MCP link) -->
+      <div *ngIf="useUnifiedChat && !isActionMode && mcpEnabled === false" class="ai-status-banner info">
+        <div class="status-banner-content">
+          <span class="status-banner-icon">💬</span>
+          <span class="status-banner-text">وضع الدردشة العامة + LMS (بيانات الـ ERP الحية غير مربوطة بعد)</span>
+        </div>
+      </div>
       <!-- Smart Top Filter Bar (Rendered only when authenticated and handshake settles) -->
       <app-copilot-top-filter-bar *ngIf="!isAuthenticating && authService.isAuthenticated()" [activeLessonId]="activeLessonId" [erpKey]="erpKey"
         [isCollapsed]="isFilterBarCollapsed" (filterChange)="onFilterChange($event)"

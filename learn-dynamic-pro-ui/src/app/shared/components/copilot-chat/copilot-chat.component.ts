@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { MarkdownComponent } from 'ngx-markdown';
 import { Subscription, timer } from 'rxjs';
 import { CdkDrag, CdkDragHandle } from '@angular/cdk/drag-drop';
-import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData, AgentStepItem } from '../../../core/services/ai-copilot/copilot.service';
+import { CopilotService, CopilotSource, CopilotFeedbackRequest, CopilotFilterState, CopilotFormFillData, AgentStepItem, ChatHistoryMessage, GeneralChatNavAction } from '../../../core/services/ai-copilot/copilot.service';
 import {
   ErpFormDriverService,
   ErpBatchStepperService,
@@ -36,7 +36,7 @@ import {
   isEditExistingFormQuery,
   resolveEditCurrentIntent
 } from './utils/erp-save-guard.helper';
-import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavScored } from '../../../core/models/erp-form.models';
+import { FormFillExecutionReport, FormFieldSchema, ErpBatchItem, NavCandidateIn, NavScored } from '../../../core/models/erp-form.models';
 import { AuthService } from '../../../core/services/platform-core/auth.service';
 import { CopilotTopFilterBarComponent } from '../copilot-top-filter-bar/copilot-top-filter-bar.component';
 import { CopilotHeaderComponent } from '../copilot-header/copilot-header.component';
@@ -82,6 +82,7 @@ export interface ChatMessage {
   /** Stores the original user question paired with this assistant response */
   relatedUserQuery?: string;
   isRetrying?: boolean;
+  usedUnifiedChat?: boolean;
   cacheHit?: boolean;
   provenance?: string;
   latencyMs?: number;
@@ -192,6 +193,10 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   @Input() backendUrl?: string;
   @Input({ transform: booleanAttribute }) hideHeader: boolean = false;
   @Input({ transform: booleanAttribute }) inline: boolean = false;
+  @Input({ transform: booleanAttribute }) useUnifiedChat: boolean = true;
+
+  mcpEnabled = false;
+  activeThreadId?: string;
 
   @HostBinding('class.inline-host') get isInlineHost(): boolean {
     return this.inline;
@@ -317,7 +322,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['token'] || changes['apiUrl'] || changes['backendUrl'] || changes['erpKey'] || changes['lmsPageId'] || changes['u'] || changes['p'] || changes['inline'] || changes['hideHeader']) {
+    if (changes['token'] || changes['apiUrl'] || changes['backendUrl'] || changes['erpKey'] || changes['activeScreenKey'] || changes['lmsPageId'] || changes['u'] || changes['p'] || changes['inline'] || changes['hideHeader'] || changes['useUnifiedChat']) {
       this.readAttributesFromHost();
       this.applyInputs();
       if (changes['apiUrl']) {
@@ -339,11 +344,13 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       p: this.p,
       token: this.token,
       hideHeader: this.hideHeader,
-      inline: this.inline
+      inline: this.inline,
+      useUnifiedChat: this.useUnifiedChat
     });
     this.apiUrl = snap.apiUrl;
     this.backendUrl = snap.backendUrl;
     this.erpKey = snap.erpKey;
+    if (snap.activeScreenKey) this.activeScreenKey = snap.activeScreenKey;
     this.lmsPageId = snap.lmsPageId;
     this.u = snap.u;
     this.p = snap.p;
@@ -353,6 +360,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (attrSsoToken) this.ssoToken = attrSsoToken;
     if (snap.hideHeader != null) this.hideHeader = snap.hideHeader;
     if (snap.inline != null) this.inline = snap.inline;
+    if (snap.useUnifiedChat != null) this.useUnifiedChat = snap.useUnifiedChat;
   }
 
   private setupAttributeObserver() {
@@ -394,7 +402,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       attributeFilter: [
         'api-url', 'apiUrl', 'backend-url', 'backendUrl',
         'erp-key', 'erpKey', 'active-screen-key', 'activeScreenKey', 'active-screen', 'activeScreen',
-        'lms-page-id', 'lmsPageId', 'u', 'p', 'token', 'sso-token', 'ssoToken', 'hide-header', 'inline'
+        'lms-page-id', 'lmsPageId', 'u', 'p', 'token', 'sso-token', 'ssoToken', 'hide-header', 'inline',
+        'use-unified-chat', 'useUnifiedChat'
       ]
     });
   }
@@ -628,6 +637,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   clearHistory() {
+    this.activeThreadId = undefined;
     this.messages = [
       {
         sender: 'assistant',
@@ -2266,9 +2276,192 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     return isPureNavigationQuery(query);
   }
 
+  private shouldUseUnifiedChat(filters: CopilotFilterState = this.activeFilter): boolean {
+    if (!this.useUnifiedChat || this.isActionMode || this.isVisionAgentMode) {
+      return false;
+    }
+    const scope = filters?.scope || 'all';
+    if (filters?.levelId || filters?.typeId || scope === 'module' || scope === 'unit') {
+      return false;
+    }
+    if ((scope === 'lesson' || scope === 'lessons') && !this.topFilterBar?.isAutoDetectedLesson) {
+      return false;
+    }
+    return true;
+  }
+
+  private buildChatHistory(upToExclusiveIndex?: number, currentQuery?: string): ChatHistoryMessage[] {
+    const end = upToExclusiveIndex ?? this.messages.length;
+    let slice = this.messages
+      .slice(1, end)
+      .filter((m) => !m.isStreaming && !!m.text?.trim());
+    if (
+      upToExclusiveIndex === undefined &&
+      currentQuery &&
+      slice.length > 0 &&
+      slice[slice.length - 1].sender === 'user' &&
+      slice[slice.length - 1].text.trim() === currentQuery.trim()
+    ) {
+      slice = slice.slice(0, -1);
+    }
+    return slice
+      .slice(-6)
+      .map((m) => ({ role: m.sender, content: m.text.trim() }));
+  }
+
+  private getBridgeNavCandidates(): NavCandidateIn[] {
+    if (!this.bridge?.isAvailable) return [];
+    if (typeof this.navigator?.scanVisibleCandidates === 'function') {
+      return this.navigator.scanVisibleCandidates();
+    }
+    if (typeof this.bridge.listScreens === 'function') {
+      return (this.bridge.listScreens() || [])
+        .map((s: any) => ({
+          id: String(s.pageId ?? s.page_id ?? s.screenKey ?? s.pageName ?? ''),
+          label: String(s.title ?? s.name_ar ?? s.pageName ?? s.screenKey ?? ''),
+          path: s.moduleName ? [String(s.moduleName)] : []
+        }))
+        .filter((c) => !!c.id && !!c.label);
+    }
+    return [];
+  }
+
+  private finalizeStreamMeta(msg: ChatMessage, meta?: any): void {
+    msg.isStreaming = false;
+    msg.isRetrying = false;
+    this.isStreaming = false;
+    this.scrollToBottom();
+    if (meta?.thread_id) {
+      msg.threadId = meta.thread_id;
+      this.activeThreadId = meta.thread_id;
+    }
+    if (meta) {
+      msg.cacheHit = meta.cache_hit ?? false;
+      msg.provenance = meta.provenance ?? (meta.provider ? `GENERAL_CHAT:${meta.provider}` : msg.provenance);
+      msg.latencyMs = meta.metrics?.total_latency_ms ?? meta.latency_ms ?? meta.metrics?.streamDurationMs;
+      if (typeof meta.mcp_enabled === 'boolean') {
+        this.mcpEnabled = meta.mcp_enabled;
+      }
+      if (msg.formFillData) {
+        msg.canEscalateToVisionAgent = false;
+        msg.escalationGoal = undefined;
+      }
+    }
+    this.cdr.markForCheck();
+  }
+
+  private async handleGeneralChatNavAction(
+    action: GeneralChatNavAction,
+    msg: ChatMessage,
+    query: string
+  ): Promise<void> {
+    if (!action) return;
+    if (action.decision === 'ask' && Array.isArray(action.candidates) && action.candidates.length > 0) {
+      msg.askOptions = action.candidates;
+      msg.relatedUserQuery = query;
+      this.cdr.markForCheck();
+      return;
+    }
+    const target = action.pageId ?? action.page_id ?? action.screenKey ?? action.screen_key ?? action.screen;
+    if (action.decision !== 'go' || target == null || String(target).trim() === '' || this.hasActivePendingTask()) {
+      return;
+    }
+    const targetStr = String(target).trim();
+    let navigated = false;
+    if (typeof this.navigator?.navigateToScreen === 'function') {
+      navigated = await this.navigator.navigateToScreen(targetStr);
+    } else if (this.bridge?.isAvailable && typeof this.bridge.navigateToScreen === 'function') {
+      navigated = await this.bridge.navigateToScreen(target);
+    }
+    if (navigated) {
+      this.syncErpKey(action.screenKey || action.screen_key || action.screen || targetStr);
+    }
+    this.telemetry?.log('NAV', `Unified chat nav_action -> ${targetStr} (navigated=${navigated})`, {
+      decision: action.decision,
+      target: targetStr,
+      reason: action.reason
+    });
+    this.cdr.markForCheck();
+  }
+
+  private async executeGeneralChatForMessage(
+    query: string,
+    msg: ChatMessage,
+    traceId?: string,
+    historyUpToIndex?: number
+  ): Promise<void> {
+    const activeScreen = this.bridge?.isAvailable ? this.bridge.getActiveScreen() : null;
+    const effectiveErpKey = (this.erpKey || activeScreen?.pageName || activeScreen?.screenKey || '').trim() || undefined;
+    const effectiveScreenKey =
+      (this.activeScreenKey || activeScreen?.screenKey || activeScreen?.pageName || effectiveErpKey || '').trim() ||
+      undefined;
+    const msgFilters = msg.filters || this.activeFilter;
+    const effectiveTraceId =
+      traceId || this.telemetry?.getTraceId() || `trc_${Math.random().toString(36).substring(2, 8)}`;
+
+    await this.copilotService.streamGeneralChat({
+      query,
+      history: this.buildChatHistory(historyUpToIndex, query),
+      threadId: msg.threadId || this.activeThreadId,
+      erpKey: effectiveErpKey,
+      activeScreenKey: effectiveScreenKey,
+      lessonId: msg.lessonId || msgFilters?.lessonId || this.activeLessonId,
+      lessonIds: msg.lessonIds || msgFilters?.lessonIds,
+      candidates: this.getBridgeNavCandidates(),
+      traceId: effectiveTraceId,
+      onSources: (sources: CopilotSource[]) => {
+        msg.sources = this.deduplicateSources(sources);
+        this.cdr.markForCheck();
+        this.scrollToBottom();
+      },
+      onToken: (token: string) => {
+        msg.text += token;
+        this.cdr.markForCheck();
+        this.scrollToBottom();
+      },
+      onNavAction: (action: GeneralChatNavAction) => {
+        void this.handleGeneralChatNavAction(action, msg, query);
+      },
+      onToolEvent: (ev) => {
+        this.telemetry?.log('GENERAL', `Unified chat tool ${ev.type}: ${ev.tool || ev.name || ''}`, ev);
+      },
+      onDone: (meta) => {
+        this.finalizeStreamMeta(msg, meta);
+      },
+      onError: (err) => {
+        msg.text += msg.isRetrying
+          ? '\n\n⚠️ تعذر إعادة المحاولة.'
+          : '\n\n⚠️ تعذر إكمال الإجابة. يرجى التأكد من تشغيل محرك الذكاء الاصطناعي.';
+        msg.isStreaming = false;
+        msg.isRetrying = false;
+        this.isStreaming = false;
+        this.telemetry?.logError('USER_QUERY', 'streamGeneralChat error', err);
+        this.cdr.markForCheck();
+      }
+    });
+  }
+
   /** Core stream method — shared by sendMessage() and retryMessage() */
   private async streamQuery(query: string, skipCache: boolean = false, skipNavCheck: boolean = false) {
     this.isStreaming = true;
+
+    if (this.shouldUseUnifiedChat()) {
+      const assistantMsg: ChatMessage = {
+        sender: 'assistant',
+        text: '',
+        sources: [],
+        isStreaming: true,
+        usedUnifiedChat: true,
+        threadId: this.activeThreadId,
+        relatedUserQuery: query,
+        filters: { ...this.activeFilter },
+        lessonId: this.activeLessonId || this.activeFilter.lessonId,
+        lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
+      };
+      this.messages.push(assistantMsg);
+      await this.executeGeneralChatForMessage(query, assistantMsg);
+      return;
+    }
 
     let pendingAskOptions: NavScored[] | undefined = undefined;
     let resolvedIntent: string | undefined = undefined;
@@ -2475,22 +2668,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         this.scrollToBottom();
       },
       (meta?: any) => {
-        this.messages[assistantMsgIndex].isStreaming = false;
-        this.messages[assistantMsgIndex].isRetrying = false;
-        this.isStreaming = false;
-        this.scrollToBottom();
-        if (meta?.thread_id) {
-          this.messages[assistantMsgIndex].threadId = meta.thread_id;
-        }
-        if (meta) {
-          this.messages[assistantMsgIndex].cacheHit = meta.cache_hit ?? false;
-          this.messages[assistantMsgIndex].provenance = meta.provenance;
-          this.messages[assistantMsgIndex].latencyMs = meta.metrics?.total_latency_ms ?? meta.latency_ms;
-          if (this.messages[assistantMsgIndex].formFillData) {
-            this.messages[assistantMsgIndex].canEscalateToVisionAgent = false;
-            this.messages[assistantMsgIndex].escalationGoal = undefined;
-          }
-        }
+        this.finalizeStreamMeta(this.messages[assistantMsgIndex], meta);
       },
       (err: any) => {
         this.messages[assistantMsgIndex].text += '\n\n⚠️ تعذر إكمال الإجابة. يرجى التأكد من تشغيل محرك الذكاء الاصطناعي.';
@@ -2587,6 +2765,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       return;
     }
 
+    const retryThreadId = msg.threadId || this.activeThreadId;
     // Reset assistant message in-place (clean slate for new answer)
     msg.text = '';
     msg.sources = [];
@@ -2597,7 +2776,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     msg.selectedReasonTag = undefined;
     msg.isStreaming = true;
     msg.isRetrying = true;
-    msg.threadId = undefined;
+    msg.threadId = retryThreadId;
 
     const traceId = 'trc_' + Math.random().toString(36).substring(2, 8);
     this.telemetry?.setTraceId(traceId);
@@ -2605,21 +2784,27 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
     this.isStreaming = true;
 
+    const useUnifiedForRetry =
+      this.useUnifiedChat &&
+      !this.isActionMode &&
+      !this.isVisionAgentMode &&
+      (msg.usedUnifiedChat === true ||
+        (msg.usedUnifiedChat !== false && this.shouldUseUnifiedChat(msg.filters || this.activeFilter)));
+
+    if (useUnifiedForRetry) {
+      msg.usedUnifiedChat = true;
+      const historyCutoff = msgIndex > 0 && this.messages[msgIndex - 1]?.sender === 'user' ? msgIndex - 1 : msgIndex;
+      await this.executeGeneralChatForMessage(userQuery, msg, traceId, historyCutoff);
+      return;
+    }
+
     await this.copilotService.streamSearch(
       userQuery,
       msg.lessonId,
       (sources) => { msg.sources = this.deduplicateSources(sources); },
       (token) => { msg.text += token; },
       (meta?: any) => {
-        msg.isStreaming = false;
-        msg.isRetrying = false;
-        this.isStreaming = false;
-        if (meta?.thread_id) msg.threadId = meta.thread_id;
-        if (meta) {
-          msg.cacheHit = meta.cache_hit ?? false;
-          msg.provenance = meta.provenance;
-          msg.latencyMs = meta.metrics?.total_latency_ms ?? meta.latency_ms;
-        }
+        this.finalizeStreamMeta(msg, meta);
       },
       (err) => {
         msg.text += '\n\n⚠️ تعذر إعادة المحاولة.';
