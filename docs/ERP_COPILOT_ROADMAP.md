@@ -1,6 +1,6 @@
-# ERP Copilot: Roadmap & Checklist (شاشة المشتريات 289)
+# ERP Copilot: Roadmap & Checklist (شاشة المشتريات 289 ➔ التحول إلى MCP Option B-Lite)
 
-**آخر تحديث:** 2026-11-16 | **حجم الحزمة الحالي:** `793.4 KB` (`183.59 KB` transfer) | **اختبارات ERP Copilot:** `104 / 104 SUCCESS`
+**آخر تحديث:** 2026-11-17 | **حجم الحزمة الحالي:** `798.1 KB` | **اختبارات الأمان (.NET):** `9 / 9 Passed` | **البرانش النشط:** `feat/mcp-copilot-phase0`
 
 ---
 
@@ -117,4 +117,31 @@
 ## 7. ديون معروفة (تُراجع كل Wave)
 - [ ] 13 فشلاً في اختبارات مكونات LMS عامة (`NullInjectorError: HttpClient`)
 - [ ] أي fallback في Host Bridge يخالف الـ registry (يُجرد دورياً)
-- [ ] مراجعة حجم الحزمة قبل Wave 4 (الهدف: عدم تجاوز `800 KB`، الحالي `797.7 KB` — هامش `2.3 KB` فقط)
+- [ ] مراجعة حجم الحزمة قبل Wave 4 (الهدف: عدم تجاوز `800 KB`، الحالي `798.1 KB` — هامش `1.9 KB` فقط)
+
+---
+
+## 8. التحول المعماري الجديد: MCP Integration (`Option B-Lite`) & Phase 0 (2026-11-17)
+
+> **المرجع التفصيلي:** [BLUEPRINT_MCP_COPILOT_INTEGRATION.md](BLUEPRINT_MCP_COPILOT_INTEGRATION.md) · [COPILOT_OPTIONS_REVIEW_AND_FASTEST_PATH.md](COPILOT_OPTIONS_REVIEW_AND_FASTEST_PATH.md)
+
+### 8.1 القرار المعماري المعتمد
+- **تجميد مسار الحفظ والتعبئة عبر DOM/CDP (Waves 4–5 مجمدة حالياً):** القراءة والتقارير وتجهيز القيود تنتقل إلى **Dynamic Pro `.NET 9` Streamable HTTP MCP Server** (`21` أداة بصلاحيات المستخدم)، مع **حجب `commit_entry` / `commit_report_designer` عن الـ LLM تماماً** وتنفيذ الحفظ فقط بزر المستخدم في الواجهة.
+- **الدور المعتمد لـ `window.DynamicERP` (`v2.5.0`):** التنقل وفتح الشاشات وسياق الشاشة والواجهة العائمة فقط (`listUserPages`, `listScreens`, `getActiveScreen`, `navigateToScreen`, `getCapabilities`, lazy load, singleton `ai-chat`).
+
+### 8.2 Phase 0: إغلاق الثغرات الأمنية وتوحيد عقد الـ SSO
+- [x] **`DynamicProLearn` (Commits `aa7a00f`, `8dc27fd` على `feat/mcp-copilot-phase0`):**
+  - إزالة الأسرار الافتراضية من `deployment/docker-compose.yml` و`.env.example` وإضافة متغيرات `ErpSso__*`.
+  - إضافة `ErpSsoSettings` مستقلة (`Issuer="ERPSystemAPI"`, `Audience="DynamicProLearn"`, `MaxTokenLifetimeMinutes=5`, `AllowLegacyErpLogin=false` إنتاج / `true` تطوير مؤقتاً).
+  - إضافة التحقق من `jti` لمرة واحدة (`IMemoryCache`) في `TokenService.cs`، ودعم `ssoToken` في `ErpRedirectComponent` و`<lms-ai-copilot>` (`copilot-chat.component.ts`).
+  - إنشاء وربط `tests/LearnDynamicPro.SecurityTests` بالـ Solution: **`9 / 9 Passed`** (`dotnet test LearnDynamicPro.sln` و`ng build` Exit `0`).
+- [ ] **Host ERP (`feat/erp-copilot-phase0-clean`, Commit `e17711f4f`):**
+  - [x] تقليص `lms-copilot.component.ts` (`2381 ➔ 354` سطر) واستبعاد دوال الحفظ بالـ DOM، وترحيل `LMSController.cs` إلى `ssoToken`، وحذف `devtunnels.ms` من `index.html:63`.
+  - [ ] **معلق قبل الـ PR للـ Lead:** تأكيد نجاح `dotnet build` و`ng build` (`0 Errors`)، والتأكد من `git rm --cached` لـ `appsettings.development.json` وتدوير الأسرار المكشوفة (`sa`, `SigningKey`, `SchemaPipelineUser`), وإرسال `LmsSsoSigningKey` للـ dev.
+- [ ] **Cutover النهائي (بعد تفعيل `ssoToken`):** تعيين `AllowLegacyErpLogin = false` في `appsettings.Development.json` وحذف فرع `u/p` من `AuthService.cs`.
+
+### 8.3 الخطوات الجاهزة للتنفيذ في `LMS_CO_Pilot` (بدون انتظار)
+- [ ] **المسار B — أساس `Step 1` (على برانش `feat/mcp-client-foundation`):**
+  - إضافة `mcp` و`langchain-mcp-adapters` في `pyproject.toml` + إعدادات `MCP_*` في `src/core/config.py`.
+  - بناء `oauth_store.py` (تخزين مشفّر في Postgres لكل `(tenant_id, user_id)`) و`client_factory.py` (قراءة فقط أولاً، حجب `commit_*`, سقف حجم رد `read_page`، وتسجيل `trace_id` في `session_telemetry.py` بدون توكنات) + Unit tests.
+- [ ] **المسار C — بنك التقييم (`tests/eval/mcp_eval_set.jsonl`):** تجهيز 50 سؤالاً (فصحى + عامية مصرية: مبيعات، مشتريات، مخازن، حسابات، شروحات `knowledge_search`، وأسئلة رفض) لمقارنة `GPT-5 mini` / `Haiku 5.5` / `Qwen 3.5` فور وصول رابط الشركة التجريبية (`/c/<code>/mcp`).
