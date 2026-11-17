@@ -9,6 +9,7 @@ public interface ITokenService
     string GenerateRefreshToken(User user);
     ClaimsPrincipal? GetPrincipalFromExpiredToken(string token);
     bool ValidateRefreshToken(string refreshToken, out Guid userId);
+    bool ValidateErpSsoToken(string ssoToken, out string username);
     
     /// <summary>
     /// Generates a short-lived (5 min) JWT for internal Backend-to-Backend service calls.

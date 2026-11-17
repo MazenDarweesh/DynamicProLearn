@@ -26,9 +26,19 @@ export class AuthService {
     }
   }
 
-  erpLogin(username: string, password: string, erpKey: string | null) {
+  erpLogin(
+    username: string | null,
+    password: string | null,
+    erpKey: string | null,
+    ssoToken?: string | null
+  ) {
     const url = this.backendBaseUrl ? `${this.backendBaseUrl}/api/Auth/erp-login` : '/api/Auth/erp-login';
-    return this.http.post<any>(url, { username, password, erpKey });
+    return this.http.post<any>(url, {
+      username: username ?? '',
+      password: password ?? '',
+      erpKey,
+      ssoToken: ssoToken ?? null
+    });
   }
 
   login(token: string, refreshToken?: string) {

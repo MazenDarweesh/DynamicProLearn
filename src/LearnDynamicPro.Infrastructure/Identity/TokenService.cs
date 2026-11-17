@@ -104,7 +104,36 @@ public class TokenService : ITokenService
     public bool ValidateRefreshToken(string refreshToken, out Guid userId)
     {
         userId = Guid.Empty;
-        if (string.IsNullOrWhiteSpace(refreshToken)) return false;
+        var principal = ValidateSignedToken(refreshToken, expectedTokenType: "refresh");
+        if (principal is null) return false;
+
+        var sub = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                  ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                  ?? principal.FindFirst("Id")?.Value;
+
+        return Guid.TryParse(sub, out userId);
+    }
+
+    public bool ValidateErpSsoToken(string ssoToken, out string username)
+    {
+        username = string.Empty;
+        var principal = ValidateSignedToken(ssoToken, expectedTokenType: "erp_sso");
+        if (principal is null) return false;
+
+        var resolved = principal.FindFirst(JwtRegisteredClaimNames.UniqueName)?.Value
+                       ?? principal.FindFirst(ClaimTypes.Name)?.Value
+                       ?? principal.FindFirst("username")?.Value
+                       ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value;
+
+        if (string.IsNullOrWhiteSpace(resolved)) return false;
+
+        username = resolved.Trim();
+        return true;
+    }
+
+    private ClaimsPrincipal? ValidateSignedToken(string token, string expectedTokenType)
+    {
+        if (string.IsNullOrWhiteSpace(token)) return null;
 
         var tokenValidationParameters = new TokenValidationParameters
         {
@@ -121,25 +150,19 @@ public class TokenService : ITokenService
         var tokenHandler = new JwtSecurityTokenHandler();
         try
         {
-            var principal = tokenHandler.ValidateToken(refreshToken, tokenValidationParameters, out var securityToken);
+            var principal = tokenHandler.ValidateToken(token, tokenValidationParameters, out var securityToken);
             if (securityToken is not JwtSecurityToken jwtSecurityToken ||
                 !jwtSecurityToken.Header.Alg.Equals(SecurityAlgorithms.HmacSha256, StringComparison.InvariantCultureIgnoreCase))
             {
-                return false;
+                return null;
             }
 
             var tokenType = principal.FindFirst("token_type")?.Value;
-            if (tokenType != "refresh") return false;
-
-            var sub = principal.FindFirst(ClaimTypes.NameIdentifier)?.Value 
-                      ?? principal.FindFirst(JwtRegisteredClaimNames.Sub)?.Value 
-                      ?? principal.FindFirst("Id")?.Value;
-
-            return Guid.TryParse(sub, out userId);
+            return tokenType == expectedTokenType ? principal : null;
         }
         catch
         {
-            return false;
+            return null;
         }
     }
 

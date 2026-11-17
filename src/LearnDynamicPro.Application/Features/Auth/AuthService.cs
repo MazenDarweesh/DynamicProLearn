@@ -57,25 +57,38 @@ public class AuthService : IAuthService
 
     public async Task<Result<ErpLoginResponse>> ErpLoginAsync(ErpLoginRequest request)
     {
-        var user = await _unitOfWork.Repository<User>().Query()
-            .AsNoTracking()
-            .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
-
-        if (user is null)
-            return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
-
-        bool isValid = false;
-        if (request.Password == user.PasswordHash) 
+        User? user;
+        if (!string.IsNullOrWhiteSpace(request.SsoToken))
         {
-            isValid = true;
-        }
-        else if (_passwordHasher.Verify(request.Password, user.PasswordHash))
-        {
-            isValid = true;
-        }
+            if (!_tokenService.ValidateErpSsoToken(request.SsoToken, out var ssoUsername))
+                return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
 
-        if (!isValid)
-            return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+            user = await _unitOfWork.Repository<User>().Query()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == ssoUsername.ToLower());
+
+            if (user is null)
+                return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+        }
+        else
+        {
+            // Legacy u/p fallback kept temporarily until ERP LMSController migrates to ssoToken
+            if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+                return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+
+            user = await _unitOfWork.Repository<User>().Query()
+                .AsNoTracking()
+                .FirstOrDefaultAsync(u => u.Username.ToLower() == request.Username.ToLower());
+
+            if (user is null)
+                return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+
+            bool isValid = request.Password == user.PasswordHash
+                           || _passwordHasher.Verify(request.Password, user.PasswordHash);
+
+            if (!isValid)
+                return Result<ErpLoginResponse>.Failure(AppErrors.Authentication.InvalidCredentials);
+        }
 
         var token = _tokenService.GenerateToken(user);
         var refreshToken = _tokenService.GenerateRefreshToken(user);

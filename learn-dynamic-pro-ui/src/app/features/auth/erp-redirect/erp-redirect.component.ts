@@ -45,16 +45,23 @@ export class ErpRedirectComponent implements OnInit {
   private authService = inject(AuthService);
 
   ngOnInit(): void {
+    const ssoToken =
+      this.route.snapshot.queryParamMap.get('ssoToken') ||
+      this.route.snapshot.queryParamMap.get('token');
     const u = this.route.snapshot.queryParamMap.get('u');
     const p = this.route.snapshot.queryParamMap.get('p');
     const key = this.route.snapshot.queryParamMap.get('key');
 
-    if (!u || !p) {
+    if (!ssoToken && (!u || !p)) {
       this.router.navigate(['/login']);
       return;
     }
 
-    this.authService.erpLogin(u, p, key).subscribe({
+    const login$ = ssoToken
+      ? this.authService.erpLogin(null, null, key, ssoToken)
+      : this.authService.erpLogin(u, p, key);
+
+    login$.subscribe({
       next: (res: any) => {
         // Store tokens locally
         this.authService.login(res.token, res.refreshToken);

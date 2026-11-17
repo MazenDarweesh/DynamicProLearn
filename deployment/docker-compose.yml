@@ -14,17 +14,17 @@ services:
       - AllowedHosts=*
 
       # Connection String (connecting to the local mssql service)
-      - ConnectionStrings__DefaultConnection=Server=dynamicprolearn-db;Database=DynamicProLearnDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:-YourStr0ngP@ssw0rd123!};TrustServerCertificate=True;MultipleActiveResultSets=True;
+      - ConnectionStrings__DefaultConnection=Server=dynamicprolearn-db;Database=DynamicProLearnDb;User Id=sa;Password=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required};TrustServerCertificate=True;MultipleActiveResultSets=True;
 
       # JWT Authentication Settings
-      - JwtSettings__Secret=${JWT_SECRET:-SuperSecretKeyNeedsToBeAtLeast32CharsLong123!}
+      - JwtSettings__Secret=${JWT_SECRET:?JWT_SECRET is required}
       - JwtSettings__Issuer=${JWT_ISSUER:-DynamicProLearn}
       - JwtSettings__Audience=${JWT_AUDIENCE:-DynamicProLearnClient}
       - JwtSettings__ExpiryMinutes=${JWT_EXPIRY_MINUTES:-60}
 
       # AI Co-Pilot Settings
       - AiCoPilot__BaseUrl=${AI_BASE_URL:-http://lms_copilot_api:8000}
-      - AiCoPilot__ServiceToken=${AI_SERVICE_TOKEN:-MySuperSecretToken2026}
+      - AiCoPilot__ServiceToken=${AI_SERVICE_TOKEN:?AI_SERVICE_TOKEN is required}
       - AiCoPilot__WebhookUrl=${AI_WEBHOOK_URL:-http://lms_copilot_api:8000/v1/webhooks/lesson-updated}
 
     depends_on:
@@ -39,7 +39,7 @@ services:
     container_name: dynamicprolearn-db
     environment:
       - ACCEPT_EULA=Y
-      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:-YourStr0ngP@ssw0rd123!}
+      - MSSQL_SA_PASSWORD=${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required}
     ports:
       - "1433:1433"
     volumes:
@@ -48,7 +48,7 @@ services:
       - dynamicprolearn-network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S 127.0.0.1 -U sa -P '${MSSQL_SA_PASSWORD:-YourStr0ngP@ssw0rd123!}' -Q 'SELECT 1' -No -C 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S 127.0.0.1 -U sa -P '$${MSSQL_SA_PASSWORD}' -Q 'SELECT 1' -No -C 2>/dev/null || exit 1"]
       interval: 10s
       timeout: 10s
       retries: 10
