@@ -199,6 +199,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   mcpEnabled = false;
   activeThreadId?: string;
   activeToolStatus: string | null = null;
+  isVoiceListening = false;
+  private speechRecognition?: any;
   readonly unifiedStarterPrompts: ReadonlyArray<{ label: string; query: string }> = [
     { label: '💡 سؤال عام', query: 'اشرحلي الفرق بين الفاتورة النقدية والآجلة ببساطة' },
     { label: '📹 شرح من الدروس', query: 'إزاي أعمل فاتورة مشتريات؟' },
@@ -488,6 +490,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.stopVoiceInput();
     this.attrObserver?.disconnect();
     this.stopReadinessPolling();
     this.lessonSub?.unsubscribe();
@@ -2391,6 +2394,87 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       target: targetStr,
       reason: action.reason
     });
+    this.cdr.markForCheck();
+  }
+
+  get isSpeechRecognitionSupported(): boolean {
+    if (typeof window === 'undefined') return false;
+    const w = window as any;
+    return !!(w.SpeechRecognition || w.webkitSpeechRecognition);
+  }
+
+  toggleVoiceInput(): void {
+    if (this.isStreaming) return;
+    if (this.isVoiceListening) {
+      this.stopVoiceInput();
+      return;
+    }
+    if (typeof window === 'undefined') return;
+    const w = window as any;
+    const SpeechRecognitionCtor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) return;
+
+    try {
+      const recognition = new SpeechRecognitionCtor();
+      this.speechRecognition = recognition;
+      recognition.lang = 'ar-EG';
+      recognition.interimResults = true;
+      recognition.continuous = false;
+
+      const baseText = this.inputQuery.trim() ? `${this.inputQuery.trim()} ` : '';
+      let hadFinalTranscript = false;
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        const results = event?.results || [];
+        for (let i = 0; i < results.length; i++) {
+          const res = results[i];
+          if (res?.[0]?.transcript) {
+            transcript += res[0].transcript;
+          }
+          if (res?.isFinal) {
+            hadFinalTranscript = true;
+          }
+        }
+        this.inputQuery = `${baseText}${transcript}`.trim();
+        this.cdr.markForCheck();
+      };
+
+      recognition.onend = () => {
+        this.isVoiceListening = false;
+        this.speechRecognition = undefined;
+        this.cdr.markForCheck();
+        if (hadFinalTranscript && this.inputQuery.trim() && !this.isStreaming) {
+          void this.sendMessage();
+        }
+      };
+
+      recognition.onerror = (err: any) => {
+        console.warn('[CopilotChat] Voice input error:', err);
+        this.isVoiceListening = false;
+        this.speechRecognition = undefined;
+        this.cdr.markForCheck();
+      };
+
+      this.isVoiceListening = true;
+      recognition.start();
+      this.cdr.markForCheck();
+    } catch (err) {
+      console.warn('[CopilotChat] Failed to start voice input:', err);
+      this.isVoiceListening = false;
+      this.speechRecognition = undefined;
+      this.cdr.markForCheck();
+    }
+  }
+
+  stopVoiceInput(): void {
+    this.isVoiceListening = false;
+    if (this.speechRecognition) {
+      try {
+        this.speechRecognition.stop();
+      } catch {}
+      this.speechRecognition = undefined;
+    }
     this.cdr.markForCheck();
   }
 

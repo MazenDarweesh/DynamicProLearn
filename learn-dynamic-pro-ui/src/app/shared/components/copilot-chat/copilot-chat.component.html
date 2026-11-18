@@ -772,8 +772,16 @@
             <span class="mode-tag">{{ isActionMode ? 'Agent ON' : 'تنفيذ ذكي' }}</span>
           </button>
           <input type="text" class="copilot-input"
-            [placeholder]="inputPlaceholder"
+            [placeholder]="isVoiceListening ? '🎙️ جاري الاستماع... تحدث الآن' : inputPlaceholder"
             [(ngModel)]="inputQuery" (keyup.enter)="sendMessage()" [disabled]="isStreaming || (!isAiReady && !isActionMode)">
+          <button *ngIf="!isStreaming && isSpeechRecognitionSupported"
+                  type="button"
+                  class="copilot-mic-btn"
+                  [class.listening]="isVoiceListening"
+                  (click)="toggleVoiceInput()"
+                  [title]="isVoiceListening ? 'جاري الاستماع... انقر للإيقاف' : 'تحدث بصوتك (العربية / المصرية)'">
+            {{ isVoiceListening ? '⏹️' : '🎤' }}
+          </button>
           <button *ngIf="!isStreaming" class="copilot-send-btn" [disabled]="!inputQuery.trim() || (!isAiReady && !isActionMode)"
             (click)="sendMessage()" title="إرسال">
             ➔

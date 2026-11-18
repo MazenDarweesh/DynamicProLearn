@@ -192,4 +192,57 @@ describe('CopilotChatComponent - Unified General Chat Routing & Nav Action', () 
     expect(component.activeToolStatus).toBeNull();
     expect(mockCopilotService.streamGeneralChat).toHaveBeenCalled();
   });
+
+  it('captures Arabic voice input via Web Speech API and auto-submits on final transcript', async () => {
+    let createdRecognition: any;
+    class FakeSpeechRecognition {
+      lang = '';
+      interimResults = false;
+      continuous = false;
+      onresult?: (ev: any) => void;
+      onend?: () => void;
+      onerror?: (err: any) => void;
+      start = jasmine.createSpy('start');
+      stop = jasmine.createSpy('stop');
+      constructor() {
+        createdRecognition = this;
+      }
+    }
+
+    const w = window as any;
+    const prevStd = w.SpeechRecognition;
+    const prevWebkit = w.webkitSpeechRecognition;
+    w.SpeechRecognition = FakeSpeechRecognition;
+    w.webkitSpeechRecognition = FakeSpeechRecognition;
+
+    try {
+      mockCopilotService.streamGeneralChat.and.callFake(async (params: GeneralChatStreamParams) => {
+        params.onToken?.('تم فتح الشاشة');
+        params.onDone?.({ thread_id: 'thr-voice', mcp_enabled: false });
+      });
+
+      expect(component.isSpeechRecognitionSupported).toBeTrue();
+      component.toggleVoiceInput();
+      expect(component.isVoiceListening).toBeTrue();
+      expect(createdRecognition.lang).toBe('ar-EG');
+      expect(createdRecognition.start).toHaveBeenCalled();
+
+      createdRecognition.onresult?.({
+        results: [
+          Object.assign([{ transcript: 'افتحلي شاشة المشتريات' }], { isFinal: true })
+        ]
+      });
+      expect(component.inputQuery).toBe('افتحلي شاشة المشتريات');
+
+      createdRecognition.onend?.();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(component.isVoiceListening).toBeFalse();
+      expect(mockCopilotService.streamGeneralChat).toHaveBeenCalled();
+    } finally {
+      w.SpeechRecognition = prevStd;
+      w.webkitSpeechRecognition = prevWebkit;
+    }
+  });
 });
