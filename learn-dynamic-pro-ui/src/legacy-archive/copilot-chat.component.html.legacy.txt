@@ -1,0 +1,797 @@
+<ng-container *ngIf="shouldRenderComponent">
+  <!-- ── Chat Window ──────────────────────────────────────────────────────── -->
+  <div class="copilot-window" 
+       [class.minimized]="!hideHeader && isMinimized" 
+       [class.no-header]="hideHeader"
+       [class.inline-mode]="inline"
+       dir="rtl" 
+       cdkDrag
+       [cdkDragDisabled]="hideHeader || inline" 
+       cdkDragBoundary="body"
+       (cdkDragStarted)="onDragStarted()"
+       (cdkDragEnded)="onDragEnded()">
+
+    <!-- ── Separated Header Component (Rendered only if !hideHeader) ────────── -->
+    <app-copilot-header *ngIf="!hideHeader"
+                        cdkDragHandle
+                        [isMinimized]="isMinimized"
+                        [isAiReady]="isAiReady"
+                        [isWarmingUp]="isWarmingUp"
+                        [hasConnectionError]="hasConnectionError"
+                        (toggleMinimize)="toggleMinimize()"
+                        (clearHistory)="clearHistory()">
+    </app-copilot-header>
+
+    <!-- Body (Visible always if hideHeader is true, or if not minimized) -->
+    <ng-container *ngIf="hideHeader || !isMinimized">
+      <!-- Auto-Login / Handshake Loading Spinner -->
+      <div *ngIf="isAuthenticating" class="copilot-auth-overlay">
+        <div class="auth-spinner"></div>
+        <p class="auth-spinner-text">جاري مصادقة الجلسة وربط المساعد الذكي بنظام الـ ERP...</p>
+      </div>
+
+      <!-- Auto-Login Error Banner with Retry -->
+      <div *ngIf="authError && !isAuthenticating" class="copilot-auth-error-banner">
+        <div class="auth-error-content">
+          <span class="auth-error-icon">⚠️</span>
+          <span class="auth-error-text">{{ authError }}</span>
+        </div>
+        <button type="button" class="btn-retry-conn" (click)="retryAuth()" title="إعادة محاولة المصادقة">
+          <span>إعادة المحاولة</span> 🔄
+        </button>
+      </div>
+      <!-- Admin Cache-Clear Strip (visible only for Admins) -->
+      <div *ngIf="isAdmin" class="admin-cache-strip">
+        <button type="button" class="cache-clear-btn" [disabled]="isClearingCache" (click)="clearAiCache()"
+          title="تفريغ ذاكرة التخزين المؤقت للذكاء الاصطناعي">
+          <span *ngIf="!isClearingCache">🧹 تفريغ الكاش</span>
+          <span *ngIf="isClearingCache">⏳ جاري التفريغ...</span>
+        </button>
+        <span *ngIf="clearCacheStatus === 'success'" class="cache-status success">✅ تم التفريغ</span>
+        <span *ngIf="clearCacheStatus === 'error'" class="cache-status error">❌ فشل التفريغ</span>
+      </div>
+
+      <!-- AI Status Banners -->
+      <div *ngIf="isWarmingUp" class="ai-status-banner warming">
+        <div class="status-banner-content">
+          <span class="status-banner-icon warming-icon">⏳</span>
+          <span class="status-banner-text">جاري تهيئة محرك الذكاء الاصطناعي وتحميل النماذج... (المحاولة {{ currentAttempt }} من {{ maxAttempts }})</span>
+        </div>
+      </div>
+
+      <div *ngIf="hasConnectionError && !isAiReady" class="ai-status-banner error">
+        <div class="status-banner-content">
+          <span class="status-banner-icon">🔌</span>
+          <span class="status-banner-text">تعذر الاتصال بمحرك الذكاء الاصطناعي (السيرفر متوقف)</span>
+        </div>
+        <button type="button" class="btn-retry-conn" (click)="retryReadiness()" title="إعادة فحص الاتصال">
+          <span>إعادة الاتصال</span> 🔄
+        </button>
+      </div>
+
+      <!-- Unified General Chat + LMS Mode Status Indicator (shown pre-MCP link) -->
+      <div *ngIf="useUnifiedChat && !isActionMode && mcpEnabled === false" class="ai-status-banner info">
+        <div class="status-banner-content">
+          <span class="status-banner-icon">💬</span>
+          <span class="status-banner-text">وضع الدردشة العامة + LMS (بيانات الـ ERP الحية غير مربوطة بعد)</span>
+        </div>
+      </div>
+      <!-- Smart Top Filter Bar (Rendered only when authenticated and handshake settles) -->
+      <app-copilot-top-filter-bar *ngIf="!isAuthenticating && authService.isAuthenticated()" [activeLessonId]="activeLessonId" [erpKey]="erpKey"
+        [isCollapsed]="isFilterBarCollapsed" (filterChange)="onFilterChange($event)"
+        (toggleCollapse)="onFilterCollapseChange($event)">
+      </app-copilot-top-filter-bar>
+
+      <div class="copilot-body" #scrollContainer>
+        <div *ngFor="let msg of messages; let idx = index; trackBy: trackByMessage" class="chat-msg" [class.user-msg]="msg.sender === 'user'"
+          [class.bot-msg]="msg.sender === 'assistant'">
+
+          <div class="msg-avatar">
+            {{ msg.sender === 'user' ? '👤' : '🤖' }}
+          </div>
+
+          <div class="msg-bubble-container">
+
+            <!-- Message Bubble — Markdown rendered for assistant -->
+            <div class="msg-bubble" (click)="onBubbleClick($event)">
+              <ng-container *ngIf="msg.sender === 'assistant'; else plainText">
+                <markdown [data]="renderMessageText(msg)" class="markdown-body"></markdown>
+                <span *ngIf="msg.isStreaming" class="typing-cursor">▋</span>
+              </ng-container>
+              <ng-template #plainText>
+                <p class="msg-text">{{ msg.text }}</p>
+              </ng-template>
+            </div>
+
+            <!-- Interactive Ambiguity Chips (decision: 'ask') -->
+            <div *ngIf="msg.askOptions && msg.askOptions.length > 0" class="nav-ask-options-card">
+              <div class="nav-ask-header">
+                <span class="nav-ask-icon">🧭</span>
+                <strong>اختر الشاشة المستهدفة:</strong>
+              </div>
+              <div class="nav-ask-chips">
+                <button *ngFor="let opt of msg.askOptions"
+                        type="button"
+                        class="nav-ask-chip-btn"
+                        (click)="selectAskOption(opt, msg.relatedUserQuery)">
+                  <span class="chip-icon">{{ opt.id === 'PURCHASE_INVOICE' || opt.id === '289' ? '📦' : opt.id === 'SALES_INVOICE' ? '🧾' : opt.id === 'NEW_CUSTOMER' ? '👤' : opt.id === 'JOURNAL_ENTRY' ? '📑' : '📊' }}</span>
+                  <span class="chip-label">{{ getScreenDisplayName(opt.id, opt.label) }}</span>
+                  <span class="chip-conf">{{ (opt.confidence * 100) | number:'1.0-0' }}%</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Pending v2.5.0 Task Cancellation Confirmation -->
+            <div *ngIf="msg.pendingV250CancelConfirm" class="v250-cancel-confirm-card">
+              <div class="v250-cancel-actions">
+                <button type="button"
+                        class="btn-v250-cancel-yes"
+                        [disabled]="msg.pendingV250CancelConfirm.resolved || isStreaming"
+                        (click)="confirmPendingV250Cancellation(msg)">
+                  ✅ نعم، ألغِ الفاتورة الحالية ونفّذ الطلب الجديد
+                </button>
+                <button type="button"
+                        class="btn-v250-cancel-no"
+                        [disabled]="msg.pendingV250CancelConfirm.resolved || isStreaming"
+                        (click)="rejectPendingV250Cancellation(msg)">
+                  ↩️ لا، أكمل الفاتورة الحالية
+                </button>
+              </div>
+            </div>
+
+            <!-- Vision Agent Escalation Card (Task A.7: Dual-Path Mode Transition) -->
+            <div *ngIf="msg.canEscalateToVisionAgent && !msg.isStreaming" class="vision-escalate-box animate-fade-in my-2 p-3 rounded-lg border border-indigo-200 bg-indigo-50/80 dark:bg-indigo-950/40 dark:border-indigo-800">
+              <div class="flex items-center gap-2 mb-1.5 text-indigo-900 dark:text-indigo-200 font-semibold text-xs">
+                <span>🤖</span>
+                <span>المساعد الذكي يقترح الأتمتة البصرية المباشرة:</span>
+              </div>
+              <p class="text-xs text-slate-600 dark:text-slate-300 mb-2.5 leading-relaxed">
+                طلبك يتطلب فتح شاشة المعاملة وتعبئتها. هل ترغب في قيام وكيل الـ Vision Agent المستقل بفتح الشاشة وحقن البيانات تلقائياً عبر المتصفح؟
+              </p>
+              <button type="button"
+                      class="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 active:scale-95 rounded-md shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                      (click)="runVisionAgent(msg.escalationGoal || msg.relatedUserQuery || '')">
+                <span>🚀</span>
+                <span>تشغيل الأتمتة البصرية المستقلة (Vision Agent)</span>
+              </button>
+            </div>
+
+            <!-- Sources Panel (shown after bot response has sources) -->
+            <div *ngIf="msg.sources && msg.sources.length > 0" class="msg-sources-box">
+              <div class="sources-header">
+                <span class="sources-icon">📍</span>
+                <span class="sources-label">المصادر المستند إليها</span>
+                <span class="sources-count">{{ msg.sources.length }}</span>
+              </div>
+              <div class="sources-chips">
+                <a *ngFor="let src of msg.sources; let i = index" class="source-chip" [href]="buildSourceUrl(src)"
+                  target="_blank" rel="noopener noreferrer" [title]="formatSourceLabel(src, i)">
+                  <span class="chip-index">{{ i + 1 }}</span>
+                  <span class="chip-icon">{{ src.type === 'pdf' ? '📄' : '📹' }}</span>
+                  <span class="chip-label">{{ formatSourceLabel(src, i) }}</span>
+                  <span *ngIf="src.start != null" class="chip-timestamp" dir="ltr">
+                    {{ formatTimestamp(src.start) }}<ng-container *ngIf="src.end != null"> – {{ formatTimestamp(src.end)
+                      }}</ng-container>
+                  </span>
+                  <span class="chip-open">↗</span>
+                </a>
+              </div>
+            </div>
+
+            <!-- In-DOM Action Card: Auto-Fill Suggestion -->
+            <div *ngIf="(hasFormFillData(msg) || !!msg.unsupportedEditReason) && !msg.isStreaming && msg.formFillData as ffd"
+                 class="form-fill-card animate-fade-in"
+                 [class.form-fill-card-edit]="msg.targetFormMode === 'SavedOpen'">
+              
+              <!-- ── Case A: Batch Mode (Multiple Invoices / Documents) ── -->
+              <ng-container *ngIf="ffd.batch_mode && ffd.batch_items && ffd.batch_items.length > 0">
+                <div class="form-fill-header batch-hdr">
+                  <div class="form-fill-title-wrap">
+                    <span class="form-fill-icon">🔄</span>
+                    <span class="form-fill-title">حلقة تنفيذ متتابعة ({{ ffd.batch_items.length }} مستندات)</span>
+                  </div>
+                  <span class="form-fill-badge batch-badge">
+                    {{ msg.batchExecutionActive ? (batchStepper.state().status === 'completed' ? 'اكتملت ✅' : (batchStepper.state().status === 'paused' ? 'متوقف ⏸️' : 'جارٍ التنفيذ ⚡')) : 'جاهز للبدء' }}
+                  </span>
+                </div>
+
+                <!-- Batch Progress Strip (When Active) -->
+                <div *ngIf="msg.batchExecutionActive" class="batch-progress-container">
+                  <div class="batch-progress-bar">
+                    <div class="batch-progress-fill"
+                         [style.width.%]="batchStepper.state().total > 0 ? ((batchStepper.state().currentIndex + (batchStepper.state().status === 'completed' ? 1 : 0)) / batchStepper.state().total * 100) : 0">
+                    </div>
+                  </div>
+                  <div class="batch-progress-meta">
+                    <span class="batch-step-count">
+                      المستند {{ batchStepper.state().currentIndex + 1 }} من {{ batchStepper.state().total }}
+                    </span>
+                    <span class="batch-step-pct">
+                      {{ batchStepper.state().total > 0 ? ((((batchStepper.state().currentIndex + (batchStepper.state().status === 'completed' ? 1 : 0)) / batchStepper.state().total) * 100) | number:'1.0-0') : 0 }}%
+                    </span>
+                  </div>
+                </div>
+
+                <!-- Batch Items List Preview / Status -->
+                <div class="form-fill-body batch-body">
+                  <div *ngFor="let bItem of getBatchItems(msg); let bIdx = index"
+                       class="batch-item-row"
+                       [class.active-item]="msg.batchExecutionActive && batchStepper.state().currentIndex === bIdx && batchStepper.state().status !== 'completed'"
+                       [class.completed-item]="msg.batchExecutionActive && bItem.status === 'completed'"
+                       [class.skipped-item]="msg.batchExecutionActive && bItem.status === 'skipped'">
+                    <div class="batch-item-head">
+                      <span class="batch-item-tag">#{{ bIdx + 1 }}</span>
+                      <span class="batch-item-desc">
+                        {{ bItem.fields['Supplier'] || bItem.fields['المورد'] || bItem.fields['CustomerName'] || bItem.fields['العميل'] || 'مستند رقم ' + (bIdx + 1) }}
+                      </span>
+                      <span class="batch-item-state">
+                        <ng-container *ngIf="!msg.batchExecutionActive">جاهز ⏳</ng-container>
+                        <ng-container *ngIf="msg.batchExecutionActive">
+                          <span *ngIf="bItem.status === 'pending'">في الانتظار ⏳</span>
+                          <span *ngIf="bItem.status === 'filling'" class="filling-blink">جارٍ التعبئة ⚡</span>
+                          <span *ngIf="bItem.status === 'completed'" class="done-green">تم بنجاح ✅</span>
+                          <span *ngIf="bItem.status === 'skipped'" class="skip-muted">تم التخطي ⏭️</span>
+                          <span *ngIf="bItem.status === 'failed'" class="fail-red">فشل ❌</span>
+                        </ng-container>
+                      </span>
+                    </div>
+
+                    <!-- Mini details for line items -->
+                    <div *ngIf="bItem.rows && bItem.rows.length > 0" class="batch-item-rows">
+                      <span *ngFor="let r of bItem.rows" class="batch-sub-row">
+                        📦 {{ r['الصنف'] || r['ItemName'] || r['الوصف'] || 'صنف' }}: {{ r['الكمية'] || r['Quantity'] || 1 }} وحدة
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Batch Stepper Controls Footer -->
+                <div class="form-fill-footer batch-footer">
+                  <!-- Case 1: Not started yet -->
+                  <div *ngIf="!msg.batchExecutionActive" class="batch-start-actions">
+                    <button type="button" class="btn-apply-form-fill" (click)="startBatchExecution(msg, false)">
+                      <span class="btn-icon">🚀</span>
+                      <span>بدء التعبئة المتتابعة (خطوة بخطوة)</span>
+                    </button>
+                    <button type="button" class="btn-apply-form-fill btn-turbo" (click)="startBatchExecution(msg, true)" title="تنفيذ آلي فوري بدون توقف">
+                      <span class="btn-icon">⚡</span>
+                      <span>تنفيذ آلي (Turbo)</span>
+                    </button>
+                  </div>
+
+                  <!-- Case 2: Active Stepper Controls -->
+                  <div *ngIf="msg.batchExecutionActive && batchStepper.state().status !== 'completed' && batchStepper.state().status !== 'cancelled'" class="batch-active-controls">
+                    <!-- If waiting for confirmation (Guided mode) -->
+                    <button *ngIf="batchStepper.state().status === 'waiting_confirm'"
+                            type="button" class="btn-ctrl btn-next"
+                            (click)="batchStepper.confirmAndNext()">
+                      <span>✅ اعتماد والفاتورة التالية</span>
+                    </button>
+
+                    <button *ngIf="batchStepper.state().status === 'waiting_confirm'"
+                            type="button" class="btn-ctrl btn-skip"
+                            (click)="batchStepper.skipCurrent()">
+                      <span>⏭️ تخطي</span>
+                    </button>
+
+                    <!-- Pause / Resume -->
+                    <button *ngIf="batchStepper.state().status === 'filling' || batchStepper.state().status === 'waiting_confirm'"
+                            type="button" class="btn-ctrl btn-pause"
+                            (click)="batchStepper.pause()">
+                      <span>⏸️ إيقاف مؤقت</span>
+                    </button>
+
+                    <button *ngIf="batchStepper.state().status === 'paused'"
+                            type="button" class="btn-ctrl btn-resume"
+                            (click)="batchStepper.resume()">
+                      <span>▶️ استئناف</span>
+                    </button>
+
+                    <!-- Cancel -->
+                    <button type="button" class="btn-ctrl btn-cancel"
+                            (click)="batchStepper.cancel()">
+                      <span>🛑 إلغاء الحلقة</span>
+                    </button>
+                  </div>
+
+                  <!-- Case 3: Completed or Cancelled badge -->
+                  <div *ngIf="msg.batchExecutionActive && (batchStepper.state().status === 'completed' || batchStepper.state().status === 'cancelled')" class="form-fill-applied-badge">
+                    <span *ngIf="batchStepper.state().status === 'completed'">🎉 تم الانتهاء من إدخال الدفعة بالكامل! راجع شاشة الـ ERP.</span>
+                    <span *ngIf="batchStepper.state().status === 'cancelled'">🛑 تم إيقاف حلقة الإدخال بواسطة المستخدم.</span>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- ── Case B: Single Document Mode (Standard / Edit Card) ── -->
+              <ng-container *ngIf="!ffd.batch_mode">
+                <div class="form-fill-header">
+                  <div class="form-fill-title-wrap">
+                    <span class="form-fill-icon">{{ msg.targetFormMode === 'SavedOpen' ? '✏️' : '🪄' }}</span>
+                    <span class="form-fill-title">
+                      {{ msg.targetFormMode === 'SavedOpen'
+                        ? ('تعديل مستند محفوظ' + (msg.targetDocRef ? ' (#' + msg.targetDocRef + ')' : ''))
+                        : 'اقتراح تعبئة الشاشة بالذكاء الاصطناعي' }}
+                    </span>
+                  </div>
+                  <span class="form-fill-badge" [class.form-fill-badge-edit]="msg.targetFormMode === 'SavedOpen' || !!msg.unsupportedEditReason">
+                    {{ msg.unsupportedEditReason ? 'غير مدعوم حالياً' : (msg.targetFormMode === 'SavedOpen' ? 'يتطلب تأكيد التعديل' : 'جاهز للتنفيذ') }}
+                  </span>
+                </div>
+
+                <div class="form-fill-body">
+                  <div *ngIf="msg.formDiff && msg.formDiff.length > 0" class="form-fill-diff-box">
+                    <div class="form-fill-diff-title">🔍 جدول الفرق (قبل ⬅ بعد التعديل):</div>
+                    <table class="form-fill-diff-table">
+                      <thead>
+                        <tr>
+                          <th>الحقل</th>
+                          <th>الحالي</th>
+                          <th>الجديد</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr *ngFor="let d of msg.formDiff">
+                          <td class="diff-label">{{ d.label }}</td>
+                          <td class="diff-before">{{ d.before }}</td>
+                          <td class="diff-after" [class.diff-cleared]="d.kind === 'cleared'">{{ d.after }}</td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <ng-container *ngIf="ffd.missing_required && ffd.missing_required.length > 0">
+                    <div class="form-fill-missing-alert" style="margin-bottom: 8px; padding: 6px 10px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 6px; font-size: 11px; color: #92400e; display: flex; align-items: center; flex-wrap: wrap; gap: 6px;">
+                      <span>⚠️</span>
+                      <strong>حقول مطلوبة ناقصة:</strong>
+                      <span *ngFor="let mf of ffd.missing_required" style="background: #fef3c7; border: 1px solid #fcd34d; padding: 1px 6px; border-radius: 4px; font-weight: 600;">
+                        {{ mf.label || mf.key }}
+                      </span>
+                    </div>
+                  </ng-container>
+
+                  <ng-container *ngIf="ffd.fields">
+                    <div *ngFor="let item of (ffd.fields | keyvalue)" class="form-fill-item">
+                      <span class="field-label">{{ item.key }}</span>
+                      <span class="field-value">{{ item.value }}</span>
+                    </div>
+                  </ng-container>
+
+                  <ng-container *ngIf="ffd.rows && ffd.rows.length > 0">
+                    <div class="form-fill-rows-title">
+                      {{ ffd.screenKey === 'NEW_CUSTOMER' || (ffd.rows[0]['BranchName'] || ffd.rows[0]['ContactPerson']) ? '🏢 الفروع والمواقع' : (ffd.screenKey === 'JOURNAL_ENTRY' ? '📑 أطراف القيد' : '📦 الأصناف / البنود') }} ({{ ffd.rows.length }} سطر):
+                    </div>
+                    <div *ngFor="let row of ffd.rows; let rIdx = index" class="form-fill-row-box">
+                      <span class="row-num">#{{ rIdx + 1 }}</span>
+                      <span *ngFor="let col of (row | keyvalue)" class="row-col">
+                        <strong class="col-k">{{ col.key }}:</strong> {{ col.value }}
+                      </span>
+                    </div>
+                  </ng-container>
+                </div>
+
+                <div *ngIf="msg.requiresDraftResetConfirm && msg.draftResetDecision === 'pending'" class="form-fill-draft-confirm">
+                  <div class="draft-confirm-text">
+                    ⚠️ توجد مسودة غير محفوظة مفتوحة حالياً. هل تريد فتح فاتورة جديدة وتجاهل المسودة؟
+                  </div>
+                  <div class="draft-confirm-actions">
+                    <button type="button" class="btn-confirm-draft-reset"
+                            [disabled]="msg.isApplyingFormFill"
+                            (click)="confirmDraftResetAndApply(msg)">
+                      🗑️ فتح جديدة وتجاهل المسودة
+                    </button>
+                    <button type="button" class="btn-cancel-draft-reset"
+                            [disabled]="msg.isApplyingFormFill"
+                            (click)="cancelDraftReset(msg)">
+                      ✋ الإبقاء على المسودة الحالية
+                    </button>
+                  </div>
+                </div>
+
+                <div *ngIf="msg.draftResetDecision === 'keep_draft'" class="edit-autosave-note" style="margin-top: 6px;">
+                  ✋ تم الإبقاء على المسودة الحالية دون مسح أو فتح مستند جديد.
+                </div>
+
+                <div *ngIf="msg.unsupportedEditReason" class="form-fill-unsupported-edit save-result-msg save-result-err" style="margin-top: 6px;">
+                  {{ msg.unsupportedEditReason }}
+                </div>
+
+                <div *ngIf="msg.formPrepError && msg.formPrepError !== msg.unsupportedEditReason && msg.formPrepError !== msg.v250PartialFailure?.message" class="save-result-msg save-result-err" style="margin-top: 6px;">
+                  {{ msg.formPrepError }}
+                </div>
+
+                <!-- Wave 1 v2.5.0 Entity Resolution Ambiguity / Missing Card -->
+                <div *ngIf="msg.v250ResolutionIssues && msg.v250ResolutionIssues.length > 0 && !msg.formFillApplied && !msg.v250PartialFailure" class="v250-resolution-card">
+                  <div class="v250-res-header">🔍 يلزم حسم البيانات التالية قبل البدء في تعبئة الفاتورة:</div>
+                  <div *ngFor="let issue of msg.v250ResolutionIssues"
+                       class="v250-issue-item"
+                       [class.v250-issue-err]="issue.status !== 'ambiguous'">
+                    <div class="v250-issue-msg">{{ issue.message }}</div>
+
+                    <div *ngIf="issue.fieldCandidates && issue.fieldCandidates.length > 0" class="v250-chips-row">
+                      <button *ngFor="let fc of issue.fieldCandidates"
+                              type="button"
+                              class="v250-option-chip"
+                              [class.v250-chip-selected]="isV250SchemaOptionSelected(msg, issue, fc.key)"
+                              [disabled]="msg.isApplyingFormFill"
+                              (click)="selectV250SchemaFieldOption(msg, issue, fc)">
+                        <span>{{ fc.label }}</span>
+                        <code>({{ fc.key }})</code>
+                      </button>
+                    </div>
+
+                    <div *ngIf="issue.candidates && issue.candidates.length > 0" class="v250-chips-row">
+                      <button *ngFor="let cand of issue.candidates"
+                              type="button"
+                              class="v250-option-chip"
+                              [class.v250-chip-selected]="isV250LookupOptionSelected(msg, issue, cand.id)"
+                              [disabled]="msg.isApplyingFormFill"
+                              (click)="selectV250AmbiguityOption(msg, issue, cand)">
+                        <span>{{ cand.label }}</span>
+                        <span class="v250-chip-id">#{{ cand.id }}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Wave 1 v2.5.0 Partial Mid-Way Failure Card (Save strictly disabled + Restart) -->
+                <div *ngIf="msg.v250PartialFailure" class="v250-partial-failure-card">
+                  <div class="v250-failure-title">⛔ تعذر إكمال تعبئة فاتورة المشتريات</div>
+                  <div class="v250-failure-msg">{{ msg.v250PartialFailure.message }}</div>
+                  <div class="v250-failure-actions">
+                    <button type="button"
+                            class="btn-v250-restart"
+                            (click)="restartV250FormFill(msg)">
+                      🔄 ابدأ من جديد
+                    </button>
+                    <span class="v250-save-locked-hint">🔒 زر الحفظ معطّل لمنع حفظ فاتورة ناقصة.</span>
+                  </div>
+                </div>
+
+                <div class="form-fill-footer">
+                  <label *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && !msg.v250PartialFailure && !msg.isPurchasesV250Target" class="auto-save-toggle" title="إرسال أمر الحفظ تلقائياً إلى نظام الـ ERP بعد اكتمال تعبئة الحقول">
+                    <input type="checkbox" [(ngModel)]="autoSaveAfterFill" name="autoSaveAfterFill">
+                    <span>💾 حفظ تلقائي بعد التعبئة</span>
+                  </label>
+                  <span *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && autoSaveAfterFill && msg.targetFormMode === 'SavedOpen'" class="edit-autosave-note">
+                    ⚠️ الحفظ التلقائي متوقف لهذا المستند المحفوظ
+                  </span>
+                  <button *ngIf="!msg.formFillApplied && !msg.unsupportedEditReason && !msg.v250PartialFailure" type="button" class="btn-apply-form-fill"
+                          [disabled]="msg.isApplyingFormFill || (msg.requiresDraftResetConfirm && msg.draftResetDecision === 'pending') || msg.draftResetDecision === 'keep_draft'"
+                          (click)="applyFormFill(msg)">
+                    <span class="btn-icon" [class.animate-spin]="msg.isApplyingFormFill">{{ msg.isApplyingFormFill ? '⏳' : '✨' }}</span>
+                    <span>{{ msg.isApplyingFormFill ? 'جارٍ ملء الشاشة...' : (msg.targetFormMode === 'SavedOpen' ? 'تطبيق التعديل على الشاشة' : 'تعبئة شاشة الـ ERP الآن') }}</span>
+                  </button>
+                  <button *ngIf="!msg.formFillApplied" type="button" class="btn-vision-fallback"
+                          (click)="runVisionAgent(msg.relatedUserQuery || 'تعبئة هذه الفاتورة')"
+                          title="تشغيل محرك الرؤية البصرية المستقل عبر CDP">
+                    <span class="btn-icon">👁️</span>
+                    <span>تنفيذ بصري (Vision Agent)</span>
+                  </button>
+                </div>
+
+                <!-- Save confirmation card (shown after the fields were filled) -->
+                <div *ngIf="msg.formFillApplied" class="form-fill-save-card">
+                  <div class="form-fill-applied-badge" [class.form-fill-edit-alert]="msg.targetFormMode === 'SavedOpen'">
+                    <span>{{ msg.targetFormMode === 'SavedOpen' ? '⚠️' : '✅' }}</span>
+                    <span>
+                      {{ msg.targetFormMode === 'SavedOpen'
+                        ? 'تم تطبيق التعديل على مستند محفوظ (# ' + (msg.targetDocRef || 'الحالي') + '). راجع جدول الفرق أعلاه وأكّد الحفظ من كارت التعديل هذا.'
+                        : 'تم ملء الحقول في الصفحة. راجع البيانات ثم أكّد الحفظ.' }}
+                    </span>
+                  </div>
+
+                  <!-- Wave 1 v2.5.0 Actual Host State Preview (read from getActiveFormContext + getTableRows) -->
+                  <div *ngIf="msg.usedV250Pipeline && msg.v250Preview" class="v250-actual-preview-card">
+                    <div class="v250-preview-title">👁️ معاينة الحالة الفعلية من شاشة الـ ERP</div>
+                    <div class="v250-preview-headers" *ngIf="msg.v250Preview.actualHeaders.length > 0">
+                      <div *ngFor="let h of msg.v250Preview.actualHeaders"
+                           class="v250-preview-hdr-row"
+                           [class.v250-hdr-mismatch]="!h.matches">
+                        <strong>{{ h.labelAr }}:</strong>
+                        <span>{{ h.plannedLabel }} (#{{ h.plannedId }})</span>
+                        <span *ngIf="h.actualValue != null" class="v250-actual-val">← الفعلي: {{ h.actualValue }}</span>
+                      </div>
+                    </div>
+
+                    <div *ngIf="msg.v250Preview.exchangeRateInfo" class="v250-exchange-info">
+                      <span>💱 سعر الصرف المحسوب من الـ ERP: <strong>{{ msg.v250Preview.exchangeRateInfo.hostComputedRate ?? 'غير مقروء' }}</strong></span>
+                      <span *ngIf="msg.v250Preview.exchangeRateInfo.userSpecifiedRate != null">
+                        | السعر المطلوب: <strong>{{ msg.v250Preview.exchangeRateInfo.userSpecifiedRate }}</strong>
+                      </span>
+                    </div>
+
+                    <div class="v250-preview-rows-summary">
+                      <strong>📦 الصفوف الفعلية بالجدول ({{ msg.v250Preview.actualRows.length }}):</strong>
+                      <div *ngFor="let ar of msg.v250Preview.actualRows; let rIdx = index" class="v250-actual-row-line">
+                        <span>#{{ rIdx + 1 }}</span>
+                        <span>{{ ar['ProductName'] || ar['ProName'] || ('Product #' + (ar['ProductID'] ?? ar['ProID'] ?? '?')) }}</span>
+                        <span>× {{ ar['Qty'] ?? ar['Quntity'] ?? ar['Quantity'] ?? '?' }}</span>
+                        <span *ngIf="(ar['Price'] ?? ar['UnitPrice']) != null">&#64; {{ ar['Price'] ?? ar['UnitPrice'] }}</span>
+                        <span *ngIf="(ar['Total'] ?? ar['NetTotal'] ?? ar['RowTotal']) != null">= {{ ar['Total'] ?? ar['NetTotal'] ?? ar['RowTotal'] }}</span>
+                      </div>
+                      <div *ngIf="msg.v250Preview.actualTotal != null" class="v250-preview-total">
+                        الإجمالي الفعلي: <strong>{{ msg.v250Preview.actualTotal }}</strong>
+                        <span *ngIf="msg.v250Preview.plannedTotal != null"> (المخطط: {{ msg.v250Preview.plannedTotal }})</span>
+                        <span *ngIf="msg.v250Preview.actualOrderTotal != null && msg.v250Preview.actualOrderTotal !== msg.v250Preview.actualTotal">
+                          | TotalOrder (محلي): <strong>{{ msg.v250Preview.actualOrderTotal }}</strong>
+                        </span>
+                      </div>
+                      <div *ngIf="msg.v250Preview.paymentSummary" class="v250-preview-payment">
+                        💵 المدفوع: <strong>{{ msg.v250Preview.paymentSummary.paidAmount }}</strong>
+                        <span *ngIf="msg.v250Preview.paymentSummary.source === 'cash_full'" class="v250-cash-full-note">
+                          (سيُسجَّل مدفوعاً بالكامل: {{ msg.v250Preview.paymentSummary.paidAmount }})
+                        </span>
+                        <span *ngIf="msg.v250Preview.paymentSummary.remainingAmount != null">
+                          | المتبقي: <strong>{{ msg.v250Preview.paymentSummary.remainingAmount }}</strong>
+                        </span>
+                      </div>
+                    </div>
+
+                    <div *ngIf="msg.v250Preview.ignoredItems && msg.v250Preview.ignoredItems.length > 0" class="v250-preview-ignored">
+                      <div class="v250-ignored-title">🚫 حقول تم تجاهلها (خارج نطاق التعديل الآلي في Wave 1):</div>
+                      <div *ngFor="let ig of msg.v250Preview.ignoredItems" class="v250-ignored-line">
+                        <strong>{{ ig.labelAr }}</strong><span *ngIf="ig.value">: «{{ ig.value }}»</span>
+                        <small class="v250-ignored-reason"> — {{ ig.reasonAr }}</small>
+                      </div>
+                      <label class="v250-warning-ack-label v250-ignored-ack-label">
+                        <input type="checkbox"
+                               class="v250-ignored-ack-checkbox"
+                               [ngModel]="msg.v250IgnoredAcknowledged"
+                               (ngModelChange)="onV250IgnoredChanged(msg, $event)"
+                               [ngModelOptions]="{ standalone: true }">
+                        <span>أؤكد مراجعة الحقول المُتجاهَلة وأعلم أنها لن تُحفَظ تلقائياً وسأستكملها يدوياً إن لزم</span>
+                      </label>
+                    </div>
+
+                    <div *ngIf="msg.v250Preview.warnings.length > 0" class="v250-preview-warnings">
+                      <div *ngFor="let w of msg.v250Preview.warnings" class="v250-warning-line">{{ w }}</div>
+                      <label class="v250-warning-ack-label">
+                        <input type="checkbox"
+                               [ngModel]="msg.v250WarningsAcknowledged"
+                               (ngModelChange)="onV250WarningsChanged(msg, $event)"
+                               [ngModelOptions]="{ standalone: true }">
+                        <span>أؤكد مراجعة هذه التنبيهات والقيم الفعلية وأطلب المتابعة للحفظ</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div *ngIf="msg.saveStatus !== 'saved'" class="save-actions">
+                    <button type="button" class="btn-confirm-save"
+                            [class.btn-confirm-save-edit]="msg.targetFormMode === 'SavedOpen'"
+                            [disabled]="isConfirmSaveDisabled(msg)"
+                            (click)="confirmSave(msg, true)">
+                      <span class="btn-icon">💾</span>
+                      <span>{{ msg.saveStatus === 'saving' ? 'جارٍ الحفظ...' : (msg.saveStatus === 'failed' ? 'إعادة محاولة الحفظ' : (msg.targetFormMode === 'SavedOpen' ? 'تأكيد حفظ التعديلات الآن' : 'تأكيد وحفظ الآن')) }}</span>
+                    </button>
+                    <span class="save-hint">أو راجع الحقول في الشاشة واحفظ بنفسك.</span>
+                  </div>
+
+                  <div *ngIf="msg.saveMessage" class="save-result"
+                       [class.save-result-ok]="msg.saveStatus === 'saved'"
+                       [class.save-result-err]="msg.saveStatus === 'failed'">
+                    {{ msg.saveMessage }}
+                  </div>
+                  <div *ngIf="msg.saveStatus === 'saved' && msg.v250SavedDoc" class="v250-saved-details">
+                    <span *ngIf="msg.v250SavedDoc.PONumber != null">رقم الفاتورة (PONumber): <strong>{{ msg.v250SavedDoc.PONumber }}</strong></span>
+                    <span *ngIf="msg.v250SavedDoc.POID != null">معرف المستند (POID): <strong>{{ msg.v250SavedDoc.POID }}</strong></span>
+                    <span *ngIf="msg.v250SavedDoc.mode">الوضع: <code>{{ msg.v250SavedDoc.mode }}</code></span>
+                  </div>
+                </div>
+
+              </ng-container>
+
+            </div>
+
+            <!-- ── Vision Agent Execution Card (Path 2: CDP Grounding Stream) ── -->
+            <div *ngIf="msg.agentExecution" class="vision-agent-card">
+              <div class="agent-card-header">
+                <div class="agent-header-title">
+                  <span class="agent-pulse-dot" [class.active]="msg.agentExecution.isActive" [class.complete]="msg.agentExecution.isComplete" [class.error]="!!msg.agentExecution.error"></span>
+                  <span class="agent-title-text">🤖 الوكيل البصري المستقل (Vision Agent)</span>
+                </div>
+                <div class="agent-badges">
+                  <span class="agent-badge port-badge">CDP :{{ cdpPort }}</span>
+                  <span *ngIf="msg.agentExecution.isActive" class="agent-badge running-badge">⚡ قيد التنفيذ</span>
+                  <span *ngIf="msg.agentExecution.isComplete" class="agent-badge success-badge">✅ اكتملت المهمة</span>
+                  <span *ngIf="msg.agentExecution.error" class="agent-badge error-badge">❌ {{ msg.agentExecution.error.includes('إيقاف') ? 'تم الإيقاف' : 'تعذر الاتصال' }}</span>
+                  <!-- 🛑 Emergency Kill Switch Button -->
+                  <button *ngIf="msg.agentExecution.isActive" type="button" class="btn-agent-stop" (click)="stopVisionAgent(msg)" title="إيقاف تشغيل الوكيل البصري فوراً">
+                    <span>🛑 إيقاف فوري</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="agent-goal-banner">
+                <span class="goal-label">الهدف المطلوب:</span>
+                <span class="goal-text">"{{ msg.agentExecution.goal }}"</span>
+              </div>
+
+              <!-- Live Status Banner -->
+              <div class="agent-status-strip" [class.acting]="msg.agentExecution.isActive" [class.error-strip]="!!msg.agentExecution.error">
+                <span class="status-icon">{{ msg.agentExecution.error ? '⚠️' : (msg.agentExecution.isComplete ? '🎉' : '🔄') }}</span>
+                <span class="status-text">{{ msg.agentExecution.currentStatus }}</span>
+              </div>
+
+              <!-- Stream Steps Log -->
+              <div *ngIf="msg.agentExecution.steps.length > 0" class="agent-steps-timeline">
+                <div *ngFor="let s of msg.agentExecution.steps; let sIdx = index" class="agent-step-item" [class.step-error]="s.status === 'error'" [class.step-acting]="s.status === 'acting'">
+                  <div class="step-meta">
+                    <span class="step-num">خطوة {{ s.step || (sIdx + 1) }}</span>
+                    <span class="step-action-badge">{{ formatAgentAction(s.action) }}</span>
+                    <span *ngIf="s.coordinate" class="step-coord-badge">📍 [{{ s.coordinate[0] }}, {{ s.coordinate[1] }}]</span>
+                  </div>
+                  <div *ngIf="s.thought" class="step-thought">
+                    <span class="thought-icon">💡</span>
+                    <span class="thought-text">{{ s.thought }}</span>
+                  </div>
+                  <div class="step-message">{{ s.message }}</div>
+                </div>
+              </div>
+
+              <!-- Error Guidance & Re-test Button -->
+              <div *ngIf="msg.agentExecution.error" class="agent-troubleshoot-box">
+                <div class="troubleshoot-title">🛠️ أمر تشغيل المتصفح على الجهاز الثاني (عبر الشبكة):</div>
+                <div class="troubleshoot-code">
+                  <code>"C:\Program Files\Google\Chrome\Application\chrome.exe" --remote-debugging-port=9222 --remote-debugging-address=0.0.0.0 --user-data-dir="C:\chrome-dev"</code>
+                </div>
+                <p class="troubleshoot-desc">تأكد من فتح المتصفح بالأمر أعلاه على الجهاز الثاني وفتح شاشة الـ ERP، ثم اكتب IP الجهاز الثاني أدناه واضغط إعادة المحاولة:</p>
+                
+                <div class="agent-host-input-wrap">
+                  <label class="host-label">🌐 عنوان IP الجهاز الثاني (أو 127.0.0.1 إذا كان محلياً):</label>
+                  <div class="host-input-row">
+                    <input type="text" [(ngModel)]="cdpHost" class="host-input" placeholder="مثال: 192.168.1.50">
+                    <button type="button" class="btn-agent-retry" (click)="runVisionAgent(msg.agentExecution.goal, cdpPort, cdpHost)">
+                      <span>إعادة المحاولة عبر المتصفح</span> 🔄
+                    </button>
+                  </div>
+                </div>
+
+                <div class="agent-fallback-action" style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.18); display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap;">
+                  <span style="font-size: 13px; color: #cbd5e1;">💡 أو نفّذ المعاملة فوراً داخل هذه الصفحة بدون الحاجة لـ CDP:</span>
+                  <button type="button" class="btn-direct-in-dom" style="background: linear-gradient(135deg, #10b981, #059669); color: white; border: none; border-radius: 6px; padding: 7px 16px; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 6px;" (click)="executeGoalInCurrentDom(msg.agentExecution.goal)">
+                    <span>⚡ تنفيذ فوري في الصفحة الحالية</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Rating Bar & Feedback Popover (For completed assistant responses) -->
+            <div *ngIf="msg.sender === 'assistant' && !msg.isStreaming && msg.text && idx > 0"
+              class="msg-feedback-container">
+              <!-- Provenance & Latency Badge -->
+              <div *ngIf="msg.provenance" class="provenance-badge-bar">
+                <span *ngIf="msg.filters && msg.filters.scope !== 'all'" class="provenance-badge badge-scope">
+                  {{ msg.filters.scope === 'lessons' ? ('🧩 مقارنة ' + (msg.filters.lessonIds?.length || '') + ' دروس')
+                  : (msg.filters.scope === 'lesson' ? '🎯 نطاق الدرس' : (msg.filters.scope === 'unit' ? '📑 نطاق الوحدة'
+                  : '📚 نطاق الموديول')) }}
+                </span>
+                <span *ngIf="msg.cacheHit" class="provenance-badge badge-cache" [title]="'المصدر: ' + msg.provenance">
+                  ⚡ استجابة فورية ({{ msg.latencyMs || 1 }} ms)
+                </span>
+                <span *ngIf="!msg.cacheHit" class="provenance-badge badge-rag" [title]="'المصدر: ' + msg.provenance">
+                  🧠 توليد ذكي ({{ ((msg.latencyMs || 0) / 1000).toFixed(1) }} s)
+                </span>
+              </div>
+
+              <div class="msg-rating-bar">
+                <span class="rating-label">هل كانت الإجابة مفيدة؟</span>
+
+                <!-- 🔄 Retry / Regenerate Button -->
+                <button type="button" class="action-icon-btn retry-btn" [disabled]="isStreaming"
+                  (click)="retryMessage(idx)" title="إعادة التوليد (يتجاوز الكاش ويولد إجابة جديدة)">
+                  🔄
+                </button>
+
+                <button type="button" class="rate-btn up-btn" [class.active]="msg.rating === 'UP'"
+                  [disabled]="msg.isSubmittingFeedback" (click)="toggleRating(idx, 'UP')"
+                  title="إجابة دقيقة ومفيدة (موافق)">
+                  <span>👍</span>
+                </button>
+
+                <button type="button" class="rate-btn down-btn" [class.active]="msg.rating === 'DOWN'"
+                  [disabled]="msg.isSubmittingFeedback" (click)="toggleRating(idx, 'DOWN')"
+                  title="تحتاج تحسين (غير موافق)">
+                  <span>👎</span>
+                </button>
+
+                <span *ngIf="msg.feedbackSubmitted && !msg.showCommentBox" class="feedback-thanks">
+                  {{ msg.rating === 'UP' ? 'شكراً لتقييمك الإيجابي! 🌟' : 'تم تسجيل ملاحظتك بنجاح! 🎓' }}
+                </span>
+
+                <span *ngIf="msg.isRetrying" class="feedback-loading">⏳ إعادة التوليد...</span>
+                <span *ngIf="msg.isSubmittingFeedback && !msg.isRetrying" class="feedback-loading">جاري
+                  التسجيل...</span>
+              </div>
+
+              <!-- Popover / Collapsible Comment Box for Downvote -->
+              <div *ngIf="msg.showCommentBox" class="feedback-popover">
+                <div class="popover-header">
+                  <span class="popover-title">ما المشكلة في هذه الإجابة؟ <small
+                      class="text-muted">(اختياري)</small></span>
+                  <button type="button" class="popover-close-btn" (click)="closeCommentBox(idx)"
+                    title="إغلاق">✕</button>
+                </div>
+
+                <!-- Quick Reasons Chips -->
+                <div class="popover-reasons">
+                  <button type="button" *ngFor="let reason of feedbackReasons" class="reason-chip"
+                    [class.selected]="msg.selectedReasonTag === reason" (click)="selectReasonChip(idx, reason)">
+                    {{ reason }}
+                  </button>
+                </div>
+
+                <!-- Textarea for optional custom comments -->
+                <textarea class="feedback-textarea" rows="2" placeholder="أخبرنا كيف يمكن تحسين الإجابة أو ما ينقصها..."
+                  [(ngModel)]="msg.feedbackComment"></textarea>
+
+                <!-- Popover Action Buttons -->
+                <div class="popover-actions">
+                  <button type="button" class="feedback-submit-btn" [disabled]="msg.isSubmittingFeedback"
+                    (click)="submitDownvote(idx)">
+                    إرسال التقييم
+                  </button>
+                  <button type="button" class="feedback-skip-btn" [disabled]="msg.isSubmittingFeedback"
+                    (click)="submitDownvote(idx, true)">
+                    تخطي بدون تعليق
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div *ngIf="useUnifiedChat && !isActionMode && messages.length === 1 && !isStreaming" class="starter-prompts">
+          <button *ngFor="let prompt of unifiedStarterPrompts"
+                  type="button"
+                  class="starter-chip"
+                  (click)="applyStarterPrompt(prompt.query)">
+            {{ prompt.label }}
+          </button>
+        </div>
+
+        <div *ngIf="isStreaming" class="bot-typing-indicator">
+          <span></span><span></span><span></span>
+          <small class="text-secondary" style="margin-right: 8px;">{{ activeToolStatus || 'جاري كتابة الإجابة لحظياً...' }}</small>
+        </div>
+      </div>
+
+      <!-- Input Footer -->
+      <div class="copilot-footer">
+        <div class="copilot-mode-badge" [ngClass]="currentModeKey">
+          <span *ngIf="!isActionMode && useUnifiedChat">💬 المساعد الذكي الموحد (دردشة عامة + شروحات + تنقل)</span>
+          <span *ngIf="!isActionMode && !useUnifiedChat">💬 نمط الشرح والإجابة على الأسئلة (Q&A)</span>
+          <span *ngIf="isActionMode">⚡👁️ نمط التنفيذ الهجين الموحد (Action & Vision Agent) — <small>تنفيذ مباشر عبر الـ DOM والرؤية البصرية</small></span>
+        </div>
+        <div class="copilot-footer-controls">
+          <button *ngIf="allowLegacyActionMode"
+                  type="button" class="copilot-mode-toggle-btn unified-agent-btn"
+                  [class.active]="isActionMode"
+                  (click)="toggleActionMode()"
+                  [title]="isActionMode ? 'نمط التنفيذ الهجين (Action & Vision) مفعّل — انقر للعودة لنمط الأسئلة والشرح (Q&A)' : 'تفعيل نمط التنفيذ الهجين الموحد (Action & Vision Mode) لتنفيذ الأوامر وتعبئة الشاشات'">
+            <span class="mode-icon">⚡👁️</span>
+            <span class="mode-tag">{{ isActionMode ? 'Agent ON' : 'تنفيذ ذكي' }}</span>
+          </button>
+          <input type="text" class="copilot-input"
+            [placeholder]="isVoiceListening ? '🎙️ جاري الاستماع... تحدث الآن' : inputPlaceholder"
+            [(ngModel)]="inputQuery" (keyup.enter)="sendMessage()" [disabled]="isStreaming || (!isAiReady && !isActionMode)">
+          <button *ngIf="!isStreaming && isSpeechRecognitionSupported"
+                  type="button"
+                  class="copilot-mic-btn"
+                  [class.listening]="isVoiceListening"
+                  (click)="toggleVoiceInput()"
+                  [title]="isVoiceListening ? 'جاري الاستماع... انقر للإيقاف' : 'تحدث بصوتك (العربية / المصرية)'">
+            {{ isVoiceListening ? '⏹️' : '🎤' }}
+          </button>
+          <button *ngIf="!isStreaming" class="copilot-send-btn" [disabled]="!inputQuery.trim() || (!isAiReady && !isActionMode)"
+            (click)="sendMessage()" title="إرسال">
+            ➔
+          </button>
+          <button *ngIf="isStreaming" type="button" class="copilot-stop-btn"
+            (click)="stopVisionAgent()" title="إيقاف التنفيذ فوراً">
+            🛑
+          </button>
+        </div>
+      </div>
+    </ng-container>
+  </div>
+</ng-container>

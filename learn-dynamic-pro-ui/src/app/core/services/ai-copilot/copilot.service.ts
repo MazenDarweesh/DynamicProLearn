@@ -4,7 +4,6 @@ import { Observable, firstValueFrom, shareReplay, BehaviorSubject, of, catchErro
 import { AuthService } from '../platform-core/auth.service';
 import { CopilotNetworkService } from './copilot-network.config';
 import { CopilotSearchStreamService } from './copilot-search-stream.service';
-import { CopilotAgentStreamService } from './copilot-agent-stream.service';
 import {
   ErpBatchItem,
   NavRequest,
@@ -40,7 +39,6 @@ export class CopilotService {
   private authService = inject(AuthService);
   private networkService = inject(CopilotNetworkService);
   private searchStreamService = inject(CopilotSearchStreamService);
-  private agentStreamService = inject(CopilotAgentStreamService);
 
   private filterData$?: Observable<StudentCopilotFilterData>;
   private filterAuthToken: string | null = null;
@@ -260,38 +258,5 @@ export class CopilotService {
     } catch (err) {
       console.warn('[Copilot Service] Feedback delivery failed silently:', err);
     }
-  }
-
-  /**
-   * Stops any ongoing Vision Agent execution immediately via AbortController.
-   */
-  stopAgentExecution(): void {
-    this.agentStreamService.stopAgentExecution();
-  }
-
-  /**
-   * Executes autonomous vision-agent workflow by streaming SSE events from POST /v1/erp/agent/stream.
-   * Delegates to CopilotAgentStreamService.
-   */
-  streamAgentExecution(
-    goal: string,
-    cdpPort: number = 9222,
-    cdpHost: string = '127.0.0.1',
-    maxSteps: number = 15,
-    sessionId?: string,
-    onStep?: (step: AgentStepItem) => void,
-    onDone?: (lastStep?: AgentStepItem) => void,
-    onError?: (err: any) => void
-  ): Promise<void> {
-    return this.agentStreamService.streamAgentExecution(
-      goal,
-      cdpPort,
-      cdpHost,
-      maxSteps,
-      sessionId,
-      onStep,
-      onDone,
-      onError
-    );
   }
 }
