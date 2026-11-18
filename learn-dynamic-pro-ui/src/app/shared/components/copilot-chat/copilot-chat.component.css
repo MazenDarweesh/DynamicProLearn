@@ -983,6 +983,29 @@
   border: 1px solid #ddd6fe;
 }
 
+.starter-prompts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 12px 10px;
+}
+
+.starter-chip {
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  padding: 5px 11px;
+  font-size: 11.5px;
+  color: #1e293b;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.starter-chip:hover {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
 .copilot-footer-controls {
   display: flex;
   gap: 8px;

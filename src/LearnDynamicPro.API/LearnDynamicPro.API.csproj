@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
     <ProjectReference Include="..\LearnDynamicPro.Domain\LearnDynamicPro.Domain.csproj" />
@@ -23,6 +23,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>890c49d7-afb8-435d-a102-a76b213f0028</UserSecretsId>
   </PropertyGroup>
 
 </Project>

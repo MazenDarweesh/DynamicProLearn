@@ -169,4 +169,27 @@ describe('CopilotChatComponent - Unified General Chat Routing & Nav Action', () 
     expect(mockCopilotService.streamSearch).toHaveBeenCalledTimes(1);
     expect(mockCopilotService.streamGeneralChat).not.toHaveBeenCalled();
   });
+
+  it('defaults to clean unified UI state, updates activeToolStatus, and sends starter prompts', async () => {
+    expect(component.allowLegacyActionMode).toBeFalse();
+    expect(component.isFilterBarCollapsed).toBeTrue();
+    expect(component.unifiedStarterPrompts.length).toBe(3);
+
+    let observedToolStatusDuringStream: string | null = null;
+    mockCopilotService.streamGeneralChat.and.callFake(async (params: GeneralChatStreamParams) => {
+      params.onToolEvent?.({ type: 'tool_start', tool: 'search_lms_lessons' });
+      observedToolStatusDuringStream = component.activeToolStatus;
+      params.onToken?.('تم العثور على الشرح');
+      expect(component.activeToolStatus).toBeNull();
+      params.onDone?.({ thread_id: 'thr-starter', mcp_enabled: false });
+    });
+
+    component.applyStarterPrompt(component.unifiedStarterPrompts[1].query);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(observedToolStatusDuringStream).toContain('شروحات النظام');
+    expect(component.activeToolStatus).toBeNull();
+    expect(mockCopilotService.streamGeneralChat).toHaveBeenCalled();
+  });
 });

@@ -194,9 +194,16 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   @Input({ transform: booleanAttribute }) hideHeader: boolean = false;
   @Input({ transform: booleanAttribute }) inline: boolean = false;
   @Input({ transform: booleanAttribute }) useUnifiedChat: boolean = true;
+  @Input({ transform: booleanAttribute }) allowLegacyActionMode: boolean = false;
 
   mcpEnabled = false;
   activeThreadId?: string;
+  activeToolStatus: string | null = null;
+  readonly unifiedStarterPrompts: ReadonlyArray<{ label: string; query: string }> = [
+    { label: '💡 سؤال عام', query: 'اشرحلي الفرق بين الفاتورة النقدية والآجلة ببساطة' },
+    { label: '📹 شرح من الدروس', query: 'إزاي أعمل فاتورة مشتريات؟' },
+    { label: '🧭 فتح شاشة', query: 'افتحلي شاشة المشتريات' }
+  ];
 
   @HostBinding('class.inline-host') get isInlineHost(): boolean {
     return this.inline;
@@ -259,12 +266,15 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (this.isWarmingUp) {
       return 'جاري تهيئة المحرك، يُرجى الانتظار لحظات...';
     }
-    return 'اسأل أي سؤال تعليمي عن النظام والمحاضرات (أو اضغط ⚡👁️ للتنفيذ الذكي)...';
+    if (this.useUnifiedChat) {
+      return 'اسألني عن أي شيء، شروحات النظام، أو اطلب فتح شاشة...';
+    }
+    return 'اسأل أي سؤال تعليمي عن النظام والمحاضرات...';
   }
 
   // ── Smart Top Filter Bar State ───────────────────────────────────────────
   activeFilter: CopilotFilterState = { scope: 'all' };
-  isFilterBarCollapsed = false;
+  isFilterBarCollapsed = true;
   private lessonSub?: Subscription;
 
   isAiReady = true;
@@ -303,7 +313,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   messages: ChatMessage[] = [
     {
       sender: 'assistant',
-      text: 'مرحباً بك! أنا مساعدك الذكي في منصة DynamicProLearn. اسألني أي سؤال عن دروس وموديولات النظام وسأجيبك مباشرة من واقع الفيديوهات والمحتوى التعليمي! ✨'
+      text: 'مرحباً بك! 👋 أنا مساعدك الذكي الموحد في DynamicPro. يمكنك سؤالي عن أي موضوع عام، شروحات وفيديوهات النظام، أو طلب فتح أي شاشة مصرح لك بها.'
     }
   ];
 
@@ -2384,6 +2394,12 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     this.cdr.markForCheck();
   }
 
+  applyStarterPrompt(query: string): void {
+    if (this.isStreaming) return;
+    this.inputQuery = query;
+    void this.sendMessage();
+  }
+
   private async executeGeneralChatForMessage(
     query: string,
     msg: ChatMessage,
@@ -2415,6 +2431,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         this.scrollToBottom();
       },
       onToken: (token: string) => {
+        this.activeToolStatus = null;
         msg.text += token;
         this.cdr.markForCheck();
         this.scrollToBottom();
@@ -2423,12 +2440,25 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         void this.handleGeneralChatNavAction(action, msg, query);
       },
       onToolEvent: (ev) => {
-        this.telemetry?.log('GENERAL', `Unified chat tool ${ev.type}: ${ev.tool || ev.name || ''}`, ev);
+        const toolName = ev.tool || ev.name || '';
+        if (ev.type === 'tool_start') {
+          this.activeToolStatus = toolName === 'search_lms_lessons'
+            ? '🔍 جاري البحث في شروحات النظام...'
+            : toolName === 'navigate_erp_screen'
+              ? '🧭 جاري تجهيز التنقل للشاشة...'
+              : '⚙️ جاري تنفيذ الأداة...';
+        } else if (ev.type === 'tool_end') {
+          this.activeToolStatus = null;
+        }
+        this.telemetry?.log('GENERAL', `Unified chat tool ${ev.type}: ${toolName}`, ev);
+        this.cdr.markForCheck();
       },
       onDone: (meta) => {
+        this.activeToolStatus = null;
         this.finalizeStreamMeta(msg, meta);
       },
       onError: (err) => {
+        this.activeToolStatus = null;
         msg.text += msg.isRetrying
           ? '\n\n⚠️ تعذر إعادة المحاولة.'
           : '\n\n⚠️ تعذر إكمال الإجابة. يرجى التأكد من تشغيل محرك الذكاء الاصطناعي.';

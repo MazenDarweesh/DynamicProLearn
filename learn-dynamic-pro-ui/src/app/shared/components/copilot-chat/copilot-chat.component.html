@@ -740,20 +740,31 @@
           </div>
         </div>
 
+        <div *ngIf="useUnifiedChat && !isActionMode && messages.length === 1 && !isStreaming" class="starter-prompts">
+          <button *ngFor="let prompt of unifiedStarterPrompts"
+                  type="button"
+                  class="starter-chip"
+                  (click)="applyStarterPrompt(prompt.query)">
+            {{ prompt.label }}
+          </button>
+        </div>
+
         <div *ngIf="isStreaming" class="bot-typing-indicator">
           <span></span><span></span><span></span>
-          <small class="text-secondary" style="margin-right: 8px;">جاري استخراج الإجابة وتدفقها لحظياً...</small>
+          <small class="text-secondary" style="margin-right: 8px;">{{ activeToolStatus || 'جاري كتابة الإجابة لحظياً...' }}</small>
         </div>
       </div>
 
       <!-- Input Footer -->
       <div class="copilot-footer">
         <div class="copilot-mode-badge" [ngClass]="currentModeKey">
-          <span *ngIf="!isActionMode">💬 نمط الشرح والإجابة على الأسئلة (Q&A) <small>— فعّل ⚡👁️ للتنفيذ الذكي الموحد</small></span>
+          <span *ngIf="!isActionMode && useUnifiedChat">💬 المساعد الذكي الموحد (دردشة عامة + شروحات + تنقل)</span>
+          <span *ngIf="!isActionMode && !useUnifiedChat">💬 نمط الشرح والإجابة على الأسئلة (Q&A)</span>
           <span *ngIf="isActionMode">⚡👁️ نمط التنفيذ الهجين الموحد (Action & Vision Agent) — <small>تنفيذ مباشر عبر الـ DOM والرؤية البصرية</small></span>
         </div>
         <div class="copilot-footer-controls">
-          <button type="button" class="copilot-mode-toggle-btn unified-agent-btn"
+          <button *ngIf="allowLegacyActionMode"
+                  type="button" class="copilot-mode-toggle-btn unified-agent-btn"
                   [class.active]="isActionMode"
                   (click)="toggleActionMode()"
                   [title]="isActionMode ? 'نمط التنفيذ الهجين (Action & Vision) مفعّل — انقر للعودة لنمط الأسئلة والشرح (Q&A)' : 'تفعيل نمط التنفيذ الهجين الموحد (Action & Vision Mode) لتنفيذ الأوامر وتعبئة الشاشات'">
