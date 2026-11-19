@@ -148,6 +148,16 @@ describe('CopilotChatComponent - Unified General Chat Routing & Nav Action', () 
     expect(capturedRetryParams?.query).toBe('افتح شاشة المبيعات');
     expect(capturedRetryParams?.threadId).toBe('thr-43');
     expect(capturedRetryParams?.history?.length).toBe(6);
+
+    // Retrying an EARLIER message appends a fresh question + regenerated answer at the bottom
+    component.messages[2].relatedUserQuery = 'سؤال 1';
+    const msgCountBeforeEarlierRetry = component.messages.length;
+    await component.retryMessage(2); // earlier assistant message ('إجابة 1', whose user query is 'سؤال 1')
+    expect(component.messages.length).toBe(msgCountBeforeEarlierRetry + 2);
+    expect(component.messages[component.messages.length - 2].sender).toBe('user');
+    expect(component.messages[component.messages.length - 2].text).toBe('سؤال 1');
+    expect(component.messages[component.messages.length - 1].sender).toBe('assistant');
+    expect(component.messages[component.messages.length - 1].text).toBe('إجابة معادة');
   });
 
   it('falls back to classic streamSearch when useUnifiedChat is false or manual lesson filter is set', async () => {

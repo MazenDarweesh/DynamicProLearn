@@ -503,11 +503,18 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
   }
 
   scrollToBottom(): void {
-    try {
-      if (this.scrollContainer) {
-        this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
-      }
-    } catch {}
+    const doScroll = () => {
+      try {
+        if (this.scrollContainer?.nativeElement) {
+          this.scrollContainer.nativeElement.scrollTop = this.scrollContainer.nativeElement.scrollHeight;
+        }
+      } catch { }
+    };
+    doScroll();
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(() => doScroll());
+    }
+    setTimeout(doScroll, 30);
   }
 
   deduplicateSources(sources: CopilotSource[]): CopilotSource[] {
@@ -575,6 +582,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     });
 
     this.inputQuery = '';
+    this.cdr.markForCheck();
+    this.scrollToBottom();
     await this.streamQuery(query, skipCache);
   }
 
@@ -715,6 +724,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       msg.askOptions = action.candidates;
       msg.relatedUserQuery = query;
       this.cdr.markForCheck();
+      this.scrollToBottom();
       return;
     }
     const target = action.pageId ?? action.page_id ?? action.screenKey ?? action.screen_key ?? action.screen;
@@ -814,7 +824,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (this.speechRecognition) {
       try {
         this.speechRecognition.stop();
-      } catch {}
+      } catch { }
       this.speechRecognition = undefined;
     }
     this.cdr.markForCheck();
@@ -878,6 +888,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         }
         this.telemetry?.log('GENERAL', `Unified chat tool ${ev.type}: ${toolName}`, ev);
         this.cdr.markForCheck();
+        this.scrollToBottom();
       },
       onDone: (meta) => {
         this.activeToolStatus = null;
@@ -914,6 +925,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
         lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
       };
       this.messages.push(assistantMsg);
+      this.cdr.markForCheck();
+      this.scrollToBottom();
       await this.executeGeneralChatForMessage(query, assistantMsg);
       return;
     }
@@ -929,6 +942,8 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
       lessonId: this.activeFilter.lessonId,
       lessonIds: this.activeFilter.lessonIds ? [...this.activeFilter.lessonIds] : undefined
     });
+    this.cdr.markForCheck();
+    this.scrollToBottom();
 
     await this.copilotService.streamSearch(
       query,
@@ -970,51 +985,92 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     if (!userQuery) return;
 
     const retryThreadId = msg.threadId || this.activeThreadId;
-    msg.text = '';
-    msg.sources = [];
-    msg.rating = null;
-    msg.feedbackSubmitted = false;
-    msg.feedbackComment = '';
-    msg.showCommentBox = false;
-    msg.selectedReasonTag = undefined;
-    msg.isStreaming = true;
-    msg.isRetrying = true;
-    msg.threadId = retryThreadId;
+    const isLastMessage = msgIndex === this.messages.length - 1;
+    const historyCutoff = msgIndex > 0 && this.messages[msgIndex - 1]?.sender === 'user' ? msgIndex - 1 : msgIndex;
+
+    let targetMsg: ChatMessage;
+    if (isLastMessage) {
+      msg.text = '';
+      msg.sources = [];
+      msg.askOptions = undefined;
+      msg.provenance = undefined;
+      msg.latencyMs = undefined;
+      msg.rating = null;
+      msg.feedbackSubmitted = false;
+      msg.feedbackComment = '';
+      msg.showCommentBox = false;
+      msg.selectedReasonTag = undefined;
+      msg.isStreaming = true;
+      msg.isRetrying = true;
+      msg.threadId = retryThreadId;
+      targetMsg = msg;
+    } else {
+      // Retrying an earlier turn appends a fresh question + answer pair at the bottom and focuses it
+      this.messages.push({
+        sender: 'user',
+        text: userQuery
+      });
+      targetMsg = {
+        sender: 'assistant',
+        text: '',
+        sources: [],
+        isStreaming: true,
+        isRetrying: true,
+        usedUnifiedChat: msg.usedUnifiedChat,
+        threadId: retryThreadId,
+        relatedUserQuery: userQuery,
+        filters: msg.filters ? { ...msg.filters } : { ...this.activeFilter },
+        lessonId: msg.lessonId,
+        lessonIds: msg.lessonIds ? [...msg.lessonIds] : undefined
+      };
+      this.messages.push(targetMsg);
+    }
 
     const traceId = 'trc_' + Math.random().toString(36).substring(2, 8);
     this.telemetry?.setTraceId(traceId);
     this.isStreaming = true;
+    this.cdr.markForCheck();
+    this.scrollToBottom();
 
     const useUnifiedForRetry =
       this.useUnifiedChat &&
       !this.isActionMode &&
       !this.isVisionAgentMode &&
-      (msg.usedUnifiedChat === true ||
-        (msg.usedUnifiedChat !== false && this.shouldUseUnifiedChat(msg.filters || this.activeFilter)));
+      (targetMsg.usedUnifiedChat === true ||
+        (targetMsg.usedUnifiedChat !== false && this.shouldUseUnifiedChat(targetMsg.filters || this.activeFilter)));
 
     if (useUnifiedForRetry) {
-      msg.usedUnifiedChat = true;
-      const historyCutoff = msgIndex > 0 && this.messages[msgIndex - 1]?.sender === 'user' ? msgIndex - 1 : msgIndex;
-      await this.executeGeneralChatForMessage(userQuery, msg, traceId, historyCutoff);
+      targetMsg.usedUnifiedChat = true;
+      await this.executeGeneralChatForMessage(userQuery, targetMsg, traceId, historyCutoff);
       return;
     }
 
     await this.copilotService.streamSearch(
       userQuery,
-      msg.lessonId,
-      (sources) => { msg.sources = this.deduplicateSources(sources); },
-      (token) => { msg.text += token; },
+      targetMsg.lessonId,
+      (sources) => {
+        targetMsg.sources = this.deduplicateSources(sources);
+        this.cdr.markForCheck();
+        this.scrollToBottom();
+      },
+      (token) => {
+        targetMsg.text += token;
+        this.cdr.markForCheck();
+        this.scrollToBottom();
+      },
       (meta?: any) => {
-        this.finalizeStreamMeta(msg, meta);
+        this.finalizeStreamMeta(targetMsg, meta);
       },
       () => {
-        msg.text += '\n\n⚠️ تعذر إعادة المحاولة.';
-        msg.isStreaming = false;
-        msg.isRetrying = false;
+        targetMsg.text += '\n\n⚠️ تعذر إعادة المحاولة.';
+        targetMsg.isStreaming = false;
+        targetMsg.isRetrying = false;
         this.isStreaming = false;
+        this.cdr.markForCheck();
+        this.scrollToBottom();
       },
       true,
-      msg.filters || this.activeFilter
+      targetMsg.filters || this.activeFilter
     );
   }
 
