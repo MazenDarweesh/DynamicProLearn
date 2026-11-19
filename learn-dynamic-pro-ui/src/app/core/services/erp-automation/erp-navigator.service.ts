@@ -42,8 +42,8 @@ export class ErpNavigatorService {
     simulateNavClick(el);
   }
 
-  async navigateToScreen(screenKey: string): Promise<boolean> {
-    if (this.isScreenActive(screenKey)) {
+  async navigateToScreen(screenKey: string, force = false): Promise<boolean> {
+    if (!force && this.isScreenActive(screenKey)) {
       return true;
     }
 

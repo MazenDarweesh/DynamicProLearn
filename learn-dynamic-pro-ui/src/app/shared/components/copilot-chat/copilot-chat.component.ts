@@ -595,7 +595,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
 
   async selectAskOption(option: NavScored, originalQuery?: string) {
     console.info('%c[Copilot Navigation] User clicked ambiguity chip:', 'color:#3b82f6;font-weight:bold', option);
-    await this.navigator.navigateToScreen(option.id);
+    await this.navigator.navigateToScreen(option.id, true);
     this.syncErpKey(option.id);
     if (!originalQuery || this.isPureNavigationQuery(originalQuery)) {
       const targetTitle = this.getScreenDisplayName(option.id, option.label);
@@ -734,7 +734,7 @@ export class CopilotChatComponent implements OnInit, OnChanges, OnDestroy {
     const targetStr = String(target).trim();
     let navigated = false;
     if (typeof this.navigator?.navigateToScreen === 'function') {
-      navigated = await this.navigator.navigateToScreen(targetStr);
+      navigated = await this.navigator.navigateToScreen(targetStr, true);
     } else if (this.bridge?.isAvailable && typeof this.bridge.navigateToScreen === 'function') {
       navigated = await this.bridge.navigateToScreen(target);
     }

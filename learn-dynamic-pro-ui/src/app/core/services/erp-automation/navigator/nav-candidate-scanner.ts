@@ -23,9 +23,14 @@ export function checkIsScreenActive(screenKey: string, bridge: ErpBridgeService)
   const normalizedKey = normalizeArabicText(screenKey);
   const upperKey = screenKey.toUpperCase().trim();
 
-  // 0. Official ERP bridge (authoritative positive match)
+  // 0. Official ERP bridge (authoritative positive match, ignoring synthetic 'screen-<id>' placeholders after refresh)
   const active = bridge.getActiveScreen();
-  if (active) {
+  const isSyntheticPlaceholder =
+    !!active &&
+    active.pageId != null &&
+    !active.title &&
+    (!active.pageName || active.pageName.trim().toLowerCase() === `screen-${active.pageId}`);
+  if (active && !isSyntheticPlaceholder) {
     if (/^\d+$/.test(screenKey.trim()) && active.pageId != null) {
       return String(active.pageId) === screenKey.trim();
     }

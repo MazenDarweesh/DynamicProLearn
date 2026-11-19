@@ -132,7 +132,7 @@ describe('CopilotChatComponent - Unified General Chat Routing & Nav Action', () 
     expect(capturedSendParams?.erpKey).toBe('Purchases');
     expect(capturedSendParams?.activeScreenKey).toBe('PURCHASE_INVOICE');
     expect(capturedSendParams?.threadId).toBe('thr-42');
-    expect(mockNavigator.navigateToScreen).toHaveBeenCalledWith('244');
+    expect(mockNavigator.navigateToScreen).toHaveBeenCalledWith('244', true);
     expect(component.activeThreadId).toBe('thr-43');
 
     // Retry re-uses streamGeneralChat with preserved threadId and history prior to the retried turn

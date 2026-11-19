@@ -353,5 +353,36 @@ describe('ErpNavigatorService & getFormMode()', () => {
     expect(ok).toBeTrue();
     expect(navigator.getFormMode(true)).toBe('EmptyNew');
   });
+
+  it('ignores synthetic screen-<id> placeholders without title and invokes DynamicERP.navigateToScreen when force=true', async () => {
+    const navigateSpy = jasmine.createSpy('navigateToScreen').and.resolveTo(true);
+    let activeScreen: any = { pageId: 244, pageName: 'screen-244', screenKey: 'screen-244' };
+
+    (window as any).DynamicERP = {
+      getActiveScreen: () => activeScreen,
+      navigateToScreen: navigateSpy,
+      triggerAddNew: async () => true,
+      submitActiveForm: async () => true,
+      getFormState: () => ({ isOpen: false, mode: 'closed' }),
+    };
+
+    // Synthetic screen-244 without real title MUST NOT be treated as active
+    expect(navigator.isScreenActive('244')).toBeFalse();
+
+    navigateSpy.and.callFake(async () => {
+      activeScreen = { pageId: 244, pageName: 'Sales Types', title: 'فواتير المبيعات', screenKey: 'Sales Types' };
+      mountDomFormMarker();
+      return true;
+    });
+    const navOk = await navigator.navigateToScreen('244');
+    expect(navOk).toBeTrue();
+    expect(navigateSpy).toHaveBeenCalledWith(244);
+
+    // Explicit force=true MUST still call DynamicERP.navigateToScreen even when 244 reports as active
+    navigateSpy.calls.reset();
+    const forcedOk = await navigator.navigateToScreen('244', true);
+    expect(forcedOk).toBeTrue();
+    expect(navigateSpy).toHaveBeenCalledWith(244);
+  });
 });
 
