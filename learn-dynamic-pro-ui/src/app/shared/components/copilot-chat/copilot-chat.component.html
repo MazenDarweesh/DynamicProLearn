@@ -241,10 +241,8 @@
           <span *ngIf="isActionMode">⚡👁️ نمط التنفيذ الهجين الموحد</span>
         </div>
         <div class="copilot-footer-controls">
-          <button *ngIf="allowLegacyActionMode"
-                  type="button" class="copilot-mode-toggle-btn unified-agent-btn"
-                  [class.active]="isActionMode"
-                  (click)="toggleActionMode()">
+          <button *ngIf="allowLegacyActionMode" type="button" class="copilot-mode-toggle-btn unified-agent-btn"
+            [class.active]="isActionMode" (click)="toggleActionMode()">
             <span class="mode-icon">⚡👁️</span>
             <span class="mode-tag">{{ isActionMode ? 'Agent ON' : 'تنفيذ ذكي' }}</span>
           </button>
