@@ -133,6 +133,39 @@ export function checkIsScreenActive(screenKey: string, bridge: ErpBridgeService)
   return false;
 }
 
+const PRIMARY_MODULES_NORM = new Set<string>([
+  normalizeArabicText('الموردين و المشتريات'),
+  normalizeArabicText('العملاء  و المبيعات'),
+  normalizeArabicText('العملاء و المبيعات'),
+  normalizeArabicText('الحسابات العامه'),
+  normalizeArabicText('المخازن'),
+  normalizeArabicText('المرتبات'),
+  normalizeArabicText('التصنيع'),
+]);
+
+const SECONDARY_MODULES_NORM = new Set<string>([
+  normalizeArabicText('الفاتورة الالكترونية'),
+  normalizeArabicText('الادارة العليا'),
+  normalizeArabicText('تقارير تكملية'),
+  normalizeArabicText('الاعدادات'),
+  normalizeArabicText('اعدادات'),
+  normalizeArabicText('اعدادات المرتبات'),
+  normalizeArabicText('الانظمة المتخصصة'),
+  normalizeArabicText('المراجعة والترحيل'),
+  normalizeArabicText('التسويق وادارة العملاء'),
+  normalizeArabicText('حركات المعدات'),
+  normalizeArabicText('الصيانة'),
+  normalizeArabicText('AdminPanel'),
+]);
+
+function getCatalogModulePriority(mod: string): number {
+  const modNorm = normalizeArabicText(mod || '');
+  if (!modNorm) return 1;
+  if (SECONDARY_MODULES_NORM.has(modNorm)) return 0;
+  if (PRIMARY_MODULES_NORM.has(modNorm)) return 2;
+  return 1;
+}
+
 export function scanDomAndBridgeCandidates(
   bridge: ErpBridgeService,
   candidateElementsMap: Map<string, HTMLElement>
@@ -146,6 +179,38 @@ export function scanDomAndBridgeCandidates(
     return candidates;
   }
 
+  // 1. Authoritative bridge catalog FIRST: preserves numeric pageId + official module,
+  // prioritizing primary operational modules over duplicate titles in secondary modules.
+  const catalog = bridge.listScreens();
+  const hasCatalog = !!(catalog && catalog.length > 0);
+  if (hasCatalog) {
+    const prioritizedCatalog = [...catalog].sort((a: any, b: any) => {
+      const modA = String(a.moduleName ?? a.module ?? '').trim();
+      const modB = String(b.moduleName ?? b.module ?? '').trim();
+      return getCatalogModulePriority(modB) - getCatalogModulePriority(modA);
+    });
+
+    for (const s of prioritizedCatalog as any[]) {
+      const pid = s.page_id ?? s.pageId;
+      const key = String(s.screen_key ?? s.pageName ?? (pid ? String(pid) : 'screen')).trim();
+      const titleAr = String(s.name_ar ?? s.title ?? s.pageName ?? key).trim();
+      const mod = String(s.moduleName ?? s.module ?? '').trim();
+      const idStr = String(pid || key);
+      const labelStr = titleAr || key;
+      const normLabel = normalizeArabicText(labelStr);
+      if (seenIds.has(idStr) || seenLabels.has(normLabel)) continue;
+      seenIds.add(idStr);
+      seenLabels.add(normLabel);
+      candidates.push({
+        id: idStr,
+        label: labelStr,
+        path: mod ? [mod] : [],
+      });
+    }
+  }
+
+  // 2. Visible DOM candidates SECOND (open header tabs skipped when bridge catalog exists,
+  // so tabs like Sales Types never shadow catalog numeric IDs such as 244).
   const badContainers = '.dp-set, #dpSettingsLabel, lms-ai-copilot, app-copilot-chat';
   const domSelectors = [
     '.dp-pgs__mod',
@@ -168,6 +233,7 @@ export function scanDomAndBridgeCandidates(
   let index = 1;
   for (const el of elements) {
     if (el.closest(badContainers)) continue;
+    if (hasCatalog && el.classList.contains('dp-hdr__tab')) continue;
     if (!isNavElementVisible(el)) continue;
 
     const labelSpan = el.querySelector<HTMLElement>(
@@ -179,9 +245,6 @@ export function scanDomAndBridgeCandidates(
     if (!rawText || rawText.length < 2 || rawText.length > 150) continue;
 
     const normalized = normalizeArabicText(rawText);
-    if (seenLabels.has(normalized)) continue;
-    seenLabels.add(normalized);
-
     const candidateId =
       el.getAttribute('data-screen') ||
       el.getAttribute('data-page-name') ||
@@ -190,8 +253,11 @@ export function scanDomAndBridgeCandidates(
       el.getAttribute('pageName') ||
       (el.id && !el.id.startsWith('candidate_') ? el.id : undefined) ||
       `candidate_${index++}`;
-    candidateElementsMap.set(candidateId, el);
+
+    if (seenLabels.has(normalized) || seenIds.has(candidateId)) continue;
+    seenLabels.add(normalized);
     seenIds.add(candidateId);
+    candidateElementsMap.set(candidateId, el);
 
     const path: string[] = [];
     if (el.classList.contains('dp-pgs__tile')) {
@@ -216,27 +282,6 @@ export function scanDomAndBridgeCandidates(
       label: rawText,
       path,
     });
-  }
-
-  const catalog = bridge.listScreens();
-  if (catalog && catalog.length > 0) {
-    for (const s of catalog as any[]) {
-      const pid = s.page_id ?? s.pageId;
-      const key = String(s.screen_key ?? s.pageName ?? (pid ? String(pid) : 'screen')).trim();
-      const titleAr = String(s.name_ar ?? s.title ?? s.pageName ?? key).trim();
-      const mod = String(s.moduleName ?? s.module ?? '').trim();
-      const idStr = String(pid || key);
-      const labelStr = titleAr || key;
-      const normLabel = normalizeArabicText(labelStr);
-      if (seenIds.has(idStr) || seenLabels.has(normLabel)) continue;
-      seenIds.add(idStr);
-      seenLabels.add(normLabel);
-      candidates.push({
-        id: idStr,
-        label: labelStr,
-        path: mod ? [mod] : [],
-      });
-    }
   }
 
   return candidates;

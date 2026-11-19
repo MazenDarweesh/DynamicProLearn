@@ -384,5 +384,29 @@ describe('ErpNavigatorService & getFormMode()', () => {
     expect(forcedOk).toBeTrue();
     expect(navigateSpy).toHaveBeenCalledWith(244);
   });
+
+  it('prioritizes bridge.listScreens() primary modules over secondary duplicates and ignores open dp-hdr__tab shadowing', () => {
+    const openTab = document.createElement('button');
+    openTab.className = 'dp-hdr__tab test-erp-form-node';
+    openTab.setAttribute('data-screen', 'Sales Types');
+    openTab.textContent = 'فواتير المبيعات';
+    document.body.appendChild(openTab);
+
+    (window as any).DynamicERP = {
+      listScreens: () => [
+        { pageId: 6701, pageName: 'Sales Types', title: 'فواتير المبيعات', moduleName: 'الفاتورة الالكترونية' },
+        { pageId: 244, pageName: 'Sales Types', title: 'فواتير المبيعات', moduleName: 'العملاء  و المبيعات' },
+        { pageId: 289, pageName: 'Purchases', title: 'فواتير المشتريات', moduleName: 'الموردين و المشتريات' },
+      ],
+    };
+
+    const scanned = navigator.scanVisibleCandidates();
+    const salesMatches = scanned.filter((c) => c.label === 'فواتير المبيعات');
+    expect(salesMatches.length).toBe(1);
+    expect(salesMatches[0].id).toBe('244');
+    expect(salesMatches[0].path).toEqual(['العملاء  و المبيعات']);
+    expect(scanned.some((c) => c.id === 'Sales Types' || c.id === '6701')).toBeFalse();
+    expect(scanned.some((c) => (c.path || []).includes('التبويبات المفتوحة'))).toBeFalse();
+  });
 });
 
